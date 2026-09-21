@@ -26,6 +26,8 @@
     <!-- Highlight.js pour la coloration syntaxique du code -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Mermaid.js pour les diagrammes d'architecture -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <!-- Vis-network pour le graphe interactif -->
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
@@ -179,12 +181,17 @@
         // Configuration du parser Markdown
         marked.setOptions({
             highlight: function(code, lang) {
-                const language = highlight.getLanguage(lang) ? lang : 'plaintext';
+                if (lang === 'mermaid') {
+                    return `<div class="mermaid">${code}</div>`;
+                }
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
                 return hljs.highlight(code, { language }).value;
             },
             breaks: true,
             gfm: true
         });
+
+        mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 
         // Chargement initial
         document.addEventListener('DOMContentLoaded', () => {
@@ -316,6 +323,13 @@
             });
 
             document.getElementById('vue-lecture').innerHTML = marked.parse(texteAvecLiens);
+            
+            // Exécute Mermaid pour les blocs de diagrammes
+            try {
+                mermaid.run({ querySelector: '.mermaid' });
+            } catch (e) {
+                console.error("Erreur rendu Mermaid:", e);
+            }
         }
 
         // Résolution de clic sur un lien [[Page]]
