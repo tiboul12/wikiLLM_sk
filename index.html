@@ -307,8 +307,13 @@
         // Basculer vers un autre projet
         async function changerProjet(nomProjet, noteASelectionner = null) {
             projetActuel = nomProjet;
+            fichierActuel = null; // Réinitialise impérativement la note pour forcer le rafraîchissement
             document.getElementById('select-projet').value = nomProjet;
+            mettreAJourUrl(nomProjet, noteASelectionner);
             await chargerProjetCourant(noteASelectionner);
+            if (vueActuelle === 'graphe') {
+                initialiserGraphe();
+            }
         }
 
         // Charger le projet sélectionné
@@ -339,10 +344,27 @@
 
                 if (cheminASelectionner) {
                     const noteTrouvee = trouverNote(cheminASelectionner);
-                    if (noteTrouvee) ouvrirFichier(noteTrouvee.chemin, false);
-                } else if (!fichierActuel && tousLesFichiers.length > 0) {
+                    if (noteTrouvee) {
+                        ouvrirFichier(noteTrouvee.chemin, false);
+                    } else if (tousLesFichiers.length > 0) {
+                        const indexFile = tousLesFichiers.find(f => f.nom === 'index.md' || f.chemin === 'index.md');
+                        ouvrirFichier(indexFile ? indexFile.chemin : tousLesFichiers[0].chemin, true);
+                    }
+                } else if (tousLesFichiers.length > 0) {
+                    // Ouvre automatiquement la page d'accueil index.md ou la première note du nouveau projet
                     const indexFile = tousLesFichiers.find(f => f.nom === 'index.md' || f.chemin === 'index.md');
-                    ouvrirFichier(indexFile ? indexFile.chemin : tousLesFichiers[0].chemin, false);
+                    ouvrirFichier(indexFile ? indexFile.chemin : tousLesFichiers[0].chemin, true);
+                } else {
+                    fichierActuel = null;
+                    document.getElementById('actions-document').classList.add('hidden');
+                    document.getElementById('titre-actuel').innerText = "Aucune note";
+                    document.getElementById('dossier-badge').innerText = "wiki";
+                    document.getElementById('vue-lecture').innerHTML = `
+                        <div class="text-center py-20 text-slate-500">
+                            <p class="text-4xl mb-3">📁</p>
+                            <p class="text-lg text-slate-300 font-semibold">Ce projet ne contient pas encore de notes.</p>
+                            <p class="text-xs text-slate-500 mt-2">Cliquez sur <span class="text-blue-400 font-medium">+ Page</span> dans la barre latérale pour créer la première note.</p>
+                        </div>`;
                 }
             } catch (err) {
                 console.error("Erreur chargement fichiers:", err);
