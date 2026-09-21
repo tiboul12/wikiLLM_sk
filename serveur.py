@@ -192,22 +192,28 @@ class WikiHandler(SimpleHTTPRequestHandler):
         return {"nodes": noeuds, "edges": liens}
 
 def demarrer(port=PORT):
-    server_address = ("", port)
+    # Écoute sur 0.0.0.0 (toutes les interfaces réseau) pour accès local et distant
+    server_address = ("0.0.0.0", port)
     httpd = HTTPServer(server_address, WikiHandler)
-    url = f"http://localhost:{port}"
-    print("=" * 60)
-    print(f" 🚀 WikiLLM Viewer & Éditeur démarré avec succès !")
-    print(f" 🌐 Ouvrez votre navigateur sur : {url}")
-    print(f" 📁 Répertoire des notes : {WIKI_DIR}")
-    print("=" * 60)
-    print(" (Appuyez sur Ctrl+C pour arrêter le serveur)")
-
-    # Essaye d'ouvrir le navigateur si exécuté avec interface
+    
+    # Détection de l'IP locale si possible
+    import socket
+    ip_locale = "10.0.0.120"
     try:
-        if "--open" in sys.argv:
-            webbrowser.open(url)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip_locale = s.getsockname()[0]
+        s.close()
     except Exception:
         pass
+
+    print("=" * 60)
+    print(f" 🚀 WikiLLM Viewer & Éditeur démarré avec succès !")
+    print(f" 🌐 Accès local   : http://localhost:{port}")
+    print(f" 🌐 Accès réseau  : http://{ip_locale}:{port}")
+    print(f" 📁 Répertoire    : {WIKI_DIR}")
+    print("=" * 60)
+    print(" (Appuyez sur Ctrl+C pour arrêter le serveur)")
 
     try:
         httpd.serve_forever()
