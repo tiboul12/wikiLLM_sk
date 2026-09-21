@@ -55,14 +55,14 @@
     <!-- Barre latérale / Explorateur -->
     <aside class="w-80 bg-darkpanel border-r border-slate-700/60 flex flex-col flex-shrink-0 select-none">
         <div class="p-4 border-b border-slate-700/60 flex items-center justify-between">
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center space-x-2 overflow-hidden">
                 <span class="text-2xl">🧠</span>
-                <div>
-                    <h1 class="font-bold text-lg tracking-tight text-white leading-tight">Wiki Projet</h1>
-                    <p class="text-xs text-slate-400">Documentation vivante</p>
+                <div class="truncate">
+                    <h1 id="nom-projet-titre" class="font-bold text-base tracking-tight text-white leading-tight truncate">Wiki Projet</h1>
+                    <p id="chemin-projet-sub" class="text-[11px] text-slate-400 truncate">Chargement...</p>
                 </div>
             </div>
-            <button onclick="ouvrirModalCreation()" title="Créer une nouvelle page" class="p-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium text-xs flex items-center space-x-1 shadow transition">
+            <button onclick="ouvrirModalCreation()" title="Créer une nouvelle page" class="p-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium text-xs flex items-center space-x-1 shadow transition flex-shrink-0">
                 <span>+ Page</span>
             </button>
         </div>
@@ -195,6 +195,7 @@
 
         // Chargement initial
         document.addEventListener('DOMContentLoaded', () => {
+            chargerInfoProjet();
             chargerFichiers();
             
             // Raccourci clavier Ctrl+S pour sauvegarder
@@ -207,6 +208,19 @@
                 }
             });
         });
+
+        // Charger les informations du projet
+        async function chargerInfoProjet() {
+            try {
+                const res = await fetch('/api/projet_info');
+                const info = await res.json();
+                document.getElementById('nom-projet-titre').innerText = info.nom_projet;
+                document.getElementById('chemin-projet-sub').innerText = info.repertoire;
+                document.title = `Wiki - ${info.nom_projet}`;
+            } catch (e) {
+                console.error("Erreur projet info:", e);
+            }
+        }
 
         // Récupérer la liste des fichiers depuis l'API
         async function chargerFichiers(cheminASelectionner = null) {
@@ -314,12 +328,18 @@
             }
         }
 
-        // Rendu du Markdown avec transformation des liens wiki [[Lien]]
+        // Rendu du Markdown avec transformation des liens wiki [[Lien]] ou [[Lien|Texte affiché]]
         function rendreMarkdown(texte) {
-            // Remplace [[NomPage]] par des liens cliquables
-            const texteAvecLiens = texte.replace(/\[\[(.*?)\]\]/g, (match, cible) => {
-                const nomClean = cible.trim();
-                return `<a class="wiki-link" onclick="resoudreLienWiki('${nomClean}')">${nomClean}</a>`;
+            // Remplace [[NomPage|Texte]] ou [[NomPage]] par des liens cliquables
+            const texteAvecLiens = texte.replace(/\[\[(.*?)\]\]/g, (match, contenu) => {
+                let cible = contenu.trim();
+                let texteAffiche = cible;
+                if (cible.includes('|')) {
+                    const parts = cible.split('|');
+                    cible = parts[0].trim();
+                    texteAffiche = parts[1].trim();
+                }
+                return `<a class="wiki-link" onclick="resoudreLienWiki('${cible}')">${texteAffiche}</a>`;
             });
 
             document.getElementById('vue-lecture').innerHTML = marked.parse(texteAvecLiens);
@@ -334,6 +354,7 @@
 
         // Résolution de clic sur un lien [[Page]]
         function resoudreLienWiki(cible) {
+            if (cible.includes('|')) cible = cible.split('|')[0].trim();
             const cibleClean = cible.endsWith('.md') ? cible : cible + '.md';
             const trouve = tousLesFichiers.find(f => f.nom === cibleClean || f.chemin === cibleClean || f.chemin.endsWith('/' + cibleClean));
             if (trouve) {
