@@ -49,6 +49,13 @@
         .wiki-link:hover { background: rgba(59, 130, 246, 0.35); color: #ffffff; }
         #network-graph { height: 100%; width: 100%; }
 
+        /* Styles des Scrollbars modernes et discrets */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0b1120; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        * { scrollbar-width: thin; scrollbar-color: #334155 #0b1120; }
+
         /* Styles des Hooks pour l'Agent */
         .hookable { position: relative; transition: background-color 0.2s; padding-right: 2rem; }
         .hookable:hover .hook-btn { opacity: 1; pointer-events: auto; }
@@ -172,11 +179,13 @@
 
         <!-- Conteneur des Vues -->
         <div class="flex-1 overflow-hidden relative">
-            <!-- Vue 1: Lecture Markdown -->
-            <div id="vue-lecture" class="h-full overflow-y-auto p-8 max-w-4xl mx-auto prose">
-                <div class="text-center py-20 text-slate-500">
-                    <p class="text-4xl mb-3">📄</p>
-                    <p class="text-lg">Choisissez une note dans la barre latérale pour la consulter.</p>
+            <!-- Vue 1: Lecture Markdown (Scrollbar tout à droite de l'écran) -->
+            <div id="vue-lecture" class="w-full h-full overflow-y-auto p-8">
+                <div id="vue-lecture-contenu" class="max-w-4xl mx-auto prose">
+                    <div class="text-center py-20 text-slate-500">
+                        <p class="text-4xl mb-3">📄</p>
+                        <p class="text-lg">Choisissez une note dans la barre latérale pour la consulter.</p>
+                    </div>
                 </div>
             </div>
 
@@ -407,12 +416,15 @@
                     document.getElementById('actions-document').classList.add('hidden');
                     document.getElementById('titre-actuel').innerText = "Aucune note";
                     document.getElementById('dossier-badge').innerText = "wiki";
-                    document.getElementById('vue-lecture').innerHTML = `
-                        <div class="text-center py-20 text-slate-500">
-                            <p class="text-4xl mb-3">📁</p>
-                            <p class="text-lg text-slate-300 font-semibold">Ce projet ne contient pas encore de notes.</p>
-                            <p class="text-xs text-slate-500 mt-2">Cliquez sur <span class="text-blue-400 font-medium">+ Page</span> dans la barre latérale pour créer la première note.</p>
-                        </div>`;
+                    const contenuEl = document.getElementById('vue-lecture-contenu');
+                    if (contenuEl) {
+                        contenuEl.innerHTML = `
+                            <div class="text-center py-20 text-slate-500">
+                                <p class="text-4xl mb-3">📁</p>
+                                <p class="text-lg text-slate-300 font-semibold">Ce projet ne contient pas encore de notes.</p>
+                                <p class="text-xs text-slate-500 mt-2">Cliquez sur <span class="text-blue-400 font-medium">+ Page</span> dans la barre latérale pour créer la première note.</p>
+                            </div>`;
+                    }
                 }
             } catch (err) {
                 console.error("Erreur chargement fichiers:", err);
@@ -502,7 +514,15 @@
 
         // Rendu Markdown et résolution des liens Wiki [[Cible|Texte]] ou [[Cible]]
         function rendreMarkdown(texte) {
-            const texteAvecLiens = texte.replace(/\[\[(.*?)\]\]/g, (match, contenu) => {
+            // Protège les blocs de code et le code inline contre la substitution des liens
+            const placeholders = [];
+            let texteProtege = texte.replace(/(```[\s\S]*?```|`[^`\n]+`)/g, (match) => {
+                placeholders.push(match);
+                return `___CODE_BLOCK_${placeholders.length - 1}___`;
+            });
+
+            // Remplace les liens [[cible|texte]] ou [[cible]] dans le texte normal
+            texteProtege = texteProtege.replace(/\[\[(.*?)\]\]/g, (match, contenu) => {
                 let cible = contenu.trim();
                 let texteAffiche = cible;
                 if (cible.includes('|')) {
@@ -513,17 +533,24 @@
                 return `<a class="wiki-link" onclick="clicSurLienWiki('${cible.replace(/'/g, "\\'")}')">${texteAffiche}</a>`;
             });
 
-            const container = document.getElementById('vue-lecture');
-            container.innerHTML = marked.parse(texteAvecLiens);
-            
-            try {
-                mermaid.run({ querySelector: '.mermaid' });
-            } catch (e) {
-                console.error("Mermaid error:", e);
-            }
+            // Restaure le code protégé
+            texteProtege = texteProtege.replace(/___CODE_BLOCK_(\d+)___/g, (match, idx) => {
+                return placeholders[parseInt(idx, 10)];
+            });
 
-            // Injection des Hooks interactifs sur chaque élément
-            injecterHooks(container);
+            const container = document.getElementById('vue-lecture-contenu');
+            if (container) {
+                container.innerHTML = marked.parse(texteProtege);
+                
+                try {
+                    mermaid.run({ querySelector: '.mermaid' });
+                } catch (e) {
+                    console.error("Mermaid error:", e);
+                }
+
+                // Injection des Hooks interactifs sur chaque élément
+                injecterHooks(container);
+            }
         }
 
         // Injection des Hooks pour l'Agent sur chaque titre, bloc de code, tableau, citation
@@ -755,7 +782,8 @@
                     fichierActuel = null;
                     document.getElementById('actions-document').classList.add('hidden');
                     document.getElementById('titre-actuel').innerText = "Sélectionnez une note";
-                    document.getElementById('vue-lecture').innerHTML = `<div class="text-center py-20 text-slate-500"><p class="text-4xl mb-3">📄</p><p class="text-lg">Note supprimée.</p></div>`;
+                    const contEl = document.getElementById('vue-lecture-contenu');
+                    if (contEl) contEl.innerHTML = `<div class="text-center py-20 text-slate-500"><p class="text-4xl mb-3">📄</p><p class="text-lg">Note supprimée.</p></div>`;
                     chargerFichiers();
                 }
             } catch (err) {
