@@ -2,7 +2,7 @@
 id: PLAN-v4
 type: plan
 titre: "Plan de développement : wikik v4, l'atelier de définition du besoin"
-statut: proposé
+statut: validé
 version: v4
 date: 2026-10-18
 sources: [CADRAGE-v4, BACKLOG]
@@ -166,4 +166,5 @@ Définition de fini cochée, backlog mis à jour, tag `v4.0`.
 | Phase | Statut | Date |
 |---|---|---|
 | Cadrage B1-B7 | ✅ | 2026-10-18 |
-| 0 à 10 | ⏳ | |
+| 0 Mise en place | ✅ framework versionné, ADR-0009 à 0011 | 2026-10-18 |
+| 1 à 10 | ⏳ | |
