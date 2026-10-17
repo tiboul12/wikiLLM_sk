@@ -758,7 +758,8 @@ fn tronquer(t: &str, n: usize) -> String {
     }
 }
 
-/// Crée ou complète l'artefact d'un élément gardé (ou saisi) ; renvoie son identifiant.
+/// Crée ou complète l'artefact d'un élément gardé (ou saisi) ; renvoie son identifiant. Un besoin suit
+/// le gabarit `templates/besoin.md` (qui, besoin, pourquoi), une exigence `templates/exigence.md`.
 fn materialiser(
     index: &Index,
     fiche: &Fiche,
@@ -939,6 +940,16 @@ fn materialiser(
         "besoin" => {
             let srcs = sources(&[]);
             let version = config.atelier.version.clone();
+            let qui = Some(texte(d, "qui")).filter(|q| !q.is_empty()).or_else(|| {
+                documents(index)
+                    .ok()?
+                    .into_iter()
+                    .find(|x| x.genre == "pitch")
+                    .map(|p| texte(&p.fm, "cible"))
+            });
+            let pourquoi = Some(texte(d, "pourquoi"))
+                .filter(|p| !p.is_empty())
+                .unwrap_or_else(|| format!("voir les sources : {}.", srcs.join(", ")));
             artefacts::creer_avec(racine, config, "besoin", |id| {
                 let fm = objet(json!({
                     "titre": texte(d, "titre"), "statut": "proposé", "version": version, "technique": fiche.id,
@@ -947,8 +958,9 @@ fn materialiser(
                 (
                     fm,
                     format!(
-                        "# {id} : {}\n\n**Besoin** : {}\n",
+                        "# {id} : {}\n\n**Qui** : {}\n**Besoin** : {}\n**Pourquoi** : {pourquoi}\n",
                         texte(d, "titre"),
+                        qui.unwrap_or_else(|| "à préciser".into()),
                         texte(d, "description")
                     ),
                 )
@@ -1242,7 +1254,9 @@ fn ecrire_genere(index: &Index, relatif: &str, fm: Map<String, Value>, corps: &s
     Ok(())
 }
 
-/// Assemble l'artefact de synthèse d'une sous-étape ; renvoie les fichiers écrits.
+/// Assemble l'artefact de synthèse d'une sous-étape ; renvoie les fichiers écrits. BDR et cahier des
+/// charges suivent les rubriques des gabarits de `templates/` ; les irritants du BDR 1 citent les
+/// verbatims du free writing.
 pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>> {
     let fiche = fiches::fiche(etape)?;
     let se = fiche.sous_etape(sous)?;
@@ -1397,20 +1411,57 @@ pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>
                 .find(|d| d.genre == "pitch")
                 .context("le pitch n'est pas écrit")?;
             let t = |k: &str| texte(&pitch.fm, k);
+            let ou = |v: String| {
+                if v.is_empty() {
+                    "À préciser.".to_string()
+                } else {
+                    v
+                }
+            };
+            // Les preuves des irritants : les verbatims du free writing, mot pour mot (P.A.R.S.).
+            let preuves: Vec<&Doc> = de("unite")
+                .into_iter()
+                .filter(|u| {
+                    ["Problème", "Frustration", "Émotion", "Besoin", "Contrainte"]
+                        .contains(&texte(&u.fm, "qualification").as_str())
+                })
+                .collect();
+            let mut situation = ou(t("probleme"));
+            if !preuves.is_empty() {
+                situation.push_str("\n\nCe qu'en dit le free writing :\n\n");
+                for u in &preuves {
+                    let verbatim = std::fs::read_to_string(index.racine.join(&u.chemin))
+                        .ok()
+                        .map(|c| crate::projet::separer_frontmatter(&c).1.trim().to_string())
+                        .unwrap_or_else(|| u.titre.clone());
+                    situation.push_str(&format!(
+                        "- « {verbatim} » ([[{}]], {})\n",
+                        u.id,
+                        texte(&u.fm, "qualification").to_lowercase()
+                    ));
+                }
+            }
+            let contexte = [t("description"), t("valeur")]
+                .into_iter()
+                .filter(|x| !x.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n\n");
             let bdr1 = format!(
-                "# BDR {version}, partie 1 : analyse du besoin\n\n> Produite par l'atelier à partir du pitch ([[PITCH]]).\n\n## Contexte\n\n{}\n\n## Personnes concernées\n\n{}\n\n## Situation actuelle et irritants\n\n{}\n\n## Contraintes\n\n{}\n\n## Hors sujet\n\n{}\n",
-                t("valeur"),
-                t("cible"),
-                t("probleme"),
-                t("contraintes"),
-                t("hors_sujet")
+                "# BDR {version}, partie 1 : analyse du besoin\n\n> Produite par l'atelier à partir du pitch ([[PITCH]]) et du free writing. Aucune solution technique.\n\n## Contexte\n\n{}\n\n## Personnes concernées\n\n{}\n\n## Situation actuelle et irritants (avec preuves)\n\n{}\n\n## Contraintes\n\n{}\n\n## Hors sujet\n\n{}\n",
+                ou(contexte),
+                ou(t("cible")),
+                situation.trim_end(),
+                ou(t("contraintes")),
+                ou(t("hors_sujet"))
             );
+            let mut sources1 = vec!["PITCH".to_string()];
+            sources1.extend(preuves.iter().map(|u| u.id.clone()));
             let r1 = format!("{majeure}/bdr-1-analyse.md");
             ecrire_genere(
                 index,
                 &r1,
                 objet(
-                    json!({ "id": format!("BDR-{version}-1"), "type": "bdr-analyse", "titre": format!("Analyse du besoin {version} : {titre_projet}"), "statut": "proposé", "version": version, "sources": ["PITCH"] }),
+                    json!({ "id": format!("BDR-{version}-1"), "type": "bdr-analyse", "titre": format!("Analyse du besoin {version} : {titre_projet}"), "statut": "proposé", "version": version, "sources": sources1 }),
                 ),
                 &bdr1,
             )?;
@@ -1441,39 +1492,86 @@ pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>
                     texte(&b.fm, "priorite")
                 ));
             }
+            let liste = |bs: Vec<&&Doc>| -> String {
+                if bs.is_empty() {
+                    "- (aucun)\n".into()
+                } else {
+                    bs.iter()
+                        .map(|b| format!("- [[{}]] {}\n", b.id, b.titre))
+                        .collect()
+                }
+            };
+            let inclus = liste(besoins.iter().filter(|b| rang(b) < 3).collect());
+            let mut exclu = liste(besoins.iter().filter(|b| rang(b) == 3).collect());
+            if !t("hors_sujet").is_empty() {
+                exclu.push_str(&format!("- Hors sujet du pitch : {}\n", t("hors_sujet")));
+            }
+            let storyboards = de("storyboard");
+            let cas: String = if storyboards.is_empty() {
+                "À préciser : aucun storyboard retenu.\n".into()
+            } else {
+                storyboards
+                    .iter()
+                    .map(|s| {
+                        format!(
+                            "- [[{}]] {} : {}\n",
+                            s.id,
+                            s.titre,
+                            texte(&s.fm, "scenario")
+                        )
+                    })
+                    .collect()
+            };
             let bdr2 = format!(
-                "# BDR {version}, partie 2 : définition du besoin\n\n## Objectifs mesurables\n\n{}\n\n## Besoins\n\n{table}\n## Décision de lancement\n\nÀ prendre par le responsable produit.\n",
-                t("criteres_succes")
+                "# BDR {version}, partie 2 : définition du besoin\n\n> Produite par l'atelier. Chaque besoin a son fichier dans `docs/projet/besoins/`.\n\n## Objectifs mesurables\n\n{}\n\n## Périmètre (inclus / exclu)\n\n**Inclus** (must, should, could) :\n\n{inclus}\n**Exclu** :\n\n{exclu}\n## Cas d'usage prioritaires\n\n{cas}\n## Besoins\n\n{table}\n## Critères de succès de la version\n\nChaque besoin `must` est couvert par au moins une exigence validée, et chaque exigence par un test.\n\n## Hypothèses et risques\n\nContraintes à vérifier : {}\n\n## Décision de lancement\n\nÀ prendre par le responsable produit.\n",
+                ou(t("criteres_succes")),
+                ou(t("contraintes"))
             );
+            let mut sources2 = vec![format!("BDR-{version}-1")];
+            sources2.extend(storyboards.iter().map(|s| s.id.clone()));
             let r2 = format!("{majeure}/bdr-2-definition.md");
             ecrire_genere(
                 index,
                 &r2,
                 objet(
-                    json!({ "id": format!("BDR-{version}-2"), "type": "bdr-definition", "titre": format!("Définition du besoin {version} : {titre_projet}"), "statut": "proposé", "version": version, "sources": [format!("BDR-{version}-1")] }),
+                    json!({ "id": format!("BDR-{version}-2"), "type": "bdr-definition", "titre": format!("Définition du besoin {version} : {titre_projet}"), "statut": "proposé", "version": version, "sources": sources2 }),
                 ),
                 &bdr2,
             )?;
             ecrits.extend([r1, r2]);
         }
         Some("cahier-des-charges") => {
-            let mut table =
-                String::from("| ID | Exigence | Priorité | Besoins |\n|---|---|---|---|\n");
-            for e in de("exigence")
-                .into_iter()
-                .filter(|e| texte(&e.fm, "technique") == "exigences")
-            {
-                table.push_str(&format!(
+            let ligne = |e: &Doc| {
+                format!(
                     "| [[{}]] | {} | {} | {} |\n",
                     e.id,
                     e.titre,
                     texte(&e.fm, "priorite"),
                     chaines(e.fm.get("besoins")).join(", ")
-                ));
-            }
+                )
+            };
+            let entete = "| ID | Exigence | Priorité | Besoins |\n|---|---|---|---|\n";
+            let fonctionnelles: String = de("exigence")
+                .into_iter()
+                .filter(|e| texte(&e.fm, "technique") == "exigences")
+                .map(ligne)
+                .collect();
+            let non_fonctionnelles: String = de("exigence-nf").into_iter().map(ligne).collect();
+            let section = |lignes: &str, vide: &str| {
+                if lignes.is_empty() {
+                    format!("{vide}\n")
+                } else {
+                    format!("{entete}{lignes}")
+                }
+            };
             let r = format!("{majeure}/cahier-des-charges.md");
             let corps = format!(
-                "# Cahier des charges {version} : {titre_projet}\n\n> Produit par l'atelier. Chaque exigence a son fichier dans `docs/projet/exigences/`.\n\n## Exigences fonctionnelles\n\n{table}"
+                "# Cahier des charges {version} : {titre_projet}\n\n> Produit par l'atelier. Chaque exigence a son fichier dans `docs/projet/exigences/`.\n\n## Exigences fonctionnelles\n\n{}\n## Exigences non fonctionnelles\n\n{}\n## Exigences modifiées ou abandonnées par rapport à la version précédente\n\nAucune : première version produite par l'atelier.\n",
+                section(&fonctionnelles, "Aucune pour l'instant."),
+                section(
+                    &non_fonctionnelles,
+                    "Aucune pour l'instant : à ajouter avec `wikik nouveau exigence-nf`."
+                )
             );
             ecrire_genere(
                 index,

@@ -165,9 +165,38 @@ fn parcours_complet_factice() {
         );
     }
     let bdr2 = lire(d.path(), "docs/projet/majeures/v1/bdr-2-definition.md");
+    let table = &bdr2[bdr2.find("## Besoins").unwrap()..];
     assert!(
-        bdr2.find("B-001").unwrap() < bdr2.find("B-002").unwrap(),
+        table.find("B-001").unwrap() < table.find("B-002").unwrap(),
         "must avant should"
+    );
+    // Rubriques des gabarits (templates/) : besoin, BDR 1 et 2, cahier des charges.
+    assert!(
+        b1.contains("**Qui** : Randonneur occasionnel")
+            && b1.contains("**Pourquoi** : « j'ai peur"),
+        "{b1}"
+    );
+    let bdr1 = lire(d.path(), "docs/projet/majeures/v1/bdr-1-analyse.md");
+    assert!(
+        bdr1.contains("(avec preuves)")
+            && bdr1.contains(
+                "« j'ai peur de me perdre quand le brouillard tombe » ([[US-001]], émotion)"
+            ),
+        "{bdr1}"
+    );
+    for rubrique in [
+        "## Périmètre (inclus / exclu)",
+        "## Cas d'usage prioritaires",
+        "[[SB-001]]",
+        "## Critères de succès de la version",
+        "## Hypothèses et risques",
+    ] {
+        assert!(bdr2.contains(rubrique), "{rubrique} absent : {bdr2}");
+    }
+    let cdc = lire(d.path(), "docs/projet/majeures/v1/cahier-des-charges.md");
+    assert!(
+        cdc.contains("[[EF-001]]") && cdc.contains("## Exigences non fonctionnelles"),
+        "{cdc}"
     );
     let r = wikik_core::check::verifier(&i).unwrap();
     let graves: Vec<_> = r
