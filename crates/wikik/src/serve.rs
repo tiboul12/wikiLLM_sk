@@ -59,7 +59,8 @@ pub(crate) fn verifier_adresse(adresse: &str, autoriser_reseau: bool) -> Result<
     Ok(ip)
 }
 
-/// Routes de lecture du wiki, partagées avec l'atelier (SPEC-20).
+/// Routes de lecture du wiki, partagées avec l'atelier (SPEC-20), et `/api/mode` qui dit au front
+/// lequel des deux serveurs le sert.
 pub(crate) fn routes_wiki() -> Router<Partage> {
     Router::new()
         .route("/api/projet", get(api_projet))
@@ -68,6 +69,12 @@ pub(crate) fn routes_wiki() -> Router<Partage> {
         .route("/api/graphe", get(api_graphe))
         .route("/api/cherche", get(api_cherche))
         .route("/api/check", get(api_check))
+        .route("/api/mode", get(api_mode))
+}
+
+/// Le front demande s'il est servi par l'atelier (SPEC-20) sans provoquer d'erreur ailleurs.
+async fn api_mode(State(e): State<Partage>) -> Response {
+    Json(serde_json::json!({ "atelier": e.atelier.is_some() })).into_response()
 }
 
 /// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C.

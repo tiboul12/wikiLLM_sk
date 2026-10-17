@@ -357,3 +357,4 @@ blockquote.question { font-size: 1.1rem; color: var(--texte); border-left-color:
 .horizons h5 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); }
 .horizons .champs { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 820px) { .horizons { grid-template-columns: minmax(0, 1fr); } }
+a.action.atelier { color: var(--violet); opacity: 0.85; font-size: 13px; }

@@ -1,7 +1,7 @@
 <script lang="ts">
   // Mise en page : en-tête (projet, recherche), barre latérale (zones Produit, Projet, Atelier), page courante.
   // Servie par `wikik atelier`, l'application ajoute les écrans de l'atelier (SPEC-20).
-  // @relu 2026-10-17 69847974
+  // @relu 2026-10-17 a957d8e5
   import { api } from "./lib/api";
   import { routeur, aller, url } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
@@ -15,6 +15,7 @@
   import Tableau from "./pages/atelier/Tableau.svelte";
   import Etape from "./pages/atelier/Etape.svelte";
   import Clarification from "./pages/atelier/Clarification.svelte";
+  import Clarifier from "./pages/atelier/Clarifier.svelte";
   import { atelier, detecter } from "./lib/atelier.svelte";
 
   let projet = $state<Projet | null>(null);
@@ -27,6 +28,7 @@
     .then((p) => {
       projet = p;
       projetCourant.nom = p.nom;
+      atelier.url = p.url_atelier;
       document.title = `${p.nom} · wikik`;
     })
     .catch((e) => (erreur = String(e)));
@@ -89,6 +91,8 @@
       {#key routeur.route.centre}<PageGraphe centre={routeur.route.centre} />{/key}
     {:else if atelier.actif && atelier.etat && routeur.route.page === "etape"}
       {#key routeur.route.etape}<Etape etape={routeur.route.etape} />{/key}
+    {:else if atelier.actif && atelier.etat && routeur.route.page === "clarifier"}
+      {#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}
     {:else if atelier.actif && atelier.etat && routeur.route.page === "clarification"}
       {#key routeur.route.id}<Clarification id={routeur.route.id} />{/key}
     {:else if atelier.actif && atelier.etat && (routeur.route.page === "atelier" || routeur.route.page === "accueil")}

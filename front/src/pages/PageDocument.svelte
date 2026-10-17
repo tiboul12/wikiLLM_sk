@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Page document (EF-042) : frontmatter, corps Markdown, liens résolus, ce qui le cite.
+  // Page document (EF-042) : frontmatter, corps Markdown, liens résolus, ce qui le cite ; liens vers
+  // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21).
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -7,6 +8,7 @@
   import { url } from "../lib/routeur.svelte";
   import type { PageDocument } from "../types/PageDocument";
   import Lien from "../composants/Lien.svelte";
+  import { lienAtelier } from "../lib/atelier.svelte";
 
   let { id, ancre }: { id: string; ancre: string } = $props();
   let page = $state<PageDocument | null>(null);
@@ -47,6 +49,11 @@
 
   const valeurs = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : v === undefined || v === null ? [] : [String(v)]);
   const estId = (v: string) => !v.includes("/") && !v.endsWith(".md");
+  // Besoins, exigences et artefacts de l'atelier s'ouvrent dans l'atelier et peuvent y être clarifiés (SPEC-21 R1).
+  const RAPPELABLES = ["besoin", "exigence", "exigence-nf"];
+  const technique = $derived(typeof page?.frontmatter.technique === "string" ? page.frontmatter.technique : null);
+  const ouvrir = $derived(page && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(technique && technique !== "clarification" ? `/atelier/${technique}` : page.genre === "clarification" ? `/clarification/${page.id}` : "/atelier") : null);
+  const clarifier = $derived(page && page.genre !== "clarification" && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(`/clarifier/${encodeURIComponent(page.id)}`) : null);
 </script>
 
 {#if erreur}
@@ -66,6 +73,8 @@
       {/each}
     {/each}
     <a class="action" href={url.graphe(page.id)} title="Graphe local">◎ graphe</a>
+    {#if ouvrir}<a class="action atelier" href={ouvrir}>ouvrir dans l'atelier</a>{/if}
+    {#if clarifier}<a class="action atelier" href={clarifier}>clarifier</a>{/if}
   </div>
   <article class="prose document" bind:this={corps}>{@html html}</article>
   {#if page.cite_par.length || page.references.length}

@@ -6,7 +6,7 @@
 // @req EF-041, EF-042, EF-080
 
 import { statique } from "./statique";
-/** Page à afficher, déduite de l'URL ; les trois dernières n'existent que dans l'atelier. */
+/** Page à afficher, déduite de l'URL ; les quatre dernières n'existent que dans l'atelier. */
 export type Route =
   | { page: "accueil" }
   | { page: "fichier"; chemin: string; ancre: string }
@@ -15,7 +15,8 @@ export type Route =
   | { page: "graphe"; centre: string }
   | { page: "atelier" }
   | { page: "etape"; etape: string }
-  | { page: "clarification"; id: string };
+  | { page: "clarification"; id: string }
+  | { page: "clarifier"; sujet: string };
 
 /** Chemin, paramètres et ancre de l'URL courante, quel que soit le mode. */
 function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
@@ -41,6 +42,7 @@ function analyser(): Route {
   if (chemin === "/atelier") return { page: "atelier" };
   if (chemin.startsWith("/atelier/")) return { page: "etape", etape: chemin.slice("/atelier/".length) };
   if (chemin.startsWith("/clarification/")) return { page: "clarification", id: chemin.slice("/clarification/".length) };
+  if (chemin.startsWith("/clarifier/")) return { page: "clarifier", sujet: chemin.slice("/clarifier/".length) };
   return { page: "accueil" };
 }
 
@@ -86,7 +88,8 @@ const prefixe = statique ? "#" : "";
 
 /**
  * Fabrique des URL stables : `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
- * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>`, `/clarification/<id>`.
+ * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>`, `/clarification/<id>`,
+ * `/clarifier/<id>`.
  */
 export const url = {
   accueil: () => `${prefixe}/`,
@@ -98,4 +101,5 @@ export const url = {
   atelier: () => `${prefixe}/atelier`,
   etape: (etape: string) => `${prefixe}/atelier/${encodeURIComponent(etape)}`,
   clarification: (id: string) => `${prefixe}/clarification/${encodeURIComponent(id)}`,
+  clarifier: (sujet: string) => `${prefixe}/clarifier/${encodeURIComponent(sujet)}`,
 };

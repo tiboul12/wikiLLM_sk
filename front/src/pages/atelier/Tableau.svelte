@@ -1,5 +1,6 @@
 <script lang="ts">
   // Tableau de bord de l'atelier : étapes du parcours (état, mode), consommation, clarifications ouvertes.
+  // @relu 2026-10-17 2fe7f36a
   import { atelier, PHASES, ETATS } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
 
@@ -41,6 +42,10 @@
     </li>
   {/each}
 </ol>
+
+<p class="discret">
+  Le wiki du projet est servi ici aussi (barre de gauche, recherche, graphe). Pour le consulter à part : <a href={etat.url_wiki}>{etat.url_wiki}</a> (<code>wikik serve</code>).
+</p>
 
 <h2>Clarifications</h2>
 {#if etat.clarifications.length}

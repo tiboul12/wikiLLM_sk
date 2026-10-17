@@ -1,16 +1,21 @@
 // État de l'atelier (SPEC-20) : chargé depuis `/api/atelier/etat`, rechargé après chaque écriture.
 //
-// Le mode atelier est détecté par cette route : servie par `wikik atelier`, absente de `wikik serve`
-// et du site exporté.
+// Le mode atelier est donné par `/api/mode` (servie par `wikik serve` et `wikik atelier`, absente du
+// site exporté).
 //
 // @req EF-100, EF-101
 import type { EtatAtelier } from "../types/EtatAtelier";
 import type { ArtefactResume } from "../types/ArtefactResume";
 import { statique } from "./statique";
 
-/** État partagé : `etat` est null hors atelier ; `occupe` compte les appels au LLM en cours. */
+/**
+ * État partagé : `actif` dans l'atelier, `url` de l'atelier vue du wiki, `etat` (null hors atelier),
+ * `occupe` : appels au LLM en cours.
+ */
 export const atelier = $state({
   actif: false,
+  /** Adresse de l'atelier vue depuis `wikik serve` (null sans atelier, ou dans le site exporté). */
+  url: null as string | null,
   etat: null as EtatAtelier | null,
   occupe: 0,
   depuis: 0,
@@ -23,12 +28,17 @@ async function lireEtat(): Promise<EtatAtelier> {
   return r.json();
 }
 
-/** Détecte le mode atelier et charge l'état ; sans effet en mode statique ou sur `wikik serve`. */
+/** Détecte le mode atelier et charge l'état ; sans effet en mode statique ou sur `wikik serve`.
+ * @relu 2026-10-17 c5c12988
+ */
 export async function detecter(): Promise<boolean> {
   if (statique) return false;
   try {
-    atelier.etat = await lireEtat();
-    atelier.actif = true;
+    const mode = await fetch("/api/mode").then((r) => r.json());
+    if (mode.atelier) {
+      atelier.etat = await lireEtat();
+      atelier.actif = true;
+    }
   } catch {
     atelier.actif = false;
   }
@@ -63,6 +73,15 @@ export async function ecrire<T = unknown>(route: string, corps: unknown, llm = f
   } finally {
     if (llm) atelier.occupe--;
   }
+}
+
+/**
+ * Lien vers une page de l'atelier : relatif quand l'atelier sert lui-même le wiki, absolu depuis
+ * `wikik serve` ; null sans atelier.
+ */
+export function lienAtelier(chemin: string): string | null {
+  if (atelier.actif) return chemin;
+  return atelier.url ? atelier.url + chemin : null;
 }
 
 /** Artefacts d'un type, dans l'ordre des identifiants. */

@@ -154,4 +154,14 @@ fn atelier_factice_de_bout_en_bout() {
         "{projet}"
     );
     assert!(d.path().join(".wikik/atelier/journal.jsonl").exists());
+
+    // Le front sait qu'il est dans l'atelier ; le wiki connaît l'adresse de l'atelier (SPEC-21 R1).
+    assert_eq!(
+        http(p, "GET", "/api/mode", None, &[]),
+        (200, r#"{"atelier":true}"#.into())
+    );
+    assert!(
+        projet.contains(r#""url_atelier":"http://127.0.0.1:8485""#),
+        "{projet}"
+    );
 }
