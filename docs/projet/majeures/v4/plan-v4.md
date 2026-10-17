@@ -168,4 +168,5 @@ Définition de fini cochée, backlog mis à jour, tag `v4.0`.
 | Cadrage B1-B7 | ✅ | 2026-10-18 |
 | 0 Mise en place | ✅ framework versionné, ADR-0009 à 0011 | 2026-10-18 |
 | 1 Spike | ✅ SPIKE-02 : 6 à 10 s par appel, MCP et JSON structuré fiables | 2026-10-18 |
-| 2 à 10 | ⏳ | |
+| 2 BDR + CdC | ✅ proposé (validation déléguée) : 3 besoins, EF-100 à 112, ENF-007 et 008 | 2026-10-18 |
+| 3 à 10 | ⏳ | |
