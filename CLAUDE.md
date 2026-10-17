@@ -4,6 +4,9 @@ wikiK est en **refonte** : la v0 Python (wiki Markdown éditable) devient un bin
 
 ## Où on en est
 
+- **Versions** (tags locaux, non poussés) : `v1.0-rc1` (index, check, requêtes, wiki), `v1.1` serveur MCP, `v2.0-rc1` TypeScript, `v2.1` JavaScript et Svelte, `v3.0-rc1` équipe (export statique, CI, annotations, `nouveau`, `stats`). Tout a été produit par délégation le 17/10/2026 : BDR, specs et ADR attendent la relecture de Tibo.
+- **Prochaine étape avec Tibo** : `docs/projet/backlog.md`, section « À faire avec Tibo ». La v4 (atelier Fast Design Thinking) attend ses décisions (publication du framework, fournisseur LLM).
+
 - **Plan de référence** : `docs/projet/plan-v1.md` (phases 0 à 9, tableau de suivi en section 7). Le lire avant toute tâche.
 - **Ce qui est reporté après la v1** : `docs/projet/backlog.md`, section « Reporté après la v1 ».
 - **Réflexions d'origine et analyse** : `.doc/reflexion et evolution/` (non versionné).
@@ -12,7 +15,7 @@ wikiK est en **refonte** : la v0 Python (wiki Markdown éditable) devient un bin
 
 ## Règles
 
-1. **Pas de code de la cible avant la porte de la Phase 3** (BDR, cahier des charges, SPEC-01 à 04 et ADR 002 à 005 validés par Tibo). Exception : le spike jetable de la Phase 1, dans `spikes/` (ignoré par git).
+1. **Toute version majeure commence par sa BDR et son cahier des charges** (`wikik nouveau`, gabarits dans `templates/`), puis specs et ADR, puis le code. Les mineures citent une exigence existante.
 2. **Doc dans le même commit que le code** : le bloc `///` ou `//!` suit la fonction qu'il décrit ; poser `@req EF-xxx` quand une exigence est implémentée, `@adr NNNN` quand le code applique une décision.
 3. **Un bloc ne paraphrase pas le code** : il dit l'intention, le contrat, les pièges, le lien vers une décision.
 4. **Une phase = une branche** `phase-N-nom`, fusionnée dans `master` quand le critère de sortie du plan est atteint. En fin de phase, mettre à jour le tableau de suivi du plan, et le backlog si quelque chose est reporté.
