@@ -1,32 +1,62 @@
-# 🧠 wikiK
+# 🧠 wikik
 
-> **Refonte en cours.** wikiK devient un outil Rust (un seul binaire) qui indexe la documentation écrite dans le code d'un projet, détecte la doc périmée, répond aux requêtes d'un agent de code à faible coût en tokens, puis affiche le tout dans un wiki local.
+**La doc vit dans le code ; l'agent l'interroge au lieu de relire le projet ; un wiki local la rend lisible.**
 
-- 🗺️ **Plan de la v1** : [`docs/projet/plan-v1.md`](./docs/projet/plan-v1.md)
-- 📋 **Backlog et suite du projet** : [`wiki/taches/backlog.md`](./wiki/taches/backlog.md)
-- 🤖 **Consignes pour l'agent** : [`CLAUDE.md`](./CLAUDE.md)
+`wikik` est un binaire Rust unique qui :
+
+- **indexe** la doc écrite dans le code (`///`, `//!`) et la zone Projet (`docs/projet/` : besoins, exigences, ADR, specs) avec tree-sitter et SQLite ;
+- **répond à l'agent de code** à faible coût en tokens (`wikik query …`) : sur ATS, le contexte d'une modification coûte 20 à 80 fois moins que la lecture des fichiers ([MESURE-01](./docs/projet/mesures/mesure-01-v1-agent.md)) ;
+- **détecte la doc périmée** : le code d'une fonction a changé depuis le dernier commit qui a touché son bloc (`wikik check`) ;
+- **sert un wiki local** en lecture seule : code et doc en cellules, documents du projet, liens entre les deux, graphe (`wikik serve`).
 
 ---
 
-## 🕰️ Version v0 (Python) : `legacy/`
-
-La v0, un wiki Markdown multi-projets éditable dans le navigateur, reste utilisable jusqu'à la fin de la refonte. Elle est figée au tag `v0-python`.
+## 🚀 Démarrage
 
 ```bash
-python3 legacy/serveur.py
+make install            # compile le front puis installe `wikik` dans ~/.cargo/bin (Rust + Node requis)
+
+cd mon-projet
+wikik init              # wikik.toml, docs/projet/, gabarits dans docs/modeles/, .wikik/ dans .gitignore
+wikik query carte       # vue d'ensemble pour l'agent
+wikik check             # doc périmée, manquante, références cassées
+wikik serve             # wiki sur http://127.0.0.1:8484
 ```
 
-Puis ouvrir **[http://localhost:8000](http://localhost:8000)**. Aucune dépendance (Python 3 standard).
+| Commande | Rôle |
+|---|---|
+| `wikik query carte` · `fichier <chemin>` · `symbole <id> [--code]` · `impact <id>` | Contexte ciblé pour l'agent, coût annoncé en tokens |
+| `wikik query cherche <mots>` · `adr <n>` · `exigence <EF-xxx>` · `perimes` · `ref <@wiki:…>` | Recherche et traçabilité |
+| `wikik check [--format json] [--strict]` | Diagnostics, codes de retour 0 / 1 / 2 |
+| `wikik relu <id>` | Déclare un bloc relu après un changement de code |
+| `wikik index [--dump-json]` | Index explicite (les autres commandes le mettent à jour seules) |
 
-Sa documentation (structure Diátaxis) est dans [`legacy/docs/`](./legacy/docs/index.md), et son wiki de projet dans [`wiki/`](./wiki/index.md).
+Pour l'agent de code : le skill [`skill/SKILL.md`](./skill/SKILL.md) (règles d'or et procédures). Il est lié pour ce dépôt dans `.claude/skills/wikik` ; pour tous les projets : `ln -s "$PWD/skill" ~/.claude/skills/wikik`.
+
+---
+
+## 🧭 Documentation du projet
+
+- 🗺️ [Plan de la v1](./docs/projet/plan-v1.md) et son tableau de suivi
+- 📋 [Besoin (BDR)](./docs/projet/majeures/v1/bdr-2-definition.md) · [Cahier des charges](./docs/projet/majeures/v1/cahier-des-charges.md)
+- 📐 [Specs](./docs/projet/specs/) · ⚖️ [Décisions (ADR)](./docs/projet/adr/)
+- 🔭 [Suite du projet (backlog)](./wiki/taches/backlog.md)
+- 🤖 [Consignes pour Claude Code](./CLAUDE.md)
+
+Le mieux reste de lancer `wikik serve` à la racine de ce dépôt : wikik se documente avec lui-même.
 
 ---
 
 ## 📁 Organisation
 
 ```text
-├── CLAUDE.md          # Consignes pour Claude Code
-├── docs/projet/       # Zone Projet de la refonte : plan, BDR, exigences, specs, ADR
-├── wiki/              # Wiki de la v0 (migré vers docs/projet/ en Phase 9)
-└── legacy/            # v0 Python : serveur.py, index.html, docs Diátaxis
+├── crates/wikik-core/   # bibliothèque : extraction, index, check, requêtes, données du wiki
+├── crates/wikik/        # binaire : CLI et serveur (front embarqué)
+├── front/               # wiki : Svelte 5 + TypeScript, types générés depuis Rust
+├── skill/               # SKILL.md et procédures pour l'agent
+├── templates/           # gabarits de la zone Projet (embarqués par `wikik init`)
+├── tests/fixtures/      # projet Rust de test et son instantané d'index
+├── docs/projet/         # zone Projet de wikik lui-même
+├── wiki/                # wiki de la v0 (migré en Phase 9)
+└── legacy/              # v0 Python (tag `v0-python`), retirée en Phase 9
 ```

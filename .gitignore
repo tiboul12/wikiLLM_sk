@@ -9,3 +9,7 @@ __pycache__/
 .wikik/
 /spikes/
 target/
+
+# Front : dépendances et compilation (embarquée dans le binaire au build release)
+front/node_modules/
+front/dist/

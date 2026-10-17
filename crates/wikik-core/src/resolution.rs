@@ -130,7 +130,7 @@ fn se_termine_par(segs: &[String], suffixe: &[String]) -> bool {
 }
 
 /// Recalcule toutes les arêtes et la cible des liens de documents.
-/// @relu 2026-10-17
+/// @relu 2026-10-17 36135ae7
 pub fn recalculer(tx: &Transaction) -> Result<()> {
     let symboles: Vec<Sym> = {
         let mut st = tx.prepare(
@@ -209,8 +209,10 @@ pub fn recalculer(tx: &Transaction) -> Result<()> {
 
     // Balises.
     let balises: Vec<(String, String, String, i64)> = {
-        let mut st =
-            tx.prepare("SELECT symbole, nom, valeur, ligne FROM balises ORDER BY symbole, ligne")?;
+        let mut st = tx.prepare(
+            "SELECT symbole, nom, valeur, ligne FROM balises
+             UNION ALL SELECT fichier, nom, valeur, ligne FROM balises_fichier ORDER BY 1, 4",
+        )?;
         st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
             .collect::<rusqlite::Result<_>>()?
     };

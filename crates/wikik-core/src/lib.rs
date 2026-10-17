@@ -17,11 +17,13 @@ pub mod projet;
 pub mod query;
 pub mod relu;
 pub mod resolution;
+pub mod wiki;
 
 pub use index::{Index, Rapport};
 
 /// Version du schéma de l'index ; un index d'une autre version est reconstruit (ADR-0003).
-pub const SCHEMA: u32 = 1;
+/// @relu 2026-10-17 719e028c
+pub const SCHEMA: u32 = 2;
 
 /// Version des règles d'extraction (hash, identifiants, résolution). À incrémenter à chaque
 /// changement qui modifie le contenu de l'index sans changer les fichiers : sinon l'incrémental

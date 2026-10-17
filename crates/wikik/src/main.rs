@@ -6,6 +6,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use wikik_core::Index;
 
+mod serve;
+
 /// Doc dans le code, index requêtable par l'agent, wiki local.
 #[derive(Parser)]
 #[command(name = "wikik", version, about)]
@@ -56,6 +58,9 @@ enum Commande {
         adresse: String,
         #[arg(long, default_value_t = 8484)]
         port: u16,
+        /// Autorise une adresse hors boucle locale (le wiki devient visible sur le réseau).
+        #[arg(long)]
+        autoriser_reseau: bool,
     },
 }
 
@@ -107,7 +112,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-17 001d848a
+/// @relu 2026-10-17 625bba30
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -168,6 +173,14 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             }
             Ok(i32::from(sortie.ambigu))
         }
+        Commande::Serve {
+            adresse,
+            port,
+            autoriser_reseau,
+        } => {
+            serve::servir(&cli.racine, &adresse, port, autoriser_reseau)?;
+            Ok(0)
+        }
         Commande::Relu { symbole } => {
             let mut index = Index::ouvrir(&cli.racine)?;
             index.mettre_a_jour()?;
@@ -176,19 +189,6 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             index.mettre_a_jour()?;
             eprintln!("wikik relu : {symbole} marqué relu le {date} ({fichier})");
             Ok(0)
-        }
-        autre => {
-            let nom = match autre {
-                Commande::Serve { .. } => "serve",
-                Commande::Init
-                | Commande::Index { .. }
-                | Commande::Check { .. }
-                | Commande::Query { .. }
-                | Commande::Relu { .. } => {
-                    unreachable!()
-                }
-            };
-            anyhow::bail!("{nom} : pas encore implémenté")
         }
     }
 }

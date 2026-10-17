@@ -61,9 +61,12 @@ pub struct Symbole {
 }
 
 /// Tout ce qu'un langage extrait d'un fichier.
+/// @relu 2026-10-17 b3b0d155
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ExtraitFichier {
     pub entete: Option<String>,
+    /// Balises du bloc `//!` : elles relient le fichier entier (source d'arête = chemin du fichier).
+    pub balises_entete: Vec<Balise>,
     pub symboles: Vec<Symbole>,
     pub imports: Vec<Import>,
     pub lignes: usize,

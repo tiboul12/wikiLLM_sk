@@ -124,7 +124,7 @@ struct SymDoc {
 }
 
 /// Lance toutes les vérifications sur un index à jour.
-/// @relu 2026-10-17
+/// @relu 2026-10-17 6e4c74e6
 pub fn verifier(index: &Index) -> Result<RapportCheck> {
     let c = &index.conn;
     let mut col = Collecteur {
@@ -215,7 +215,8 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
     // Balises inconnues.
     {
         let mut st = c.prepare(
-            "SELECT b.symbole, s.fichier, b.nom, b.ligne FROM balises b JOIN symboles s ON s.id = b.symbole ORDER BY 1, 4",
+            "SELECT b.symbole, s.fichier, b.nom, b.ligne FROM balises b JOIN symboles s ON s.id = b.symbole
+             UNION ALL SELECT fichier, fichier, nom, ligne FROM balises_fichier ORDER BY 1, 4",
         )?;
         let lignes: Vec<(String, String, String, i64)> = st
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
@@ -226,7 +227,7 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
                     "balise-inconnue",
                     &fichier,
                     ligne as usize,
-                    Some(&sym),
+                    (sym != fichier).then_some(sym.as_str()),
                     format!(
                         "balise `@{nom}` inconnue (attendu : {})",
                         rust::BALISES_CONNUES.join(", ")
@@ -244,8 +245,9 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
     };
     {
         let mut st = c.prepare(
-            "SELECT a.source, s.fichier, a.cible, a.genre, a.ligne FROM aretes a JOIN symboles s ON s.id = a.source
-             WHERE a.genre IN ('adr', 'req') ORDER BY 1, 3",
+            "SELECT a.source, coalesce(s.fichier, f.chemin), a.cible, a.genre, a.ligne FROM aretes a
+             LEFT JOIN symboles s ON s.id = a.source LEFT JOIN fichiers f ON f.chemin = a.source
+             WHERE a.genre IN ('adr', 'req') AND (s.id IS NOT NULL OR f.chemin IS NOT NULL) ORDER BY 1, 3",
         )?;
         let lignes: Vec<(String, String, String, String, Option<i64>)> = st
             .query_map([], |r| {
@@ -259,7 +261,7 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
                     &format!("ref-{genre}"),
                     &fichier,
                     ligne.unwrap_or(0) as usize,
-                    Some(&sym),
+                    (sym != fichier).then_some(sym.as_str()),
                     format!("`@{genre}` vers {quoi} inexistant(e) : {cible}"),
                 );
             }

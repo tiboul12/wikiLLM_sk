@@ -11,4 +11,5 @@ besoins: [B-000]
 # EF-000 : Titre court de l'exigence
 
 **Énoncé** : Le système doit …
+
 **Critère d'acceptation** : test observable qui prouve que l'exigence est remplie.

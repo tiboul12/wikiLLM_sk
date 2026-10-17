@@ -47,7 +47,7 @@ Toutes les fonctions de l'outil (requêtes, check, wiki) lisent le même index. 
 
 Pour un type, une constante ou une macro, `corps` porte sur l'item entier et `signature` est vide.
 
-### Schéma SQLite (version 1)
+### Schéma SQLite (version 2)
 
 Schéma de référence : `SCHEMA_SQL` dans `crates/wikik-core/src/index.rs`, recopié ici.
 
@@ -65,6 +65,8 @@ CREATE INDEX symboles_fichier ON symboles(fichier);
 CREATE INDEX symboles_nom ON symboles(nom);
 CREATE TABLE balises (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,
   nom TEXT NOT NULL, valeur TEXT NOT NULL, ligne INTEGER NOT NULL);
+CREATE TABLE balises_fichier (fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
+  nom TEXT NOT NULL, valeur TEXT NOT NULL, ligne INTEGER NOT NULL);
 CREATE TABLE appels_bruts (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,
   forme TEXT NOT NULL, cible TEXT NOT NULL, qualificatif TEXT, ligne INTEGER NOT NULL);
 CREATE TABLE imports (fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
@@ -81,6 +83,7 @@ CREATE VIRTUAL TABLE recherche USING fts5(cle UNINDEXED, genre UNINDEXED, titre,
 ```
 
 Règles :
+- `balises_fichier` : balises de l'en-tête `//!` ; leurs arêtes ont pour source le chemin du fichier (schéma 2).
 - `etat` (taille, date, hash par fichier) sert au test de fraîcheur ; il n'apparaît pas dans le dump.
 - `type_parent` (type de l'impl englobant) sert à résoudre `self.f()` et `Self::f()` ; `doc_ligne_fin` sert à `check` (SPEC-04).
 - Les arêtes `adr`, `req`, `topic` viennent des balises ; `lien` des liens `[[...]]` et des champs de frontmatter qui listent des identifiants (`besoins`, `exigences`, `decisions`, `sources`, `remplace`, `remplace_par`).

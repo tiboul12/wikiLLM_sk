@@ -218,6 +218,7 @@
   ],
   "fichiers": [
     {
+      "balises": [],
       "chemin": "src/geo.rs",
       "entete": "Types et fonctions géométriques.",
       "erreurs_parse": 0,
@@ -227,6 +228,7 @@
       "lignes_macros": 1
     },
     {
+      "balises": [],
       "chemin": "src/lib.rs",
       "entete": "Bibliothèque de démonstration : calculs géométriques simples.\n\nSert de fixture aux tests de wikik ; chaque construction couvre un cas de SPEC-02/03.",
       "erreurs_parse": 0,
@@ -236,6 +238,7 @@
       "lignes_macros": 0
     },
     {
+      "balises": [],
       "chemin": "src/util.rs",
       "entete": "Utilitaires divers.",
       "erreurs_parse": 0,
@@ -283,7 +286,7 @@
       "source": "notes"
     }
   ],
-  "schema": 1,
+  "schema": 2,
   "symboles": [
     {
       "balises": [],

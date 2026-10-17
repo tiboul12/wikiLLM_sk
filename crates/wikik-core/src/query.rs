@@ -735,14 +735,22 @@ fn section(corps: &str, titre: &str, max: usize) -> Option<String> {
     })
 }
 
+/// Symboles et fichiers (balise d'en-tête) qui citent `cible` : (source, résumé, est un test).
 fn citants(index: &Index, cible: &str, genre: &str) -> Result<Vec<(String, Option<String>, bool)>> {
     let mut st = index.conn.prepare(
-        "SELECT a.source, s.resume, coalesce(s.est_test, 0) FROM aretes a LEFT JOIN symboles s ON s.id = a.source
+        "SELECT a.source, s.resume, f.entete, coalesce(s.est_test, 0) FROM aretes a
+         LEFT JOIN symboles s ON s.id = a.source LEFT JOIN fichiers f ON f.chemin = a.source
          WHERE a.cible = ?1 AND a.genre = ?2 ORDER BY a.source",
     )?;
     let v = st
         .query_map(params![cible, genre], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            let entete: Option<String> = r.get(2)?;
+            let resume: Option<String> = r.get(1)?;
+            Ok((
+                r.get(0)?,
+                resume.or_else(|| entete.map(|e| format!("fichier : {}", une_ligne(&e)))),
+                r.get(3)?,
+            ))
         })?
         .collect::<rusqlite::Result<_>>()?;
     Ok(v)

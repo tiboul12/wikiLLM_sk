@@ -36,6 +36,8 @@ CREATE INDEX symboles_fichier ON symboles(fichier);
 CREATE INDEX symboles_nom ON symboles(nom);
 CREATE TABLE balises (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,
   nom TEXT NOT NULL, valeur TEXT NOT NULL, ligne INTEGER NOT NULL);
+CREATE TABLE balises_fichier (fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
+  nom TEXT NOT NULL, valeur TEXT NOT NULL, ligne INTEGER NOT NULL);
 CREATE TABLE appels_bruts (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,
   forme TEXT NOT NULL, cible TEXT NOT NULL, qualificatif TEXT, ligne INTEGER NOT NULL);
 CREATE TABLE imports (fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
@@ -293,9 +295,10 @@ impl Index {
     }
 
     /// Dump JSON déterministe : trié, sans horodatage ni identifiant interne (SPEC-02).
+    /// @relu 2026-10-17 bdd2e9f9
     pub fn dump_json(&self) -> Result<Value> {
         let c = &self.conn;
-        let fichiers = requete_json(
+        let mut fichiers = requete_json(
             c,
             "SELECT chemin, langage, hash_contenu, entete, lignes, lignes_macros, erreurs_parse FROM fichiers ORDER BY chemin",
             &[
@@ -308,6 +311,21 @@ impl Index {
                 "erreurs_parse",
             ],
         )?;
+        let balises_f = requete_json(
+            c,
+            "SELECT fichier, nom, valeur, ligne FROM balises_fichier ORDER BY fichier, ligne, nom, valeur",
+            &["fichier", "nom", "valeur", "ligne"],
+        )?;
+        let mut par_fichier: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+        for mut b in balises_f {
+            let f = b["fichier"].as_str().unwrap_or_default().to_string();
+            b.as_object_mut().unwrap().remove("fichier");
+            par_fichier.entry(f).or_default().push(b);
+        }
+        for f in &mut fichiers {
+            let ch = f["chemin"].as_str().unwrap_or_default().to_string();
+            f["balises"] = Value::Array(par_fichier.remove(&ch).unwrap_or_default());
+        }
         let mut symboles = requete_json(
             c,
             "SELECT id, fichier, nom, nom_qualifie, genre, visibilite, ligne_debut, ligne_fin, doc_ligne_debut, doc_ligne_fin,
@@ -451,6 +469,10 @@ fn ecrire_fichier(
                 a.ligne as i64
             ])?;
         }
+    }
+    let mut ins_bf = tx.prepare_cached("INSERT INTO balises_fichier VALUES (?1, ?2, ?3, ?4)")?;
+    for b in &e.balises_entete {
+        ins_bf.execute(params![chemin, b.nom, b.valeur, b.ligne as i64])?;
     }
     let mut ins_i = tx.prepare_cached("INSERT INTO imports VALUES (?1, ?2, ?3)")?;
     for i in &e.imports {

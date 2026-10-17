@@ -51,6 +51,7 @@ impl Langage for Rust {
         desambiguiser(&mut symboles);
         symboles.sort_by(|a, b| a.ligne_debut.cmp(&b.ligne_debut).then(a.id.cmp(&b.id)));
 
+        let (entete, balises_entete) = entete(racine, source);
         let mut imports = vec![];
         let mut c = racine.walk();
         for enfant in racine.children(&mut c) {
@@ -64,7 +65,8 @@ impl Langage for Rust {
         imports.dedup();
 
         ExtraitFichier {
-            entete: entete(racine, source),
+            entete,
+            balises_entete,
             symboles,
             imports,
             lignes: compter_lignes(source),
@@ -808,8 +810,10 @@ fn aplatir_use(n: Node, prefixe: &str, src: &[u8], sortie: &mut Vec<Import>) {
     }
 }
 
-fn entete(racine: Node, src: &[u8]) -> Option<String> {
+/// En-tête `//!` et ses balises (une balise d'en-tête vaut pour tout le fichier).
+fn entete(racine: Node, src: &[u8]) -> (Option<String>, Vec<Balise>) {
     let mut lignes = vec![];
+    let mut premiere = None;
     let mut c = racine.walk();
     for enfant in racine.children(&mut c) {
         if enfant.kind() != "line_comment" {
@@ -817,7 +821,10 @@ fn entete(racine: Node, src: &[u8]) -> Option<String> {
         }
         let t = txt(enfant, src).trim_end_matches(['\n', '\r']);
         match t.strip_prefix("//!") {
-            Some(r) => lignes.push(r.strip_prefix(' ').unwrap_or(r).trim_end().to_string()),
+            Some(r) => {
+                premiere.get_or_insert(enfant.start_position().row + 1);
+                lignes.push(r.strip_prefix(' ').unwrap_or(r).trim_end().to_string());
+            }
             // Commentaire ordinaire (licence…) avant l'en-tête : ignoré ; après : fin de l'en-tête.
             None if lignes.is_empty() => continue,
             None => break,
@@ -826,7 +833,8 @@ fn entete(racine: Node, src: &[u8]) -> Option<String> {
     while lignes.last().is_some_and(|l| l.is_empty()) {
         lignes.pop();
     }
-    (!lignes.is_empty()).then(|| lignes.join("\n"))
+    let b = balises(&lignes, premiere);
+    ((!lignes.is_empty()).then(|| lignes.join("\n")), b)
 }
 
 fn lignes_macros(racine: Node) -> usize {
