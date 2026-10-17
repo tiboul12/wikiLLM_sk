@@ -351,7 +351,7 @@ ATS est déjà écrit avec **Leptos** (Rust/WASM) et Tauri. Tu maîtrises donc u
 | 3 Specs + ADR (porte) | ✅ terminée : SPEC-01 à 04, ADR-0001 à 0006 (porte franchie par délégation) | 2026-10-17 |
 | 4 Squelette | ✅ terminée | 2026-10-17 |
 | 5 Extracteur + index | ✅ terminée (ATS : 645 symboles en 203 ms, 513 appels certains) | 2026-10-17 |
-| 6 check | ⏳ | |
+| 6 check | ✅ terminée (ATS : 21 docs périmées réelles en 1,2 s ; wikiK : 0 diagnostic) | 2026-10-17 |
 | 7 Requêtes + skill (v1-agent) | ⏳ | |
 | 8 Wiki local | ⏳ | |
 | 9 Clôture (v1.0) | ⏳ | |

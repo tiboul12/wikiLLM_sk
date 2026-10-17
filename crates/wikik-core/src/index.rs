@@ -11,7 +11,7 @@ use crate::hash::empreinte;
 use crate::lang::{self, Langage};
 use crate::modele::ExtraitFichier;
 use crate::projet::{self, Document};
-use crate::{SCHEMA, resolution};
+use crate::{SCHEMA, VERSION_EXTRACTION, resolution};
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
@@ -86,7 +86,8 @@ enum Genre {
 }
 
 impl Index {
-    /// Ouvre (ou crée) `.wikik/index.sqlite` ; un schéma d'une autre version est supprimé et recréé.
+    /// Ouvre (ou crée) `.wikik/index.sqlite` ; un index d'un autre schéma ou d'une autre version
+    /// d'extraction ([`crate::VERSION_EXTRACTION`]) est supprimé et recréé.
     pub fn ouvrir(racine: &Path) -> Result<Index> {
         let racine = racine
             .canonicalize()
@@ -103,15 +104,16 @@ impl Index {
             })
             .optional()
             .unwrap_or(None);
-        if version.as_deref() != Some(&SCHEMA.to_string()) {
+        // Schéma et règles d'extraction : un changement de l'un ou l'autre impose de tout relire.
+        let attendu = format!("{SCHEMA}.{VERSION_EXTRACTION}");
+        if version.as_deref() != Some(attendu.as_str()) {
             drop(conn);
-            let _ = std::fs::remove_file(&chemin);
+            for suffixe in ["", "-wal", "-shm"] {
+                let _ = std::fs::remove_file(dossier.join(format!("index.sqlite{suffixe}")));
+            }
             conn = Connection::open(&chemin)?;
             conn.execute_batch(SCHEMA_SQL)?;
-            conn.execute(
-                "INSERT INTO meta VALUES ('schema', ?1)",
-                [SCHEMA.to_string()],
-            )?;
+            conn.execute("INSERT INTO meta VALUES ('schema', ?1)", [attendu])?;
         }
         conn.execute_batch(
             "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;",

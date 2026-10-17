@@ -16,6 +16,7 @@ pub struct Config {
     pub check: ConfigCheck,
 }
 
+/// Section `[index]` : ce qui est indexé.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigIndex {
@@ -33,6 +34,7 @@ impl Default for ConfigIndex {
     }
 }
 
+/// Section `[projet]` : où vit la zone Projet.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigProjet {
@@ -48,6 +50,7 @@ impl Default for ConfigProjet {
     }
 }
 
+/// Section `[check]` : exigences de doc et sévérités (SPEC-04).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigCheck {

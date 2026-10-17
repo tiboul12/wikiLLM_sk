@@ -103,6 +103,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
+/// @relu 2026-10-17
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -122,14 +123,33 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             }
             Ok(0)
         }
+        Commande::Check { format, strict } => {
+            let mut index = Index::ouvrir(&cli.racine)?;
+            index.mettre_a_jour()?;
+            let rapport = wikik_core::check::verifier(&index)?;
+            match format {
+                Format::Texte => print!("{}", wikik_core::check::formater_texte(&rapport)),
+                Format::Json => println!("{}", serde_json::to_string_pretty(&rapport)?),
+            }
+            Ok(rapport.code_retour(strict))
+        }
+        Commande::Relu { symbole } => {
+            let mut index = Index::ouvrir(&cli.racine)?;
+            index.mettre_a_jour()?;
+            let date = wikik_core::relu::aujourdhui();
+            let fichier = wikik_core::relu::marquer(&index, &symbole, &date)?;
+            index.mettre_a_jour()?;
+            eprintln!("wikik relu : {symbole} marqué relu le {date} ({fichier})");
+            Ok(0)
+        }
         autre => {
             let nom = match autre {
                 Commande::Init => "init",
-                Commande::Check { .. } => "check",
                 Commande::Query { .. } => "query",
-                Commande::Relu { .. } => "relu",
                 Commande::Serve { .. } => "serve",
-                Commande::Index { .. } => unreachable!(),
+                Commande::Index { .. } | Commande::Check { .. } | Commande::Relu { .. } => {
+                    unreachable!()
+                }
             };
             anyhow::bail!("{nom} : pas encore implémenté")
         }

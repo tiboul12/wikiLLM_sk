@@ -41,7 +41,7 @@ Toutes les fonctions de l'outil (requêtes, check, wiki) lisent le même index. 
 
 | Hash | Porte sur | Normalisation (validée par SPIKE-01) |
 |---|---|---|
-| `corps` | nœud `body` de l'item | feuilles de l'arbre hors commentaires ; sans virgule finale avant `)` `]` `}` `>` ; sans les accolades d'un bloc à expression unique sous un bras de `match` ou une closure ; séparateur `\0` |
+| `corps` | nœud `body` de l'item | feuilles de l'arbre hors commentaires et hors modificateur de visibilité (constaté sur ATS : ajouter `pub(crate)` ne doit pas rendre une doc périmée) ; sans virgule finale avant `)` `]` `}` `>` ; sans les accolades d'un bloc à expression unique sous un bras de `match` ou une closure ; séparateur `\0` |
 | `signature` | l'item sans son corps | mêmes règles |
 | `doc` | texte du bloc | lignes sans le marqueur `///`, blancs de début et de fin retirés, lignes vides finales retirées |
 

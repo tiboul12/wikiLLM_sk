@@ -276,13 +276,19 @@ fn balises(lignes: &[String], ligne_debut: Option<usize>) -> Vec<Balise> {
     v
 }
 
-/// Hash normalisé (SPIKE-01 S2) : feuilles hors commentaires, sans virgule finale avant un
+/// Hash normalisé (SPIKE-01 S2) : feuilles hors commentaires et visibilité, sans virgule finale avant un
 /// délimiteur fermant, sans accolades d'un bloc à expression unique sous `match`/closure.
 pub fn hash_normalise(n: Node, src: &[u8], sauter: Option<usize>) -> String {
     let mut feuilles: Vec<(usize, &str)> = vec![];
     let mut pile = vec![n];
     while let Some(x) = pile.pop() {
-        if Some(x.id()) == sauter || x.kind() == "line_comment" || x.kind() == "block_comment" {
+        // La visibilité (`pub`, `pub(crate)`) ne change pas ce que décrit la doc : hors hash.
+        if Some(x.id()) == sauter
+            || matches!(
+                x.kind(),
+                "line_comment" | "block_comment" | "visibility_modifier"
+            )
+        {
             continue;
         }
         if x.child_count() == 0 {
