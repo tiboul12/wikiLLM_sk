@@ -640,6 +640,38 @@ fn perimes_local(index: &Index, symboles: &[SymDoc], col: &mut Collecteur) -> Re
     Ok(())
 }
 
+/// Annotations GitHub Actions : une ligne par diagnostic, rattachée au fichier et à la ligne (SPEC-16 R3).
+///
+/// @req EF-081
+pub fn formater_github(r: &RapportCheck) -> String {
+    let echapper = |t: &str| {
+        t.replace('%', "%25")
+            .replace('\r', "%0D")
+            .replace('\n', "%0A")
+    };
+    let propriete = |t: &str| echapper(t).replace(':', "%3A").replace(',', "%2C");
+    let mut s = String::new();
+    for d in &r.diagnostics {
+        let niveau = match d.severite.as_str() {
+            "erreur" => "error",
+            "avertissement" => "warning",
+            _ => "notice",
+        };
+        s.push_str(&format!(
+            "::{niveau} file={},line={},title={}::{}\n",
+            propriete(&d.fichier),
+            d.ligne.max(1),
+            propriete(&d.code),
+            echapper(&d.message)
+        ));
+    }
+    s.push_str(&format!(
+        "wikik check : {} erreur(s), {} avertissement(s), {} info(s)\n",
+        r.resume.erreurs, r.resume.avertissements, r.resume.infos
+    ));
+    s
+}
+
 /// Rapport lisible, groupé par fichier.
 pub fn formater_texte(r: &RapportCheck) -> String {
     let mut s = String::new();

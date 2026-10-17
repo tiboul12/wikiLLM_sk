@@ -21,7 +21,7 @@ use wikik_core::{Index, check, wiki};
 /// Front compilé (`front/dist`), embarqué dans le binaire en release.
 #[derive(rust_embed::Embed)]
 #[folder = "../../front/dist"]
-struct Front;
+pub(crate) struct Front;
 
 struct Etat {
     index: Mutex<Index>,

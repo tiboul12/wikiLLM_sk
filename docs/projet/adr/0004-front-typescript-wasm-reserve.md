@@ -18,7 +18,7 @@ Le wiki affiche du Markdown, des diagrammes Mermaid, un graphe, du code coloré,
 
 - Front en **TypeScript**, compilé par Vite, **embarqué dans le binaire** (`rust-embed`) : aucun CDN.
 - Les types échangés avec le serveur sont **générés depuis Rust** pour éviter toute dérive.
-- **WebAssembly** est réservé au moteur de requêtes compilé pour le futur site statique publié (phase équipe, backlog).
+- **WebAssembly** est réservé au moteur de requêtes compilé pour le futur site statique publié (phase équipe, backlog). *Précisé par [[adr/0008-site-statique-sans-wasm]] : le site statique de la v3 s'en passe.*
 - Le choix du framework (Svelte par défaut, Leptos possible) se fait dans SPEC-05, juste avant la Phase 8, en rouvrant la question Leptos si Tibo le souhaite.
 
 ## Conséquences

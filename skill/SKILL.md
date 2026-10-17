@@ -33,6 +33,8 @@ description: >-
 | Référence copiée du wiki | `wikik query ref @wiki:…` |
 | Vérifier | `wikik check` (`--format json`, `--strict`) |
 | Marquer un bloc relu | `wikik relu <id>` |
+| Créer une exigence, un besoin, un ADR, une spec | `wikik nouveau <genre> "titre"` |
+| Couverture de la doc | `wikik stats` |
 
 Identifiant de symbole : `chemin/fichier.rs::Type::methode` ; un nom partiel (`methode`, `Type::methode`) suffit s'il est unique. Chaque sortie commence par `# … · ~N tokens`.
 

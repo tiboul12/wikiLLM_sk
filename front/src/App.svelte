@@ -1,5 +1,6 @@
 <script lang="ts">
   // Mise en page : en-tête (projet, recherche), barre latérale (zones Produit et Projet), page courante.
+  // @relu 2026-10-17 69847974
   import { api } from "./lib/api";
   import { routeur, aller, url } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
@@ -38,7 +39,7 @@
 
 <header class="entete">
   <button class="menu" aria-label="Afficher la navigation" onclick={() => (barreOuverte = !barreOuverte)}>☰</button>
-  <a class="marque" href="/"><span class="logo">w</span>{projet?.nom ?? "wikik"}</a>
+  <a class="marque" href={url.accueil()}><span class="logo">w</span>{projet?.nom ?? "wikik"}</a>
   <form class="recherche" onsubmit={chercher} role="search">
     <input type="search" placeholder="Rechercher dans la doc…" bind:value={saisie} aria-label="Rechercher" />
   </form>

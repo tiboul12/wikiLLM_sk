@@ -6,6 +6,7 @@ import type { PageFichier } from "../types/PageFichier";
 import type { PageDocument } from "../types/PageDocument";
 import type { Graphe } from "../types/Graphe";
 import type { Resultat } from "../types/Resultat";
+import { statique, lireDonnee, cheminSur, nomSur, grapheLocal, chercher } from "./statique";
 
 /** Diagnostic de `wikik check` (même forme que le JSON de SPEC-04). */
 export type Diagnostic = {
@@ -40,8 +41,21 @@ async function lire<T>(chemin: string, params: Record<string, string | number | 
   return r.json() as Promise<T>;
 }
 
-/** Une fonction par route de l'API ; une réponse en erreur lève une exception avec le message du serveur. */
-export const api = {
+/**
+ * Une fonction par route de l'API ; une réponse en erreur lève une exception avec le message du serveur.
+ * En mode statique (site exporté), les mêmes fonctions lisent les fichiers de `donnees/`.
+ */
+export const api = statique
+  ? {
+      projet: () => lireDonnee<Projet>("projet.json"),
+      fichier: (chemin: string) => lireDonnee<PageFichier>(`fichiers/${cheminSur(chemin)}.json`),
+      document: (id: string) => lireDonnee<PageDocument>(`documents/${nomSur(id)}.json`),
+      graphe: (centre?: string, profondeur?: number) =>
+        centre ? grapheLocal(centre, profondeur ?? 1) : lireDonnee<Graphe>("graphe.json"),
+      cherche: (q: string) => chercher(q),
+      check: () => lireDonnee<RapportCheck>("check.json"),
+    }
+  : {
   projet: () => lire<Projet>("/api/projet"),
   fichier: (chemin: string) => lire<PageFichier>("/api/fichier", { chemin }),
   document: (id: string) => lire<PageDocument>("/api/document", { id }),

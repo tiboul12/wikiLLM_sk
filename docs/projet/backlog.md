@@ -24,6 +24,7 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 
 - [ ] **Relire et valider** la BDR, le cahier des charges, les specs et les ADR produits par délégation le 17/10 (statut `proposé`), et corriger ce qui ne convient pas.
 - [ ] **Mesure en session réelle** sur ATS (protocole dans MESURE-01).
+- [ ] **Activer la CI et Pages sur wikiK** : `wikik init --ci`, puis activer GitHub Pages (source : GitHub Actions) ; non fait automatiquement car cela publie le wiki.
 - [ ] **Installer** : `make install`, puis le skill pour tous les projets (`ln -s "$PWD/skill" ~/.claude/skills/wikik`) en remplacement de `doc-as-code` et `wiki-dev-sync`.
 - [ ] **Amorcer ATS** (procédure `skill/procedures/amorcer.md`) : `wikik init`, puis les blocs manquants module par module ; migrer `ATS/wiki/` et le cahier des charges d'ATS vers `docs/projet/` (convertir `AC-009`, `F1`… en `EF-xxx`).
 - [ ] **Trancher Leptos ou Svelte** pour le front (SPEC-05) : Svelte a été choisi par défaut.
@@ -39,19 +40,19 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 Tout ce qui a été volontairement laissé de côté pendant l'analyse du 17/10. Rien ici n'est abandonné.
 
 ### 👥 Passage en équipe (A1 : v1 solo, architecture prête)
-- [ ] **Workflow CI** : build de l'index, `check` sur chaque PR, génération et publication du site.
-- [ ] **Publication du wiki en site statique** (GitHub Pages ou équivalent interne).
-- [ ] **Rôles de validation** BDR / cahier des charges dans `doc.toml`, approbation obligatoire sur PR (Q10).
-- [ ] **Attribution d'identifiants sans collision** entre PR parallèles (ADR, `B-xxx`, `EF-xxx`).
-- [ ] **Annotations GitHub** depuis la sortie JSON de `check`.
-- [ ] **Métriques partagées** : couverture des blocs, nombre de périmés, tendance.
-- [ ] **Hook pre-commit** optionnel.
-- [ ] **Niveaux de sévérité configurables** (avertissement puis bloquant).
+- [x] **Workflow CI** : `wikik init --ci` (v3, EF-082).
+- [x] **Publication du wiki en site statique** : `wikik export` (v3, EF-080, ADR-0008).
+- [x] **Rôles de validation** : `[equipe] validateurs` → `CODEOWNERS` (v3, EF-082). Activer « Require review from Code Owners » sur GitHub.
+- [x] **Identifiants** : `wikik nouveau` + `id-duplique` bloquant en CI (v3, EF-084).
+- [x] **Annotations GitHub** : `check --format github` (v3, EF-081).
+- [x] **Métriques** : `wikik stats` (v3, EF-085). Tendance dans le temps : à faire (artefact de CI).
+- [x] **Hook pre-commit** : `wikik init --hook` (v3, EF-083).
+- [x] **Niveaux de sévérité configurables** : `[check.severites]` (v1).
 - [ ] **Backlog dans un outil de tickets** (GitHub Issues) lu par le wiki (Q1).
 - [ ] **Portail multi-dépôts**, héritier du registre multi-projets (Q7).
 
 ### 🌐 Front & WebAssembly (A3)
-- [ ] **Moteur de requêtes compilé en WASM** pour le wiki statique publié : recherche et graphe dans le navigateur, sans serveur.
+- [~] **Moteur de requêtes en WASM** : remplacé par des données pré-calculées (ADR-0008) ; à reprendre seulement pour de très gros projets.
 - [ ] **Responsive mobile** (tiroir latéral, barre d'actions adaptée).
 - [ ] **Thèmes visuels**.
 - [ ] **Édition dans le navigateur** pour la zone Projet (Q5 : non en v1).

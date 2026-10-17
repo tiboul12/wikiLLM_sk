@@ -1,8 +1,9 @@
 <script lang="ts">
   // Barre latérale : zone Produit (arbre des fichiers) et zone Projet (documents par type).
+  // @relu 2026-10-17 4532aeb1
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
-  import { routeur, url } from "../lib/routeur.svelte";
+  import { routeur, url, estCourant } from "../lib/routeur.svelte";
 
   let { projet }: { projet: Projet } = $props();
   let zone = $state<"produit" | "projet">(routeur.route.page === "document" ? "projet" : "produit");
@@ -39,7 +40,7 @@
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
   });
 
-  const actif = (href: string) => decodeURIComponent(location.pathname) === decodeURIComponent(href.split("#")[0]);
+  const actif = (href: string) => estCourant(href);
 </script>
 
 <nav class="onglets" aria-label="Zones">

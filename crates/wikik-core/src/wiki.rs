@@ -685,3 +685,117 @@ pub fn cherche(index: &Index, texte: &str) -> Result<Vec<Resultat>> {
         .collect::<rusqlite::Result<_>>()?;
     Ok(v)
 }
+
+/// Entrée de l'index de recherche du site statique (SPEC-16 R1).
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct EntreeRecherche {
+    pub cle: String,
+    /// `symbole` ou `document`.
+    pub genre: String,
+    pub titre: String,
+    /// Doc du symbole ou corps du document, 2 000 caractères au plus.
+    pub texte: String,
+    pub fichier: Option<String>,
+}
+
+/// Tous les nœuds et toutes les arêtes : le site statique en tire les graphes locaux.
+///
+/// @req EF-080
+pub fn graphe_complet(index: &Index) -> Result<Graphe> {
+    let res = Resolveur::charger(index)?;
+    let mut st = index.conn.prepare(
+        "SELECT source, cible, genre, confiance FROM aretes ORDER BY source, cible, genre",
+    )?;
+    let aretes: Vec<AreteVue> = st
+        .query_map([], |r| {
+            Ok(AreteVue {
+                source: r.get(0)?,
+                cible: r.get(1)?,
+                genre: r.get(2)?,
+                confiance: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut ids: BTreeSet<String> = res.symboles.keys().cloned().collect();
+    ids.extend(res.documents.keys().cloned());
+    for a in &aretes {
+        ids.insert(a.source.clone());
+        ids.insert(a.cible.clone());
+    }
+    let noeuds = ids
+        .into_iter()
+        .map(|id| {
+            let l = res.lien(&id, "", "");
+            let genre = if l.fichier.is_some() {
+                "symbole"
+            } else if id.starts_with("topic:") {
+                "topic"
+            } else if l.existe {
+                "document"
+            } else {
+                "absent"
+            };
+            let libelle = if genre == "document" {
+                id.clone()
+            } else {
+                l.libelle
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or(&l.libelle)
+                    .to_string()
+            };
+            Noeud {
+                id,
+                libelle,
+                genre: genre.into(),
+                fichier: l.fichier,
+                centre: false,
+            }
+        })
+        .collect();
+    Ok(Graphe { noeuds, aretes })
+}
+
+/// Index de recherche du site statique : symboles documentés et documents.
+///
+/// @req EF-080
+pub fn donnees_recherche(index: &Index) -> Result<Vec<EntreeRecherche>> {
+    let tronquer = |t: String| {
+        if t.chars().count() > 2000 {
+            t.chars().take(2000).collect()
+        } else {
+            t
+        }
+    };
+    let mut v = vec![];
+    let mut st = index.conn.prepare(
+        "SELECT id, nom_qualifie, coalesce(doc, '') || ' ' || signature, fichier FROM symboles WHERE est_test = 0 ORDER BY id",
+    )?;
+    for r in st.query_map([], |r| {
+        Ok((r.get(0)?, r.get(1)?, r.get::<_, String>(2)?, r.get(3)?))
+    })? {
+        let (cle, titre, texte, fichier) = r?;
+        v.push(EntreeRecherche {
+            cle,
+            genre: "symbole".into(),
+            titre,
+            texte: tronquer(texte),
+            fichier: Some(fichier),
+        });
+    }
+    let mut st = index
+        .conn
+        .prepare("SELECT id, titre, corps FROM documents ORDER BY id")?;
+    for r in st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, String>(2)?)))? {
+        let (cle, titre, texte) = r?;
+        v.push(EntreeRecherche {
+            cle,
+            genre: "document".into(),
+            titre,
+            texte: tronquer(texte),
+            fichier: None,
+        });
+    }
+    Ok(v)
+}

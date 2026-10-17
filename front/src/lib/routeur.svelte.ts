@@ -1,6 +1,11 @@
 // Routeur minimal à l'API History : URL stables (SPEC-05 R7) sans dépendance.
 //
-// @req EF-041, EF-042
+// En mode statique (site exporté), le chemin vit dans l'ancre (`#/produit/…`) : aucune configuration
+// d'hébergement n'est nécessaire.
+//
+// @req EF-041, EF-042, EF-080
+
+import { statique } from "./statique";
 /** Page à afficher, déduite de l'URL. */
 export type Route =
   | { page: "accueil" }
@@ -9,10 +14,23 @@ export type Route =
   | { page: "recherche"; q: string }
   | { page: "graphe"; centre: string };
 
+/** Chemin, paramètres et ancre de l'URL courante, quel que soit le mode. */
+function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
+  if (!statique)
+    return { chemin: decodeURIComponent(location.pathname), params: new URLSearchParams(location.search), ancre: decodeURIComponent(location.hash.slice(1)) };
+  const h = location.hash.slice(1) || "/";
+  const [avantAncre, ancre = ""] = splitUne(h, "#");
+  const [chemin, requete = ""] = splitUne(avantAncre, "?");
+  return { chemin: decodeURIComponent(chemin), params: new URLSearchParams(requete), ancre: decodeURIComponent(ancre) };
+}
+
+function splitUne(t: string, sep: string): [string, string?] {
+  const i = t.indexOf(sep);
+  return i < 0 ? [t] : [t.slice(0, i), t.slice(i + 1)];
+}
+
 function analyser(): Route {
-  const chemin = decodeURIComponent(location.pathname);
-  const ancre = decodeURIComponent(location.hash.slice(1));
-  const params = new URLSearchParams(location.search);
+  const { chemin, params, ancre } = lireUrl();
   if (chemin.startsWith("/produit/")) return { page: "fichier", chemin: chemin.slice("/produit/".length), ancre };
   if (chemin.startsWith("/projet/")) return { page: "document", id: chemin.slice("/projet/".length), ancre };
   if (chemin === "/recherche") return { page: "recherche", q: params.get("q") ?? "" };
@@ -23,8 +41,12 @@ function analyser(): Route {
 /** Route courante, réactive : l'application se redessine quand elle change. */
 export const routeur = $state({ route: analyser() as Route });
 
-/** Navigue sans recharger la page ; ne fait rien si l'URL est déjà la bonne. */
+/** Navigue sans recharger la page ; ne fait rien si l'URL est déjà la bonne. En mode statique, change l'ancre. */
 export function aller(url: string) {
+  if (statique) {
+    location.hash = url.replace(/^#/, "");
+    return;
+  }
   if (url === location.pathname + location.search + location.hash) return;
   history.pushState(null, "", url);
   routeur.route = analyser();
@@ -32,6 +54,17 @@ export function aller(url: string) {
 }
 
 addEventListener("popstate", () => (routeur.route = analyser()));
+addEventListener("hashchange", () => {
+  if (!statique) return;
+  routeur.route = analyser();
+  if (!lireUrl().ancre) window.scrollTo(0, 0);
+});
+
+/** Vrai si `href` désigne la page affichée (ancre de symbole ignorée). */
+export function estCourant(href: string): boolean {
+  const cible = decodeURIComponent(splitUne(href.replace(/^#/, ""), "#")[0]);
+  return cible === lireUrl().chemin;
+}
 
 // Les liens internes (href commençant par /) sont gérés sans rechargement.
 addEventListener("click", (e) => {
@@ -43,11 +76,17 @@ addEventListener("click", (e) => {
   aller(href);
 });
 
-/** Fabrique des URL stables : `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`. */
+const prefixe = statique ? "#" : "";
+
+/**
+ * Fabrique des URL stables : `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
+ * précédées de `#` en mode statique.
+ */
 export const url = {
+  accueil: () => `${prefixe}/`,
   fichier: (chemin: string, ancre?: string) =>
-    `/produit/${chemin.split("/").map(encodeURIComponent).join("/")}${ancre ? "#" + encodeURIComponent(ancre) : ""}`,
-  document: (id: string) => `/projet/${encodeURIComponent(id)}`,
-  recherche: (q: string) => `/recherche?q=${encodeURIComponent(q)}`,
-  graphe: (centre?: string) => (centre ? `/graphe?centre=${encodeURIComponent(centre)}` : "/graphe"),
+    `${prefixe}/produit/${chemin.split("/").map(encodeURIComponent).join("/")}${ancre ? "#" + encodeURIComponent(ancre) : ""}`,
+  document: (id: string) => `${prefixe}/projet/${encodeURIComponent(id)}`,
+  recherche: (q: string) => `${prefixe}/recherche?q=${encodeURIComponent(q)}`,
+  graphe: (centre?: string) => (centre ? `${prefixe}/graphe?centre=${encodeURIComponent(centre)}` : `${prefixe}/graphe`),
 };

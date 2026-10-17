@@ -27,9 +27,13 @@ wikik serve             # wiki sur http://127.0.0.1:8484
 |---|---|
 | `wikik query carte` · `fichier <chemin>` · `symbole <id> [--code]` · `impact <id>` | Contexte ciblé pour l'agent, coût annoncé en tokens |
 | `wikik query cherche <mots>` · `adr <n>` · `exigence <EF-xxx>` · `perimes` · `ref <@wiki:…>` | Recherche et traçabilité |
-| `wikik check [--format json] [--strict]` | Diagnostics, codes de retour 0 / 1 / 2 |
+| `wikik check [--format json\|github] [--strict]` | Diagnostics, codes de retour 0 / 1 / 2 |
 | `wikik relu <id>` | Déclare un bloc relu après un changement de code |
 | `wikik index [--dump-json]` | Index explicite (les autres commandes le mettent à jour seules) |
+| `wikik export <dossier>` | Site statique du wiki (publiable tel quel, ex. GitHub Pages) |
+| `wikik init --ci` · `--hook` | Workflow GitHub (check annoté, wiki publié), `CODEOWNERS`, hook pre-commit |
+| `wikik nouveau <exigence\|besoin\|adr\|spec> "titre"` | Crée le prochain identifiant libre |
+| `wikik stats` | Couverture de la doc |
 | `wikik mcp` | Serveur MCP (stdio) : les requêtes comme outils pour l'agent. Claude Code : `claude mcp add wikik -- wikik mcp` |
 
 Pour l'agent de code : le skill [`skill/SKILL.md`](./skill/SKILL.md) (règles d'or et procédures). Il est lié pour ce dépôt dans `.claude/skills/wikik` ; pour tous les projets : `ln -s "$PWD/skill" ~/.claude/skills/wikik`.

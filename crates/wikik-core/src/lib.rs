@@ -17,6 +17,7 @@ pub mod projet;
 pub mod query;
 pub mod relu;
 pub mod resolution;
+pub mod stats;
 pub mod wiki;
 
 pub use index::{Index, Rapport};

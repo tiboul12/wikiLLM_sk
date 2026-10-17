@@ -8,12 +8,23 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Configuration d'un projet.
+/// @relu 2026-10-17 f8511f37
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
     pub index: ConfigIndex,
     pub projet: ConfigProjet,
     pub check: ConfigCheck,
+    pub equipe: ConfigEquipe,
+}
+
+/// Section `[equipe]` : qui valide les documents produit (SPEC-16 R4).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigEquipe {
+    /// Comptes ou équipes GitHub (`@tibo`, `@org/produit`) dont l'approbation est exigée sur les
+    /// BDR, cahiers des charges et exigences (fichier `CODEOWNERS`).
+    pub validateurs: Vec<String>,
 }
 
 /// Section `[index]` : ce qui est indexé.

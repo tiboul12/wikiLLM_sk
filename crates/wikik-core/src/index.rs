@@ -22,6 +22,9 @@ use std::time::Instant;
 /// Dossier de travail de wikik dans un projet (ignoré par git).
 pub const DOSSIER: &str = ".wikik";
 
+/// Fichier déposé par `wikik export` à la racine du site : l'indexation ignore ce dossier.
+pub const MARQUEUR_EXPORT: &str = ".wikik-export";
+
 const SCHEMA_SQL: &str = r#"
 CREATE TABLE meta (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL);
 CREATE TABLE etat (chemin TEXT PRIMARY KEY, taille INTEGER NOT NULL, mtime INTEGER NOT NULL, hash TEXT NOT NULL);
@@ -242,8 +245,11 @@ impl Index {
             .overrides(surcharges)
             .filter_entry(|e| {
                 let n = e.file_name().to_string_lossy();
-                !(e.file_type().is_some_and(|t| t.is_dir())
-                    && matches!(n.as_ref(), "target" | "node_modules" | ".git" | DOSSIER))
+                let dossier = e.file_type().is_some_and(|t| t.is_dir());
+                // Un site exporté (`wikik export`) contient le JavaScript compilé du front : jamais indexé.
+                !(dossier
+                    && (matches!(n.as_ref(), "target" | "node_modules" | ".git" | DOSSIER)
+                        || e.path().join(MARQUEUR_EXPORT).exists()))
             })
             .build();
         let dossier_projet = format!("{}/", self.config.projet.dossier.trim_end_matches('/'));

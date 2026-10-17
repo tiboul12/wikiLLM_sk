@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use wikik_core::Index;
 
+mod export;
 mod mcp;
 mod serve;
 
@@ -24,12 +25,30 @@ struct Cli {
 enum Format {
     Texte,
     Json,
+    /// Annotations GitHub Actions (`check` seulement).
+    Github,
 }
 
 #[derive(Subcommand)]
 enum Commande {
     /// Crée `wikik.toml` et l'arborescence `docs/projet/` (n'écrase rien).
-    Init,
+    Init {
+        /// Ajoute le workflow GitHub (check sur PR, wiki publié sur Pages) et `CODEOWNERS`.
+        #[arg(long)]
+        ci: bool,
+        /// Installe un hook git `pre-commit` qui lance `wikik check`.
+        #[arg(long)]
+        hook: bool,
+    },
+    /// Crée le fichier du prochain identifiant libre (`exigence`, `exigence-nf`, `besoin`, `adr`, `spec`).
+    Nouveau { genre: String, titre: String },
+    /// Couverture de la doc : symboles documentés, périmés, exigences couvertes.
+    Stats {
+        #[arg(long, value_enum, default_value = "texte")]
+        format: Format,
+    },
+    /// Écrit le wiki en site statique dans `dossier` (publiable tel quel, ex. GitHub Pages).
+    Export { dossier: std::path::PathBuf },
     /// Construit ou met à jour l'index dans `.wikik/`.
     Index {
         /// Écrit le dump JSON déterministe de l'index (sur la sortie standard si aucun fichier).
@@ -115,7 +134,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-17 072ad631
+/// @relu 2026-10-17 8c147c61
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -142,17 +161,49 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             match format {
                 Format::Texte => print!("{}", wikik_core::check::formater_texte(&rapport)),
                 Format::Json => println!("{}", serde_json::to_string_pretty(&rapport)?),
+                Format::Github => print!("{}", wikik_core::check::formater_github(&rapport)),
             }
             Ok(rapport.code_retour(strict))
         }
-        Commande::Init => {
-            let faits = wikik_core::init::initialiser(&cli.racine)?;
+        Commande::Init { ci, hook } => {
+            let mut faits = wikik_core::init::initialiser(&cli.racine)?;
+            let config = wikik_core::config::Config::charger(&cli.racine)?;
+            if ci {
+                faits.extend(wikik_core::init::ci(&cli.racine, &config)?);
+            }
+            if hook {
+                faits.push(wikik_core::init::hook(&cli.racine)?);
+            }
             if faits.is_empty() {
                 eprintln!("wikik init : rien à faire, le projet est déjà initialisé");
             }
             for f in faits {
                 eprintln!("créé : {f}");
             }
+            Ok(0)
+        }
+        Commande::Nouveau { genre, titre } => {
+            let config = wikik_core::config::Config::charger(&cli.racine)?;
+            let f = wikik_core::init::nouveau(&cli.racine, &config, &genre, &titre)?;
+            println!("{f}");
+            Ok(0)
+        }
+        Commande::Stats { format } => {
+            let mut index = Index::ouvrir(&cli.racine)?;
+            index.mettre_a_jour()?;
+            let s = wikik_core::stats::calculer(&index)?;
+            match format {
+                Format::Json => println!("{}", serde_json::to_string_pretty(&s)?),
+                _ => print!("{}", wikik_core::stats::formater(&s)),
+            }
+            Ok(0)
+        }
+        Commande::Export { dossier } => {
+            let n = export::exporter(&cli.racine, &dossier)?;
+            eprintln!(
+                "wikik export : {n} fichiers écrits dans {}",
+                dossier.display()
+            );
             Ok(0)
         }
         Commande::Query { requete, format } => {
@@ -171,8 +222,8 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
                 Requete::Ref { reference } => q::reference(&index, &reference)?,
             };
             match format {
-                Format::Texte => print!("{}", sortie.texte),
                 Format::Json => println!("{}", serde_json::to_string_pretty(&sortie.json)?),
+                _ => print!("{}", sortie.texte),
             }
             Ok(i32::from(sortie.ambigu))
         }
