@@ -170,4 +170,5 @@ Définition de fini cochée, backlog mis à jour, tag `v4.0`.
 | 1 Spike | ✅ SPIKE-02 : 6 à 10 s par appel, MCP et JSON structuré fiables | 2026-10-18 |
 | 2 BDR + CdC | ✅ proposé (validation déléguée) : 3 besoins, EF-100 à 112, ENF-007 et 008 | 2026-10-18 |
 | 3 Fiches + specs (porte) | ✅ 12 fiches (atelier/techniques/), SPEC-17 à 21 ; porte franchie par délégation | 2026-10-18 |
-| 4 à 10 | ⏳ | |
+| 4 Modèle de données | ✅ atelier indexé, traçabilité contrôlée, outils MCP atelier / document / atelier_rappel | 2026-10-18 |
+| 5 à 10 | ⏳ | |

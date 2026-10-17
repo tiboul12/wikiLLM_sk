@@ -5,6 +5,7 @@
 //!
 //! @adr 2, 5
 
+pub mod atelier;
 pub mod check;
 pub mod config;
 pub mod git;
@@ -29,5 +30,5 @@ pub const SCHEMA: u32 = 2;
 /// Version des règles d'extraction (hash, identifiants, résolution). À incrémenter à chaque
 /// changement qui modifie le contenu de l'index sans changer les fichiers : sinon l'incrémental
 /// garderait des valeurs calculées par l'ancien algorithme et `check` comparerait des hash incompatibles.
-/// @relu 2026-10-17 aa9a1087
-pub const VERSION_EXTRACTION: u32 = 6;
+/// @relu 2026-10-17 d9a2eed6
+pub const VERSION_EXTRACTION: u32 = 7;

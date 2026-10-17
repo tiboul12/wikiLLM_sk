@@ -45,7 +45,7 @@ Vers `docs/projet/` : `besoin` (`B-`, champs `categorie`, `priorite` MoSCoW, `so
 ## Index et contrôles
 
 - L'index lit `docs/atelier/` comme une seconde zone de documents (champs de liens : `sources`, `sujet`, `probleme`, `axe`, plus ceux de la zone Projet).
-- `check` : `exigence-sans-besoin` (avertissement), `besoin-sans-source` (avertissement si le projet a un atelier).
+- `check`, seulement si le projet a un dossier d'atelier : `exigence-sans-besoin` et `besoin-sans-source` (avertissements). Un projet sans atelier (ATS aujourd'hui) n'est pas concerné.
 
 ## Critères d'acceptation
 

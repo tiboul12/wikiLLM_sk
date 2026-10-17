@@ -1058,3 +1058,78 @@ fn retirer_projet(index: &Index, chemin: &str) -> Result<String> {
         _ => Ok(chemin.to_string()),
     }
 }
+
+/// `atelier` : les artefacts de l'atelier par type, un par ligne (identifiant, titre, statut) (SPEC-21).
+///
+/// @req EF-106
+pub fn atelier(index: &Index) -> Result<Sortie> {
+    let dossier = format!("{}/", index.config.atelier.dossier.trim_end_matches('/'));
+    let mut st = index.conn.prepare(
+        "SELECT id, genre, titre, coalesce(statut, '') FROM documents WHERE chemin LIKE ?1 || '%' ORDER BY genre, id",
+    )?;
+    let lignes: Vec<(String, String, String, String)> = st
+        .query_map([&dossier], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    let mut corps = String::new();
+    let mut courant = String::new();
+    for (id, genre, titre, statut) in &lignes {
+        if *genre != courant {
+            corps.push_str(&format!("{genre}\n"));
+            courant = genre.clone();
+        }
+        let marque = if statut.is_empty() {
+            String::new()
+        } else {
+            format!(" [{statut}]")
+        };
+        corps.push_str(&format!("  {id} — {titre}{marque}\n"));
+    }
+    if lignes.is_empty() {
+        corps.push_str("l'atelier est vide\n");
+    }
+    let titre = format!("atelier · {} artefact(s)", lignes.len());
+    let json = json!({ "artefacts": lignes.iter().map(|(i, g, t, s)| json!({"id": i, "type": g, "titre": t, "statut": s})).collect::<Vec<_>>() });
+    Ok(finaliser(&titre, corps, json))
+}
+
+/// `document` : un document de l'atelier ou du projet par identifiant, frontmatter compris (SPEC-21).
+///
+/// @req EF-106
+pub fn document_complet(index: &Index, id: &str) -> Result<Sortie> {
+    let Some(d) = document(index, id)? else {
+        return Ok(sortie_ambigue(id, &[]));
+    };
+    let fm: Value =
+        serde_json::from_str(d["frontmatter"].as_str().unwrap_or("{}")).unwrap_or_default();
+    let mut corps = String::new();
+    if let Some(m) = fm.as_object() {
+        for (k, v) in m
+            .iter()
+            .filter(|(k, _)| !matches!(k.as_str(), "id" | "titre"))
+        {
+            corps.push_str(&format!(
+                "{k} : {}\n",
+                if let Some(t) = v.as_str() {
+                    t.to_string()
+                } else {
+                    v.to_string()
+                }
+            ));
+        }
+    }
+    corps.push_str("---\n");
+    corps.push_str(&tronquer(d["corps"].as_str().unwrap_or_default(), 6000));
+    corps.push('\n');
+    let titre = format!(
+        "document {id} · {} · {}",
+        d["genre"].as_str().unwrap_or_default(),
+        d["titre"].as_str().unwrap_or_default()
+    );
+    Ok(finaliser(
+        &titre,
+        corps,
+        json!({ "document": d, "frontmatter": fm }),
+    ))
+}

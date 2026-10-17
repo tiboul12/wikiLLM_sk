@@ -50,6 +50,7 @@ impl RapportCheck {
 }
 
 /// Sévérité par défaut de chaque code (SPEC-04) ; `wikik.toml` peut la changer.
+/// @relu 2026-10-17 1bf8d441
 pub fn severite_par_defaut(code: &str) -> &'static str {
     match code {
         "ref-adr" | "ref-req" | "lien-casse" | "frontmatter-invalide" | "id-duplique" => "erreur",
@@ -58,7 +59,9 @@ pub fn severite_par_defaut(code: &str) -> &'static str {
         | "manquant"
         | "exigence-non-couverte"
         | "balise-inconnue"
-        | "parse-partiel" => "avertissement",
+        | "parse-partiel"
+        | "exigence-sans-besoin"
+        | "besoin-sans-source" => "avertissement",
         _ => "info",
     }
 }
@@ -124,7 +127,7 @@ struct SymDoc {
 }
 
 /// Lance toutes les vérifications sur un index à jour.
-/// @relu 2026-10-17 a91daaee
+/// @relu 2026-10-17 c95bccbb
 pub fn verifier(index: &Index) -> Result<RapportCheck> {
     let c = &index.conn;
     let mut col = Collecteur {
@@ -332,6 +335,44 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
                 None,
                 format!("{id} (must) n'est citée par aucun `@req`"),
             );
+        }
+    }
+
+    // Traçabilité de l'atelier (SPEC-17) : seulement si le projet a un atelier.
+    if index
+        .racine
+        .join(index.config.atelier.dossier.trim_end_matches('/'))
+        .is_dir()
+    {
+        let mut st = c.prepare("SELECT id, chemin, genre, frontmatter FROM documents WHERE genre IN ('exigence', 'besoin') ORDER BY id")?;
+        let docs: Vec<(String, String, String, String)> = st
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (id, chemin, genre, fm) in docs {
+            let fm: serde_json::Value = serde_json::from_str(&fm).unwrap_or_default();
+            let vide = |cle: &str| {
+                fm.get(cle)
+                    .and_then(|v| v.as_array())
+                    .is_none_or(|a| a.is_empty())
+            };
+            if genre == "exigence" && vide("besoins") {
+                col.ajouter(
+                    "exigence-sans-besoin",
+                    &chemin,
+                    1,
+                    None,
+                    format!("{id} ne cite aucun besoin (`besoins`)"),
+                );
+            }
+            if genre == "besoin" && vide("sources") {
+                col.ajouter(
+                    "besoin-sans-source",
+                    &chemin,
+                    1,
+                    None,
+                    format!("{id} ne cite aucune source dans l'atelier (`sources`)"),
+                );
+            }
         }
     }
 

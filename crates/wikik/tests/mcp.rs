@@ -65,8 +65,19 @@ fn dialogue_mcp() {
         .map(|t| t["name"].as_str().unwrap())
         .collect();
     for o in [
-        "carte", "fichier", "symbole", "impact", "perimes", "cherche", "adr", "exigence", "ref",
+        "carte",
+        "fichier",
+        "symbole",
+        "impact",
+        "perimes",
+        "cherche",
+        "adr",
+        "exigence",
+        "ref",
         "check",
+        "atelier",
+        "document",
+        "atelier_rappel",
     ] {
         assert!(outils.contains(&o), "outil {o}");
     }

@@ -38,7 +38,7 @@ pub struct FichierResume {
     pub documentes: u32,
 }
 
-/// Document de la zone Projet dans la barre latérale.
+/// Document de la zone Projet ou de l'atelier dans la barre latérale.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct DocumentResume {
@@ -47,6 +47,8 @@ pub struct DocumentResume {
     pub genre: String,
     pub titre: String,
     pub statut: Option<String>,
+    /// `projet` ou `atelier` (dossier où vit le document).
+    pub zone: String,
 }
 
 /// Lien vers un symbole ou un document, prêt à afficher.
@@ -187,7 +189,7 @@ fn u(v: i64) -> u32 {
 }
 
 /// Accueil : fichiers avec leur rôle, documents, statistiques.
-/// @relu 2026-10-17 f033f9f2
+/// @relu 2026-10-17 ba7dcf88
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -218,13 +220,21 @@ pub fn projet(index: &Index) -> Result<Projet> {
             })
         })
         .collect::<rusqlite::Result<_>>()?;
+    let dossier_atelier = format!("{}/", index.config.atelier.dossier.trim_end_matches('/'));
     let mut st =
         c.prepare("SELECT id, chemin, genre, titre, statut FROM documents ORDER BY chemin")?;
     let documents = st
         .query_map([], |r| {
+            let chemin: String = r.get(1)?;
+            let zone = if chemin.starts_with(&dossier_atelier) {
+                "atelier"
+            } else {
+                "projet"
+            };
             Ok(DocumentResume {
                 id: r.get(0)?,
-                chemin: r.get(1)?,
+                zone: zone.into(),
+                chemin,
                 genre: r.get(2)?,
                 titre: r.get(3)?,
                 statut: r.get(4)?,

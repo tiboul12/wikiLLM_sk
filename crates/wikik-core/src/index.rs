@@ -134,7 +134,8 @@ impl Index {
     /// Met l'index à jour : seuls les fichiers dont la taille, la date ou le contenu ont changé sont relus.
     ///
     /// Relit aussi les `Cargo.toml` (crates locales) : s'ils changent, la résolution est refaite même
-    /// si aucun fichier de code n'a changé.
+    /// si aucun fichier de code n'a changé. Les documents viennent de deux zones : la zone Projet et
+    /// l'atelier (SPEC-17).
     pub fn mettre_a_jour(&mut self) -> Result<Rapport> {
         let debut = Instant::now();
         let langages = lang::actives(&self.config.index.langages);
@@ -166,6 +167,12 @@ impl Index {
         }
 
         let dossier_projet = self.config.projet.dossier.trim_end_matches('/').to_string();
+        let dossier_atelier = self
+            .config
+            .atelier
+            .dossier
+            .trim_end_matches('/')
+            .to_string();
         for c in &candidats {
             if let Some((taille, mtime, _)) = etat.get(&c.relatif)
                 && *taille == c.taille
@@ -195,6 +202,7 @@ impl Index {
                     let relatif_projet = c
                         .relatif
                         .strip_prefix(&format!("{dossier_projet}/"))
+                        .or_else(|| c.relatif.strip_prefix(&format!("{dossier_atelier}/")))
                         .unwrap_or(&c.relatif);
                     let doc = projet::lire(&c.relatif, relatif_projet, &texte);
                     ecrire_document(&tx, &doc)?;
@@ -253,6 +261,7 @@ impl Index {
             })
             .build();
         let dossier_projet = format!("{}/", self.config.projet.dossier.trim_end_matches('/'));
+        let dossier_atelier = format!("{}/", self.config.atelier.dossier.trim_end_matches('/'));
         let mut v = vec![];
         let mut manifestes = vec![];
         for entree in marcheur {
@@ -281,7 +290,9 @@ impl Index {
             let genre = if let Some(i) = langages.iter().position(|l| l.extensions().contains(&ext))
             {
                 Genre::Code(i)
-            } else if ext == "md" && relatif.starts_with(&dossier_projet) {
+            } else if ext == "md"
+                && (relatif.starts_with(&dossier_projet) || relatif.starts_with(&dossier_atelier))
+            {
                 Genre::Document
             } else {
                 continue;

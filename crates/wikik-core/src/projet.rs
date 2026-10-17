@@ -6,6 +6,7 @@ use crate::hash::empreinte;
 use serde_json::Value;
 
 /// Champs de frontmatter dont les valeurs sont des identifiants de documents (arêtes `lien`).
+/// @relu 2026-10-17 fada8278
 pub const CHAMPS_LIENS: &[&str] = &[
     "besoins",
     "exigences",
@@ -13,6 +14,11 @@ pub const CHAMPS_LIENS: &[&str] = &[
     "sources",
     "remplace",
     "remplace_par",
+    // Atelier (SPEC-17) : d'où vient un artefact, ce qu'il analyse ou clarifie.
+    "sujet",
+    "probleme",
+    "axe",
+    "parent",
 ];
 
 /// Document Markdown de la zone Projet.
@@ -137,7 +143,7 @@ fn valeur_texte(v: &Value) -> Option<String> {
 }
 
 /// Renvoie (yaml, corps, nombre de lignes avant le corps).
-fn separer_frontmatter(contenu: &str) -> (Option<&str>, &str, usize) {
+pub(crate) fn separer_frontmatter(contenu: &str) -> (Option<&str>, &str, usize) {
     let Some(reste) = contenu
         .strip_prefix("---\n")
         .or_else(|| contenu.strip_prefix("---\r\n"))

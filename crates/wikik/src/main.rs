@@ -119,6 +119,10 @@ enum Requete {
     Exigence { id: String },
     /// Résout une référence `@wiki:` copiée depuis le wiki.
     Ref { reference: String },
+    /// Artefacts de l'atelier par type.
+    Atelier,
+    /// Un document de l'atelier ou du projet, frontmatter compris.
+    Document { id: String },
 }
 
 fn main() {
@@ -134,7 +138,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-17 8c147c61
+/// @relu 2026-10-17 416507e2
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -220,6 +224,8 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
                 Requete::Adr { id } => q::adr(&index, &id)?,
                 Requete::Exigence { id } => q::exigence(&index, &id)?,
                 Requete::Ref { reference } => q::reference(&index, &reference)?,
+                Requete::Atelier => q::atelier(&index)?,
+                Requete::Document { id } => q::document_complet(&index, &id)?,
             };
             match format {
                 Format::Json => println!("{}", serde_json::to_string_pretty(&sortie.json)?),

@@ -1,12 +1,14 @@
 <script lang="ts">
-  // Barre latérale : zone Produit (arbre des fichiers) et zone Projet (documents par type).
+  // Barre latérale : zones Produit (arbre des fichiers), Projet et Atelier (documents par type).
   // @relu 2026-10-17 4532aeb1
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
 
   let { projet }: { projet: Projet } = $props();
-  let zone = $state<"produit" | "projet">(routeur.route.page === "document" ? "projet" : "produit");
+  let zone = $state<"produit" | "projet" | "atelier">(routeur.route.page === "document" ? "projet" : "produit");
+  const docsProjet = $derived(projet.documents.filter((d) => d.zone !== "atelier"));
+  const docsAtelier = $derived(projet.documents.filter((d) => d.zone === "atelier"));
 
   const ORDRE: Record<string, [number, string]> = {
     plan: [0, "Plan"],
@@ -18,6 +20,20 @@
     "exigence-nf": [5, "Exigences non fonctionnelles"],
     adr: [6, "Décisions (ADR)"],
     spec: [7, "Specs"],
+    // Atelier (SPEC-17), dans l'ordre du parcours.
+    parcours: [20, "Parcours"],
+    pitch: [21, "Pitch"],
+    axe: [22, "Axes"],
+    ecrit: [23, "Écrits libres"],
+    unite: [24, "Unités de sens"],
+    carte: [25, "Carte mentale"],
+    probleme: [26, "Problèmes"],
+    analogie: [27, "Analogies"],
+    idee: [28, "Idées"],
+    analyse: [29, "Analyses"],
+    scamper: [30, "SCAMPER"],
+    storyboard: [31, "Storyboards"],
+    clarification: [32, "Clarifications"],
   };
 
   const dossiers = $derived.by(() => {
@@ -30,22 +46,26 @@
     return [...m.entries()];
   });
 
-  const groupes = $derived.by(() => {
+  const grouper = (docs: DocumentResume[]) => {
     const m = new Map<string, { rang: number; docs: DocumentResume[] }>();
-    for (const d of projet.documents) {
+    for (const d of docs) {
       const [rang, nom] = ORDRE[d.genre] ?? [9, "Autres"];
       if (!m.has(nom)) m.set(nom, { rang, docs: [] });
       m.get(nom)!.docs.push(d);
     }
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
-  });
+  };
+  const groupes = $derived(grouper(zone === "atelier" ? docsAtelier : docsProjet));
 
   const actif = (href: string) => estCourant(href);
 </script>
 
 <nav class="onglets" aria-label="Zones">
   <button class:actif={zone === "produit"} onclick={() => (zone = "produit")}>Produit <small>{projet.fichiers.length}</small></button>
-  <button class:actif={zone === "projet"} onclick={() => (zone = "projet")}>Projet <small>{projet.documents.length}</small></button>
+  <button class:actif={zone === "projet"} onclick={() => (zone = "projet")}>Projet <small>{docsProjet.length}</small></button>
+  {#if docsAtelier.length}
+    <button class:actif={zone === "atelier"} onclick={() => (zone = "atelier")}>Atelier <small>{docsAtelier.length}</small></button>
+  {/if}
 </nav>
 
 {#key routeur.route}

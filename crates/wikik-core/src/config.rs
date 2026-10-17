@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Configuration d'un projet.
-/// @relu 2026-10-17 f8511f37
+/// @relu 2026-10-17 2ab96c2b
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -16,6 +16,76 @@ pub struct Config {
     pub projet: ConfigProjet,
     pub check: ConfigCheck,
     pub equipe: ConfigEquipe,
+    pub atelier: ConfigAtelier,
+}
+
+/// Section `[atelier]` : dossier des artefacts, adresses des deux serveurs, LLM (SPEC-17 à 21).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigAtelier {
+    /// Dossier des artefacts de l'atelier, relatif à la racine.
+    pub dossier: String,
+    /// Adresse de l'atelier, pour les liens « ouvrir dans l'atelier » du wiki.
+    pub url: String,
+    /// Adresse du wiki, pour les liens « voir dans le wiki » de l'atelier.
+    pub url_wiki: String,
+    pub llm: ConfigLlm,
+}
+
+impl Default for ConfigAtelier {
+    fn default() -> Self {
+        Self {
+            dossier: "docs/atelier".into(),
+            url: "http://127.0.0.1:8485".into(),
+            url_wiki: "http://127.0.0.1:8484".into(),
+            llm: ConfigLlm::default(),
+        }
+    }
+}
+
+/// Section `[atelier.llm]` : commande du fournisseur (SPEC-19). Les jetons `{consigne}`, `{schema}`
+/// et `{mcp}` des arguments sont remplacés à chaque appel.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigLlm {
+    /// `cli` (défaut) ou `factice` (tests, démonstration sans LLM).
+    pub fournisseur: String,
+    pub commande: String,
+    pub arguments: Vec<String>,
+    /// Délai maximum d'un appel, en secondes.
+    pub delai: u64,
+}
+
+impl Default for ConfigLlm {
+    fn default() -> Self {
+        let a = |s: &str| s.to_string();
+        Self {
+            fournisseur: a("cli"),
+            commande: a("claude"),
+            arguments: [
+                "-p",
+                "{consigne}",
+                "--mcp-config",
+                "{mcp}",
+                "--strict-mcp-config",
+                "--restricted",
+                "--tools",
+                "",
+                "--allowedTools",
+                "mcp__wikik",
+                "--output-format",
+                "stream-json",
+                "--verbose",
+                "--json-schema",
+                "{schema}",
+                "--no-session-persistence",
+            ]
+            .iter()
+            .map(|s| a(s))
+            .collect(),
+            delai: 180,
+        }
+    }
 }
 
 /// Section `[equipe]` : qui valide les documents produit (SPEC-16 R4).

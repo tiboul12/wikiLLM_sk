@@ -92,6 +92,28 @@ const OUTILS: &[Outil] = &[
         )],
     },
     Outil {
+        nom: "atelier",
+        description: "Artefacts de l'atelier de définition du besoin (pitch, idées, analyses, storyboards, clarifications…) : identifiant, titre, statut.",
+        parametres: &[],
+    },
+    Outil {
+        nom: "document",
+        description: "Contenu complet d'un document de l'atelier ou du projet (frontmatter et texte), par identifiant : IDEE-003, SB-001, B-002, EF-010…",
+        parametres: &[("id", "Identifiant du document.", true)],
+    },
+    Outil {
+        nom: "atelier_rappel",
+        description: "Rouvre l'atelier sur un besoin, une exigence, un artefact ou un symbole flou : crée une clarification avec la question et renvoie l'adresse de son écran, à transmettre à l'utilisateur. Seul outil qui écrit (un fichier CLAR-xxx).",
+        parametres: &[
+            (
+                "sujet",
+                "Identifiant à clarifier (B-002, EF-010, AC-019, SB-001, chemin::symbole…).",
+                true,
+            ),
+            ("question", "Ce qui est flou, en une ou deux phrases.", true),
+        ],
+    },
+    Outil {
         nom: "check",
         description: "Diagnostics de doc : périmée, manquante, références cassées, exigences non couvertes.",
         parametres: &[],
@@ -207,6 +229,7 @@ fn texte(args: &Value, cle: &str) -> Result<String> {
 }
 
 /// Exécute un outil sur l'index à jour et renvoie la sortie texte de la CLI.
+/// @relu 2026-10-17 7b1f98c9
 fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
     index.mettre_a_jour()?;
     let i = &*index;
@@ -228,6 +251,15 @@ fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
         "exigence" => query::exigence(i, &texte(args, "id")?)?,
         "ref" => query::reference(i, &texte(args, "reference")?)?,
         "check" => return Ok(check::formater_texte(&check::verifier(i)?)),
+        "atelier" => query::atelier(i)?,
+        "document" => query::document_complet(i, &texte(args, "id")?)?,
+        "atelier_rappel" => {
+            let (id, url) =
+                wikik_core::atelier::rappel(i, &texte(args, "sujet")?, &texte(args, "question")?)?;
+            return Ok(format!(
+                "Clarification {id} ouverte. L'utilisateur la traite dans l'atelier : {url}\nSa conclusion sera lisible avec l'outil document ({id})."
+            ));
+        }
         _ => anyhow::bail!("outil inconnu : {nom}"),
     };
     Ok(sortie.texte)
