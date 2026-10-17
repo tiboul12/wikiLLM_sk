@@ -127,10 +127,13 @@ impl Index {
     }
 
     /// Met l'index à jour : seuls les fichiers dont la taille, la date ou le contenu ont changé sont relus.
+    ///
+    /// Relit aussi les `Cargo.toml` (crates locales) : s'ils changent, la résolution est refaite même
+    /// si aucun fichier de code n'a changé.
     pub fn mettre_a_jour(&mut self) -> Result<Rapport> {
         let debut = Instant::now();
         let langages = lang::actives(&self.config.index.langages);
-        let candidats = self.lister(&langages)?;
+        let (candidats, crates) = self.lister(&langages)?;
         let mut rapport = Rapport {
             fichiers: candidats.len(),
             ..Default::default()
@@ -194,7 +197,20 @@ impl Index {
             }
         }
 
-        if rapport.analyses > 0 || rapport.supprimes > 0 {
+        // Crates locales (noms de `Cargo.toml`) : elles servent à résoudre `ma_crate::f()`.
+        let crates_avant: Option<String> = tx
+            .query_row("SELECT valeur FROM meta WHERE cle = 'crates'", [], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        let crates_changent = crates_avant.as_deref() != Some(crates.as_str());
+        if crates_changent {
+            tx.execute(
+                "INSERT OR REPLACE INTO meta VALUES ('crates', ?1)",
+                [&crates],
+            )?;
+        }
+        if rapport.analyses > 0 || rapport.supprimes > 0 || crates_changent {
             resolution::recalculer(&tx)?;
             reconstruire_recherche(&tx)?;
         }
@@ -212,7 +228,7 @@ impl Index {
         Ok(rapport)
     }
 
-    fn lister(&self, langages: &[Box<dyn Langage>]) -> Result<Vec<Candidat>> {
+    fn lister(&self, langages: &[Box<dyn Langage>]) -> Result<(Vec<Candidat>, String)> {
         let mut surcharges = ignore::overrides::OverrideBuilder::new(&self.racine);
         for motif in &self.config.index.exclure {
             surcharges.add(&format!("!{motif}"))?;
@@ -230,6 +246,7 @@ impl Index {
             .build();
         let dossier_projet = format!("{}/", self.config.projet.dossier.trim_end_matches('/'));
         let mut v = vec![];
+        let mut manifestes = vec![];
         for entree in marcheur {
             let entree = entree?;
             if !entree.file_type().is_some_and(|t| t.is_file()) {
@@ -244,6 +261,10 @@ impl Index {
                 .map(|c| c.as_os_str().to_string_lossy())
                 .collect::<Vec<_>>()
                 .join("/");
+            if absolu.file_name().is_some_and(|n| n == "Cargo.toml") {
+                manifestes.push((relatif.clone(), absolu.clone()));
+                continue;
+            }
             let ext = absolu.extension().and_then(|e| e.to_str()).unwrap_or("");
             let genre = if let Some(i) = langages.iter().position(|l| l.extensions().contains(&ext))
             {
@@ -268,7 +289,7 @@ impl Index {
             });
         }
         v.sort_by(|a, b| a.relatif.cmp(&b.relatif));
-        Ok(v)
+        Ok((v, crates_locales(&manifestes)))
     }
 
     /// Dump JSON déterministe : trié, sans horodatage ni identifiant interne (SPEC-02).
@@ -340,6 +361,36 @@ impl Index {
             "liens_doc": liens,
         }))
     }
+}
+
+/// `[{"nom": "ma_crate", "dossier": "shared"}]` trié, à partir des `[package]` et `[lib]` des manifestes.
+fn crates_locales(manifestes: &[(String, PathBuf)]) -> String {
+    let mut v: Vec<(String, String)> = vec![];
+    for (relatif, absolu) in manifestes {
+        let Ok(texte) = std::fs::read_to_string(absolu) else {
+            continue;
+        };
+        let Ok(t) = texte.parse::<toml::Table>() else {
+            continue;
+        };
+        let dossier = relatif.rsplit_once('/').map_or("", |p| p.0).to_string();
+        for section in ["package", "lib"] {
+            if let Some(nom) = t
+                .get(section)
+                .and_then(|x| x.get("name"))
+                .and_then(|x| x.as_str())
+            {
+                v.push((nom.replace('-', "_"), dossier.clone()));
+            }
+        }
+    }
+    v.sort();
+    v.dedup();
+    let liste: Vec<Value> = v
+        .into_iter()
+        .map(|(n, d)| json!({"nom": n, "dossier": d}))
+        .collect();
+    Value::Array(liste).to_string()
 }
 
 fn ecrire_fichier(

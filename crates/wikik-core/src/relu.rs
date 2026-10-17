@@ -31,14 +31,20 @@ fn date_civile(jours: i64) -> String {
     format!("{:04}-{:02}-{:02}", if m <= 2 { a + 1 } else { a }, m, j)
 }
 
-/// Ajoute ou remplace la ligne `@relu` à la fin du bloc de `id` ; renvoie le fichier modifié.
+/// Empreinte courte du code relu (signature + corps), écrite après la date de `@relu` : le texte du
+/// bloc change donc à chaque relecture d'un code différent, et `check` sait quel code a été relu.
+pub fn jeton(hash_signature: &str, hash_corps: &str) -> String {
+    crate::hash::empreinte(format!("{hash_signature}{hash_corps}").as_bytes())[..8].to_string()
+}
+
+/// Ajoute ou remplace la ligne `@relu <date> <jeton>` à la fin du bloc de `id` ; renvoie le fichier modifié.
 pub fn marquer(index: &Index, id: &str, date: &str) -> Result<String> {
-    let (fichier, debut, fin): (String, Option<i64>, Option<i64>) = index
+    let (fichier, debut, fin, corps, sig): (String, Option<i64>, Option<i64>, String, String) = index
         .conn
         .query_row(
-            "SELECT fichier, doc_ligne_debut, doc_ligne_fin FROM symboles WHERE id = ?1",
+            "SELECT fichier, doc_ligne_debut, doc_ligne_fin, hash_corps, hash_signature FROM symboles WHERE id = ?1",
             [id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
         )
         .with_context(|| format!("symbole inconnu : {id}"))?;
     let (Some(debut), Some(fin)) = (debut, fin) else {
@@ -62,7 +68,7 @@ pub fn marquer(index: &Index, id: &str, date: &str) -> Result<String> {
                 .chars()
                 .take_while(|c| c.is_whitespace())
                 .collect();
-            lignes[i] = format!("{indentation}/// @relu {date}");
+            lignes[i] = format!("{indentation}/// @relu {date} {}", jeton(&sig, &corps));
         }
         None => {
             if !lignes[f].trim_start().starts_with("///") {
@@ -74,7 +80,10 @@ pub fn marquer(index: &Index, id: &str, date: &str) -> Result<String> {
                 .chars()
                 .take_while(|c| c.is_whitespace())
                 .collect();
-            lignes.insert(f + 1, format!("{indentation}/// @relu {date}"));
+            lignes.insert(
+                f + 1,
+                format!("{indentation}/// @relu {date} {}", jeton(&sig, &corps)),
+            );
         }
     }
     let mut sortie = lignes.join(fin_ligne);

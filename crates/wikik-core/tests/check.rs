@@ -64,7 +64,7 @@ impl Depot {
     fn commit(&mut self, message: &str) {
         self.horloge += 1;
         self.git(&["add", "-A"]);
-        self.git(&["commit", "-q", "-m", message]);
+        self.git(&["commit", "-q", "--allow-empty", "-m", message]);
     }
 
     fn check(&self) -> RapportCheck {
@@ -116,6 +116,19 @@ fn scenario_specs04() {
     );
     d.commit("3 : relu");
     assert!(d.codes().is_empty(), "{:?}", d.codes());
+
+    // 3b : nouveau changement de corps, puis relu le même jour : le jeton change, le bloc redevient frais.
+    let v = std::fs::read_to_string(d.chemin().join("src/lib.rs")).unwrap();
+    d.ecrire(&v.replace("wrapping_mul(2)", "wrapping_mul(2) | 0"));
+    d.commit("3b : corps");
+    assert_eq!(d.codes(), vec!["perime-corps"]);
+    {
+        let mut i = Index::ouvrir(d.chemin()).unwrap();
+        i.mettre_a_jour().unwrap();
+        wikik_core::relu::marquer(&i, "src/lib.rs::f", "2026-01-01").unwrap();
+    }
+    assert!(d.codes().is_empty(), "relu le même jour : {:?}", d.codes());
+    d.commit("3c : relu");
 
     // 4 : reformatage seul → rien.
     let fmt = Command::new("rustfmt")

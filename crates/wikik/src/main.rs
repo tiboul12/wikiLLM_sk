@@ -48,7 +48,7 @@ enum Commande {
         #[arg(long, value_enum, default_value = "texte", global = true)]
         format: Format,
     },
-    /// Marque le bloc d'un symbole comme relu (`@relu AAAA-MM-JJ`).
+    /// Marque le bloc d'un symbole comme relu (`@relu AAAA-MM-JJ <jeton du code>`).
     Relu { symbole: String },
     /// Sert le wiki en local, en lecture seule.
     Serve {
@@ -62,7 +62,11 @@ enum Commande {
 #[derive(Subcommand)]
 enum Requete {
     /// Modules et fichiers avec leur rôle en une ligne.
-    Carte,
+    Carte {
+        /// Détail de chaque fichier même au-delà de 150 fichiers.
+        #[arg(long)]
+        complet: bool,
+    },
     /// En-tête, symboles et imports d'un fichier.
     Fichier { chemin: String },
     /// Doc, signature, appelants, appelés, liens d'un symbole.
@@ -103,7 +107,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-17
+/// @relu 2026-10-17 001d848a
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -133,6 +137,37 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             }
             Ok(rapport.code_retour(strict))
         }
+        Commande::Init => {
+            let faits = wikik_core::init::initialiser(&cli.racine)?;
+            if faits.is_empty() {
+                eprintln!("wikik init : rien à faire, le projet est déjà initialisé");
+            }
+            for f in faits {
+                eprintln!("créé : {f}");
+            }
+            Ok(0)
+        }
+        Commande::Query { requete, format } => {
+            let mut index = Index::ouvrir(&cli.racine)?;
+            index.mettre_a_jour()?;
+            use wikik_core::query as q;
+            let sortie = match requete {
+                Requete::Carte { complet } => q::carte(&index, complet)?,
+                Requete::Fichier { chemin } => q::fichier(&index, &chemin)?,
+                Requete::Symbole { id, code } => q::symbole(&index, &id, code)?,
+                Requete::Impact { id, profondeur } => q::impact(&index, &id, profondeur)?,
+                Requete::Perimes => q::perimes(&index)?,
+                Requete::Cherche { texte } => q::cherche(&index, &texte.join(" "))?,
+                Requete::Adr { id } => q::adr(&index, &id)?,
+                Requete::Exigence { id } => q::exigence(&index, &id)?,
+                Requete::Ref { reference } => q::reference(&index, &reference)?,
+            };
+            match format {
+                Format::Texte => print!("{}", sortie.texte),
+                Format::Json => println!("{}", serde_json::to_string_pretty(&sortie.json)?),
+            }
+            Ok(i32::from(sortie.ambigu))
+        }
         Commande::Relu { symbole } => {
             let mut index = Index::ouvrir(&cli.racine)?;
             index.mettre_a_jour()?;
@@ -144,10 +179,12 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
         }
         autre => {
             let nom = match autre {
-                Commande::Init => "init",
-                Commande::Query { .. } => "query",
                 Commande::Serve { .. } => "serve",
-                Commande::Index { .. } | Commande::Check { .. } | Commande::Relu { .. } => {
+                Commande::Init
+                | Commande::Index { .. }
+                | Commande::Check { .. }
+                | Commande::Query { .. }
+                | Commande::Relu { .. } => {
                     unreachable!()
                 }
             };

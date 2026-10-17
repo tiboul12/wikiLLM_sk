@@ -130,6 +130,7 @@ fn se_termine_par(segs: &[String], suffixe: &[String]) -> bool {
 }
 
 /// Recalcule toutes les arêtes et la cible des liens de documents.
+/// @relu 2026-10-17
 pub fn recalculer(tx: &Transaction) -> Result<()> {
     let symboles: Vec<Sym> = {
         let mut st = tx.prepare(
@@ -162,6 +163,30 @@ pub fn recalculer(tx: &Transaction) -> Result<()> {
             .collect::<rusqlite::Result<_>>()?
     };
 
+    let crates: HashMap<String, String> = {
+        let brut: Option<String> = tx
+            .query_row("SELECT valeur FROM meta WHERE cle = 'crates'", [], |r| {
+                r.get(0)
+            })
+            .ok();
+        let v: Vec<serde_json::Value> = brut
+            .and_then(|b| serde_json::from_str(&b).ok())
+            .unwrap_or_default();
+        v.iter()
+            .filter_map(|c| {
+                Some((
+                    c["nom"].as_str()?.to_string(),
+                    c["dossier"].as_str()?.to_string(),
+                ))
+            })
+            .collect()
+    };
+    let ctx = Contexte {
+        par_nom: &par_nom,
+        imports: &imports,
+        crates: &crates,
+    };
+
     let mut aretes: Aretes = BTreeMap::new();
 
     // Appels et composants rendus.
@@ -177,7 +202,7 @@ pub fn recalculer(tx: &Transaction) -> Result<()> {
             continue;
         };
         let genre = if forme == "rend" { "rend" } else { "appel" };
-        for (id, confiance) in resoudre(src, forme, cible, qualif.as_deref(), &par_nom, &imports) {
+        for (id, confiance) in resoudre(src, forme, cible, qualif.as_deref(), &ctx) {
             ajouter(&mut aretes, source, &id, genre, confiance, Some(*ligne));
         }
     }
@@ -264,14 +289,22 @@ pub fn recalculer(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
+/// Tables partagées par la résolution de tous les sites d'appel.
+struct Contexte<'a, 'b> {
+    par_nom: &'a HashMap<&'b str, Vec<&'b Sym>>,
+    imports: &'a HashMap<(String, String), String>,
+    /// Nom de crate locale (`ma_crate`) → dossier de son `Cargo.toml`.
+    crates: &'a HashMap<String, String>,
+}
+
 fn resoudre(
     src: &Sym,
     forme: &str,
     cible: &str,
     qualif: Option<&str>,
-    par_nom: &HashMap<&str, Vec<&Sym>>,
-    imports: &HashMap<(String, String), String>,
+    ctx: &Contexte,
 ) -> Vec<(String, &'static str)> {
+    let (par_nom, imports) = (ctx.par_nom, ctx.imports);
     let vide = vec![];
     let fonctions = |nom: &str| -> Vec<&Sym> {
         par_nom
@@ -300,7 +333,7 @@ fn resoudre(
                 return locales.iter().map(|s| (s.id.clone(), "certain")).collect();
             }
             if let Some(chemin) = imports.get(&(src.fichier.clone(), cible.to_string())) {
-                let r = par_suffixe(&normaliser_chemin(chemin, src, imports), par_nom);
+                let r = par_suffixe(&normaliser_chemin(chemin, src, ctx), par_nom);
                 if r.len() == 1 {
                     return vec![(r[0].id.clone(), "certain")];
                 }
@@ -312,7 +345,7 @@ fn resoudre(
             vec![]
         }
         "chemin" => {
-            let segs = normaliser_chemin(cible, src, imports);
+            let segs = normaliser_chemin(cible, src, ctx);
             if segs.len() == 2 && src.type_parent.as_deref() == Some(segs[0].as_str()) {
                 let meme_fichier: Vec<&Sym> = par_nom
                     .get(segs[1].as_str())
@@ -380,12 +413,10 @@ fn resoudre(
     }
 }
 
-/// `crate::a::f` → `[a, f]` ; `Self::f` → `[Type, f]` ; premier segment importé → chemin de l'import.
-fn normaliser_chemin(
-    chemin: &str,
-    src: &Sym,
-    imports: &HashMap<(String, String), String>,
-) -> Vec<String> {
+/// `crate::a::f` → `[a, f]` ; `Self::f` → `[Type, f]` ; premier segment importé → chemin de l'import ;
+/// `ma_crate::f` → `[f]` si `ma_crate` est une crate du projet.
+fn normaliser_chemin(chemin: &str, src: &Sym, ctx: &Contexte) -> Vec<String> {
+    let imports = ctx.imports;
     let mut segs = segments_chemin(chemin);
     if segs.first().is_some_and(|s| s == "Self")
         && let Some(t) = &src.type_parent
@@ -403,6 +434,10 @@ fn normaliser_chemin(
         .first()
         .is_some_and(|s| matches!(s.as_str(), "crate" | "self" | "super"))
     {
+        segs.remove(0);
+    }
+    // `ma_crate::f` : crate du projet, son nom ne fait pas partie du chemin de module.
+    if segs.len() > 1 && ctx.crates.contains_key(&segs[0]) {
         segs.remove(0);
     }
     segs

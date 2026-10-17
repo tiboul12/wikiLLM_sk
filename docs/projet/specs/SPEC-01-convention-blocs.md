@@ -48,7 +48,7 @@ pub fn compile(/* … */) { /* … */ }
 | `@req` | un ou plusieurs `EF-xxx` / `ENF-xxx` | majuscules | arête `req` symbole → exigence |
 | `@topic` | un ou plusieurs identifiants courts en kebab-case | minuscules | arête `topic` ; page transversale dans le wiki |
 | `@pitfall` | texte libre jusqu'à la fin de la ligne | aucune | attribut « piège », mis en avant dans `symbole` et `impact` |
-| `@relu` | date `AAAA-MM-JJ` | aucune | rafraîchit le bloc sans le réécrire (voir SPEC-04) |
+| `@relu` | date `AAAA-MM-JJ`, puis jeton de 8 caractères écrit par `wikik relu` | aucune | déclare le bloc relu pour le code dont le jeton est l'empreinte (voir SPEC-04) |
 
 Règle de reconnaissance : après `///` ou `//!` et des blancs, la ligne commence par `@` suivi d'un nom de balise en minuscules. Un `@` au milieu d'une phrase (adresse, mention) n'est jamais une balise.
 

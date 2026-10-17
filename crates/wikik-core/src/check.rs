@@ -124,6 +124,7 @@ struct SymDoc {
 }
 
 /// Lance toutes les vérifications sur un index à jour.
+/// @relu 2026-10-17
 pub fn verifier(index: &Index) -> Result<RapportCheck> {
     let c = &index.conn;
     let mut col = Collecteur {
@@ -131,33 +132,7 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
         diagnostics: vec![],
     };
 
-    let symboles: Vec<SymDoc> = {
-        let mut st = c.prepare(
-            "SELECT id, fichier, nom, nom_qualifie, genre, visibilite, ligne_debut, doc_ligne_debut, doc_ligne_fin,
-                    signature, resume, doc, hash_corps, hash_signature, hash_doc, est_test FROM symboles ORDER BY id",
-        )?;
-        st.query_map([], |r| {
-            Ok(SymDoc {
-                id: r.get(0)?,
-                fichier: r.get(1)?,
-                nom: r.get(2)?,
-                nom_qualifie: r.get(3)?,
-                genre: r.get(4)?,
-                visibilite: r.get(5)?,
-                ligne_debut: r.get::<_, i64>(6)? as usize,
-                doc_ligne_debut: r.get::<_, Option<i64>>(7)?.map(|v| v as usize),
-                doc_ligne_fin: r.get::<_, Option<i64>>(8)?.map(|v| v as usize),
-                signature: r.get(9)?,
-                resume: r.get(10)?,
-                doc: r.get(11)?,
-                hash_corps: r.get(12)?,
-                hash_signature: r.get(13)?,
-                hash_doc: r.get(14)?,
-                est_test: r.get::<_, i64>(15)? != 0,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?
-    };
+    let symboles = charger_symboles(c, None)?;
 
     // Blocs manquants (SPEC-01 R5) et heuristiques de rédaction.
     let seuil = index.config.check.seuil_visibilite.as_str();
@@ -384,6 +359,72 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
     })
 }
 
+fn charger_symboles(c: &rusqlite::Connection, fichiers: Option<&[String]>) -> Result<Vec<SymDoc>> {
+    // Filtre passé en une seule chaîne `\nf1\nf2\n` pour rester dans une requête préparée.
+    let filtre: Option<String> = fichiers.map(|f| format!("\n{}\n", f.join("\n")));
+    let mut st = c.prepare(
+            "SELECT id, fichier, nom, nom_qualifie, genre, visibilite, ligne_debut, doc_ligne_debut, doc_ligne_fin,
+                    signature, resume, doc, hash_corps, hash_signature, hash_doc, est_test FROM symboles
+             WHERE ?1 IS NULL OR instr(?1, char(10) || fichier || char(10)) > 0 ORDER BY id",
+        )?;
+    let v = st
+        .query_map([filtre], |r| {
+            Ok(SymDoc {
+                id: r.get(0)?,
+                fichier: r.get(1)?,
+                nom: r.get(2)?,
+                nom_qualifie: r.get(3)?,
+                genre: r.get(4)?,
+                visibilite: r.get(5)?,
+                ligne_debut: r.get::<_, i64>(6)? as usize,
+                doc_ligne_debut: r.get::<_, Option<i64>>(7)?.map(|v| v as usize),
+                doc_ligne_fin: r.get::<_, Option<i64>>(8)?.map(|v| v as usize),
+                signature: r.get(9)?,
+                resume: r.get(10)?,
+                doc: r.get(11)?,
+                hash_corps: r.get(12)?,
+                hash_signature: r.get(13)?,
+                hash_doc: r.get(14)?,
+                est_test: r.get::<_, i64>(15)? != 0,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(v)
+}
+
+/// Statut de doc des symboles des fichiers donnés : `à jour`, `périmé` ou `sans doc` (SPEC-07).
+pub fn statuts(index: &Index, fichiers: &[String]) -> Result<HashMap<String, String>> {
+    let symboles = charger_symboles(&index.conn, Some(fichiers))?;
+    let vide = BTreeMap::new();
+    let mut col = Collecteur {
+        severites: &vide,
+        diagnostics: vec![],
+    };
+    match Depot::trouver(&index.racine) {
+        Some(depot) => perimes_git(index, &depot, &symboles, &mut col)?,
+        None => perimes_local(index, &symboles, &mut col)?,
+    }
+    let perimes: HashSet<String> = col
+        .diagnostics
+        .into_iter()
+        .filter(|d| d.code == "perime-corps" || d.code == "perime-signature")
+        .filter_map(|d| d.symbole)
+        .collect();
+    Ok(symboles
+        .into_iter()
+        .map(|s| {
+            let statut = if s.doc.is_none() {
+                "sans doc"
+            } else if perimes.contains(&s.id) {
+                "périmé"
+            } else {
+                "à jour"
+            };
+            (s.id, statut.to_string())
+        })
+        .collect())
+}
+
 /// Le résumé n'utilise que des mots du nom et de la signature (SPEC-01, indice et non règle).
 fn paraphrase(resume: &str, nom: &str, signature: &str) -> bool {
     let mots = |t: &str| -> Vec<String> {
@@ -410,12 +451,34 @@ fn paraphrase(resume: &str, nom: &str, signature: &str) -> bool {
     !significatifs.is_empty() && significatifs.iter().all(|m| identifiants.contains(m))
 }
 
+/// Symboles dont la dernière balise `@relu` porte le jeton du code actuel : relus, donc frais.
+fn relus_a_jour(index: &Index, symboles: &[SymDoc]) -> Result<HashSet<String>> {
+    let mut st = index
+        .conn
+        .prepare("SELECT symbole, valeur FROM balises WHERE nom = 'relu'")?;
+    let jetons: Vec<(String, String)> = st
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let par_id: HashMap<&str, &SymDoc> = symboles.iter().map(|s| (s.id.as_str(), s)).collect();
+    Ok(jetons
+        .into_iter()
+        .filter(|(id, valeur)| {
+            par_id.get(id.as_str()).is_some_and(|s| {
+                valeur.split_whitespace().nth(1)
+                    == Some(crate::relu::jeton(&s.hash_signature, &s.hash_corps).as_str())
+            })
+        })
+        .map(|(id, _)| id)
+        .collect())
+}
+
 fn perimes_git(
     index: &Index,
     depot: &Depot,
     symboles: &[SymDoc],
     col: &mut Collecteur,
 ) -> Result<()> {
+    let relus = relus_a_jour(index, symboles)?;
     let rust = rust::Rust;
     let mut par_fichier: BTreeMap<&str, Vec<&SymDoc>> = BTreeMap::new();
     for s in symboles
@@ -431,7 +494,7 @@ fn perimes_git(
         let Some(blame) = depot.blame(fichier) else {
             continue;
         };
-        for s in syms {
+        for s in syms.into_iter().filter(|s| !relus.contains(&s.id)) {
             let (Some(d), Some(f)) = (s.doc_ligne_debut, s.doc_ligne_fin) else {
                 continue;
             };
@@ -516,6 +579,7 @@ fn charger_ancien(
 }
 
 /// Repli hors git : référence = état vu quand le bloc est apparu ou a changé, gardé dans `.wikik/`.
+/// Comme en mode git, un bloc dont le jeton `@relu` correspond au code actuel est frais.
 fn perimes_local(index: &Index, symboles: &[SymDoc], col: &mut Collecteur) -> Result<()> {
     let chemin = index.racine.join(DOSSIER).join("reference.json");
     let mut reference: BTreeMap<String, (String, String, String)> =
@@ -523,7 +587,11 @@ fn perimes_local(index: &Index, symboles: &[SymDoc], col: &mut Collecteur) -> Re
             .ok()
             .and_then(|t| serde_json::from_str(&t).ok())
             .unwrap_or_default();
-    for s in symboles.iter().filter(|s| !s.est_test) {
+    let relus = relus_a_jour(index, symboles)?;
+    for s in symboles
+        .iter()
+        .filter(|s| !s.est_test && !relus.contains(&s.id))
+    {
         let Some(hd) = &s.hash_doc else { continue };
         match reference.get(&s.id) {
             Some((doc, corps, sig)) if doc == hd => {

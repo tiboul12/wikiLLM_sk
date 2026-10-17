@@ -88,7 +88,9 @@ Tri : fichier, ligne, code, symbole.
 
 ### `wikik relu <symbole>`
 
-Ajoute ou met à jour la ligne `/// @relu AAAA-MM-JJ` en fin du bloc du symbole. C'est la seule commande v1 qui écrit dans le code ; elle n'écrit que cette ligne.
+Ajoute ou met à jour la ligne `/// @relu AAAA-MM-JJ <jeton>` en fin du bloc du symbole, où `<jeton>` est l'empreinte (8 caractères) de la signature et du corps relus. C'est la seule commande v1 qui écrit dans le code ; elle n'écrit que cette ligne.
+
+Un symbole dont le jeton `@relu` correspond à son code actuel n'est jamais signalé périmé, quel que soit l'historique git. Ajouté après usage : sans jeton, relancer `relu` le même jour sur un bloc déjà marqué ne changeait pas le texte, et le bloc restait périmé.
 
 ## Alternatives écartées
 

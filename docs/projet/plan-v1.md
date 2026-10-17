@@ -352,6 +352,6 @@ ATS est déjà écrit avec **Leptos** (Rust/WASM) et Tauri. Tu maîtrises donc u
 | 4 Squelette | ✅ terminée | 2026-10-17 |
 | 5 Extracteur + index | ✅ terminée (ATS : 645 symboles en 203 ms, 513 appels certains) | 2026-10-17 |
 | 6 check | ✅ terminée (ATS : 21 docs périmées réelles en 1,2 s ; wikiK : 0 diagnostic) | 2026-10-17 |
-| 7 Requêtes + skill (v1-agent) | ⏳ | |
+| 7 Requêtes + skill (v1-agent) | ✅ terminée (MESURE-01 : contexte ÷ 22 à ÷ 84 sur ATS) ; reste à faire avec Tibo : amorçage d'ATS (autre dépôt), installation globale du skill, mesure en session réelle | 2026-10-17 |
 | 8 Wiki local | ⏳ | |
 | 9 Clôture (v1.0) | ⏳ | |
