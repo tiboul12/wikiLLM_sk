@@ -346,7 +346,7 @@ ATS est déjà écrit avec **Leptos** (Rust/WASM) et Tauri. Tu maîtrises donc u
 |---|---|---|
 | Analyse et décisions A1-A6 | ✅ terminée | 2026-10-17 |
 | 0 Ménage | ✅ terminée | 2026-10-17 |
-| 1 Spike | ⏳ | |
+| 1 Spike | ✅ terminée (SPIKE-01) | 2026-10-17 |
 | 2 BDR + CdC | ⏳ | |
 | 3 Specs + ADR (porte) | ⏳ | |
 | 4 Squelette | ⏳ | |
