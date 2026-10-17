@@ -340,10 +340,12 @@ ATS est déjà écrit avec **Leptos** (Rust/WASM) et Tauri. Tu maîtrises donc u
 
 ## 7. Suivi
 
+> **17/10/2026 : exécution en continu déléguée.** Tibo a demandé d'enchaîner les phases sans s'arrêter. Les portes de validation (BDR, cahier des charges, specs, ADR) sont donc franchies **par délégation** : les documents sont produits au statut `proposé` et Claude Code applique les recommandations par défaut. Tibo les relit a posteriori ; toute correction de sa part repasse par une mise à jour des documents puis du code.
+
 | Phase | Statut | Date |
 |---|---|---|
 | Analyse et décisions A1-A6 | ✅ terminée | 2026-10-17 |
-| 0 Ménage | 🔄 en revue (CLAUDE.md à relire) | 2026-10-17 |
+| 0 Ménage | ✅ terminée | 2026-10-17 |
 | 1 Spike | ⏳ | |
 | 2 BDR + CdC | ⏳ | |
 | 3 Specs + ADR (porte) | ⏳ | |

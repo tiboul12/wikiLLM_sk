@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .wikillm_projets.json
+# Dépôt local de Tibo : réflexions, données et captures fournies à Claude (jamais versionné)
 .doc/
 
 # Refonte Rust (plan docs/projet/plan-v1.md)
