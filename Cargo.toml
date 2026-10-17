@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = ["crates/wikik-core", "crates/wikik"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/tiboul12/wiki_LLM"
+
+[workspace.dependencies]
+wikik-core = { path = "crates/wikik-core" }
+anyhow = "1"
+clap = { version = "4.6", features = ["derive"] }
+ignore = "0.4.33"
+rusqlite = { version = "0.40", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+sha2 = "0.11"
+toml = "1"
+tree-sitter = "0.27"
+tree-sitter-rust = "0.24.2"

@@ -1,0 +1,3 @@
+# Configuration wikik du dépôt wikiK lui-même.
+[index]
+exclure = ["tests/fixtures/**", "spikes/**", "legacy/**"]
