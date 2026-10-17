@@ -124,7 +124,7 @@ struct SymDoc {
 }
 
 /// Lance toutes les vérifications sur un index à jour.
-/// @relu 2026-10-17 6e4c74e6
+/// @relu 2026-10-17 a91daaee
 pub fn verifier(index: &Index) -> Result<RapportCheck> {
     let c = &index.conn;
     let mut col = Collecteur {
@@ -145,8 +145,9 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
             "pub-crate" => s.visibilite != "prive",
             _ => s.visibilite == "pub",
         };
-        // Les méthodes d'un impl de trait héritent de la doc du trait ; un module en ligne n'est pas exigé.
-        let exempte = s.nom_qualifie.contains('<') || s.genre == "mod";
+        // Les méthodes d'un impl de trait héritent de la doc du trait ; un module en ligne ou un champ
+        // de classe (TypeScript) n'est pas exigé.
+        let exempte = s.nom_qualifie.contains('<') || matches!(s.genre.as_str(), "mod" | "champ");
         match &s.doc {
             None if exige && !exempte => col.ajouter(
                 "manquant",
@@ -222,7 +223,9 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
             .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
             .collect::<rusqlite::Result<_>>()?;
         for (sym, fichier, nom, ligne) in lignes {
-            if !rust::BALISES_CONNUES.contains(&nom.as_str()) {
+            if !rust::BALISES_CONNUES.contains(&nom.as_str())
+                && !crate::lang::typescript::BALISES_JSDOC.contains(&nom.as_str())
+            {
                 col.ajouter(
                     "balise-inconnue",
                     &fichier,
@@ -481,7 +484,7 @@ fn perimes_git(
     col: &mut Collecteur,
 ) -> Result<()> {
     let relus = relus_a_jour(index, symboles)?;
-    let rust = rust::Rust;
+    let langages = crate::lang::actives(&index.config.index.langages);
     let mut par_fichier: BTreeMap<&str, Vec<&SymDoc>> = BTreeMap::new();
     for s in symboles
         .iter()
@@ -510,7 +513,13 @@ fn perimes_git(
                 .unwrap();
             let cle = (reference.commit.clone(), reference.chemin.clone());
             if !anciens.contains_key(&cle) {
-                let table = charger_ancien(depot, &rust, fichier, &cle.0, &cle.1, &cache_dir);
+                // L'état passé se relit avec l'extracteur du langage du fichier.
+                let ext = fichier.rsplit('.').next().unwrap_or("");
+                let Some(langage) = langages.iter().find(|l| l.extensions().contains(&ext)) else {
+                    continue;
+                };
+                let table =
+                    charger_ancien(depot, langage.as_ref(), fichier, &cle.0, &cle.1, &cache_dir);
                 anciens.insert(cle.clone(), table);
             }
             let court = &reference.commit[..7];
@@ -543,18 +552,21 @@ fn perimes_git(
     Ok(())
 }
 
-/// Hash (corps, signature) des symboles d'un fichier à un commit, avec cache disque par (commit, chemin).
+/// Hash (corps, signature) des symboles d'un fichier à un commit, relus avec l'extracteur de son langage ;
+/// cache disque par (version des règles, langage, commit, chemin).
 fn charger_ancien(
     depot: &Depot,
-    rust: &rust::Rust,
+    langage: &dyn Langage,
     fichier_projet: &str,
     commit: &str,
     chemin_depot: &str,
     cache_dir: &std::path::Path,
 ) -> HashMap<String, (String, String)> {
+    // Clé : version des règles, langage, commit, chemins ; un changement de l'un invalide l'entrée.
     let nom_cache = format!(
-        "v{}-{commit}-{}.json",
+        "v{}-{}-{commit}-{}.json",
         crate::VERSION_EXTRACTION,
+        langage.nom(),
         crate::hash::empreinte(format!("{chemin_depot}\0{fichier_projet}").as_bytes())
     );
     let chemin_cache = cache_dir.join(nom_cache);
@@ -567,7 +579,7 @@ fn charger_ancien(
         return HashMap::new();
     };
     // Même chemin que l'actuel : les identifiants se comparent directement, même après renommage du fichier.
-    let extrait = rust.extraire(fichier_projet, &octets);
+    let extrait = langage.extraire(fichier_projet, &octets);
     let table: HashMap<String, (String, String)> = extrait
         .symboles
         .into_iter()

@@ -7,10 +7,11 @@
   import Lien from "./Lien.svelte";
   import Balises from "./Balises.svelte";
 
-  let { cellule, ouverte = false }: { cellule: Cellule; ouverte?: boolean } = $props();
+  let { cellule, ouverte = false, langage = "rust" }: { cellule: Cellule; ouverte?: boolean; langage?: string } = $props();
   let copie = $state(false);
   const doc = $derived(cellule.doc ? rendre(cellule.doc) : "");
-  const code = $derived(colorer(cellule.code, "rust"));
+  const code = $derived(colorer(cellule.code, langage));
+  const nbLignes = $derived(cellule.ligne_fin - cellule.ligne_debut + 1);
   const classeStatut = $derived(cellule.statut === "périmé" ? "perime" : cellule.statut === "sans doc" ? "sansdoc" : "ajour");
 
   async function hook() {
@@ -28,7 +29,7 @@
     <a class="action" href={url.graphe(cellule.id)} title="Graphe local">◎</a>
     <button class="hook" class:copie onclick={hook} title="Copier la référence pour un prompt">⚓</button>
   </header>
-  <pre class="signature"><code class="hljs">{@html colorer(cellule.signature, "rust")}</code></pre>
+  <pre class="signature"><code class="hljs">{@html colorer(cellule.signature, langage)}</code></pre>
   {#if doc}
     <div class="doc prose">{@html doc}</div>
   {:else}
@@ -46,7 +47,7 @@
     </div>
   {/if}
   <details class="code" open={ouverte}>
-    <summary>Code ({cellule.ligne_fin - cellule.ligne_debut + 1} lignes)</summary>
+    <summary>Code ({nbLignes} ligne{nbLignes > 1 ? "s" : ""})</summary>
     <pre><code class="hljs">{@html code}</code></pre>
   </details>
 </article>

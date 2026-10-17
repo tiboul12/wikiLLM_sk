@@ -4,8 +4,8 @@
 
 `wikik` est un binaire Rust unique qui :
 
-- **indexe** la doc écrite dans le code (`///`, `//!`) et la zone Projet (`docs/projet/` : besoins, exigences, ADR, specs) avec tree-sitter et SQLite ;
-- **répond à l'agent de code** à faible coût en tokens (`wikik query …`) : sur ATS, le contexte d'une modification coûte 20 à 80 fois moins que la lecture des fichiers ([MESURE-01](./docs/projet/mesures/mesure-01-v1-agent.md)) ;
+- **indexe** la doc écrite dans le code, Rust (`///`, `//!`) et TypeScript (JSDoc `/** */`), et la zone Projet (`docs/projet/` : besoins, exigences, ADR, specs) avec tree-sitter et SQLite ;
+- **répond à l'agent de code** à faible coût en tokens (`wikik query …`) : sur ATS (Rust) le contexte d'une modification coûte 20 à 80 fois moins que la lecture des fichiers ([MESURE-01](./docs/projet/mesures/mesure-01-v1-agent.md)), sur shelley (Angular) un composant de 3 400 lignes se résume en 1 500 tokens ([MESURE-02](./docs/projet/mesures/mesure-02-v2-typescript.md)) ;
 - **détecte la doc périmée** : le code d'une fonction a changé depuis le dernier commit qui a touché son bloc (`wikik check`) ;
 - **sert un wiki local** en lecture seule : code et doc en cellules, documents du projet, liens entre les deux, graphe (`wikik serve`).
 

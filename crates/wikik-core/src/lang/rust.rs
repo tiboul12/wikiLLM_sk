@@ -101,7 +101,7 @@ fn txt<'a>(n: Node, src: &'a [u8]) -> &'a str {
     n.utf8_text(src).unwrap_or("")
 }
 
-fn compter_lignes(src: &[u8]) -> usize {
+pub(crate) fn compter_lignes(src: &[u8]) -> usize {
     if src.is_empty() {
         return 0;
     }
@@ -260,7 +260,7 @@ fn est_ligne_balise(t: &str) -> bool {
     it.next() == Some('@') && it.next().is_some_and(|c| c.is_ascii_lowercase())
 }
 
-fn balises(lignes: &[String], ligne_debut: Option<usize>) -> Vec<Balise> {
+pub(crate) fn balises(lignes: &[String], ligne_debut: Option<usize>) -> Vec<Balise> {
     let mut v = vec![];
     for (i, l) in lignes.iter().enumerate() {
         let t = l.trim();
@@ -621,7 +621,7 @@ fn completer_visibilite_impl_trait(symboles: &mut [Symbole]) {
 }
 
 /// Suffixe `@cfg(..)` puis `#n` pour les identifiants en collision dans le fichier (SPEC-02).
-fn desambiguiser(symboles: &mut [Symbole]) {
+pub(crate) fn desambiguiser(symboles: &mut [Symbole]) {
     let mut compte: HashMap<String, usize> = HashMap::new();
     for s in symboles.iter() {
         *compte.entry(s.id.clone()).or_default() += 1;
@@ -853,7 +853,7 @@ fn lignes_macros(racine: Node) -> usize {
     total
 }
 
-fn compter_erreurs(racine: Node) -> usize {
+pub(crate) fn compter_erreurs(racine: Node) -> usize {
     if !racine.has_error() {
         return 0;
     }

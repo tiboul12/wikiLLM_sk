@@ -105,14 +105,15 @@ fn sortie_ambigue(demande: &str, candidats: &[String]) -> Sortie {
     s
 }
 
-/// `carte` : vue d'ensemble du projet, un fichier par ligne (EF-020).
+/// `carte` : vue d'ensemble du projet, un fichier par ligne (EF-020). Les champs de classe ne sont
+/// pas comptés comme symboles : aucun bloc n'est exigé sur eux.
 pub fn carte(index: &Index, complet: bool) -> Result<Sortie> {
     let c = &index.conn;
     let fichiers = requete_json(
         c,
         "SELECT f.chemin, f.entete, f.lignes,
-                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0),
-                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0 AND s.doc IS NOT NULL)
+                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0 AND s.genre <> 'champ'),
+                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0 AND s.genre <> 'champ' AND s.doc IS NOT NULL)
          FROM fichiers f ORDER BY f.chemin",
         &["chemin", "entete", "lignes", "symboles", "documentes"],
     )?;
@@ -215,6 +216,9 @@ pub fn carte(index: &Index, complet: bool) -> Result<Sortie> {
 }
 
 /// `fichier` : en-tête, imports et symboles d'un fichier (EF-021).
+///
+/// Au-delà de 40 symboles, les champs, les privés et les publics sans doc sont listés par leur nom
+/// seulement, pour tenir le budget de tokens (ENF-001) même sur un composant de plusieurs milliers de lignes.
 pub fn fichier(index: &Index, demande: &str) -> Result<Sortie> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -265,25 +269,43 @@ pub fn fichier(index: &Index, demande: &str) -> Result<Sortie> {
         corps.push_str("\n\n");
     }
     if !imports.is_empty() {
-        let l: Vec<String> = imports
-            .iter()
-            .map(|i| {
-                let a = i["alias"].as_str().unwrap_or_default();
-                let ch = i["chemin"].as_str().unwrap_or_default();
-                if ch == a || ch.ends_with(&format!("::{a}")) {
-                    ch.to_string()
+        // Regroupés par module : `module::{a, b as c}` (plus court qu'un chemin par import).
+        let mut par_module: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for i in &imports {
+            let a = i["alias"].as_str().unwrap_or_default();
+            let ch = i["chemin"].as_str().unwrap_or_default();
+            let (module, nom) = ch.rsplit_once("::").unwrap_or(("", ch));
+            let entree = if nom == a {
+                nom.to_string()
+            } else {
+                format!("{nom} as {a}")
+            };
+            par_module
+                .entry(module.to_string())
+                .or_default()
+                .push(entree);
+        }
+        let l: Vec<String> = par_module
+            .into_iter()
+            .map(|(m, noms)| {
+                if m.is_empty() {
+                    noms.join(", ")
+                } else if noms.len() == 1 {
+                    format!("{m}::{}", noms[0])
                 } else {
-                    format!("{ch} as {a}")
+                    format!("{m}::{{{}}}", noms.join(", "))
                 }
             })
             .collect();
-        corps.push_str(&format!("imports : {}\n", l.join(", ")));
+        corps.push_str(&format!("imports : {}\n", l.join(" ; ")));
     }
     let mut documentes = 0;
     let mut tests = 0;
     // Gros fichier : résumé pour ce qui est visible hors du module, noms seuls pour le reste (ENF-001).
     let compact = symboles.len() > 40;
     let mut prives = vec![];
+    let mut champs = vec![];
+    let mut sans_doc = vec![];
     for s in &symboles {
         if s["est_test"] == 1 {
             tests += 1;
@@ -304,6 +326,20 @@ pub fn fichier(index: &Index, demande: &str) -> Result<Sortie> {
             prives.push(format!("{nq}{}", if marque.is_empty() { "" } else { "*" }));
             continue;
         }
+        if compact && s["genre"] == "champ" {
+            champs.push(nq.rsplit("::").next().unwrap_or(nq).to_string());
+            continue;
+        }
+        if compact
+            && s["resume"].is_null()
+            && !matches!(
+                s["genre"].as_str(),
+                Some("classe" | "composant" | "struct" | "trait")
+            )
+        {
+            sans_doc.push(nq.rsplit("::").next().unwrap_or(nq).to_string());
+            continue;
+        }
         let resume = s["resume"]
             .as_str()
             .map_or("(sans doc)".to_string(), |r| tronquer(r, 100));
@@ -312,6 +348,20 @@ pub fn fichier(index: &Index, demande: &str) -> Result<Sortie> {
             s["ligne_debut"].as_i64().unwrap_or(0),
             s["visibilite"].as_str().unwrap_or_default(),
             s["genre"].as_str().unwrap_or_default(),
+        ));
+    }
+    if !sans_doc.is_empty() {
+        corps.push_str(&format!(
+            "publics sans doc ({}) : {}\n",
+            sans_doc.len(),
+            sans_doc.join(", ")
+        ));
+    }
+    if !champs.is_empty() {
+        corps.push_str(&format!(
+            "champs publics ({}) : {}\n",
+            champs.len(),
+            champs.join(", ")
         ));
     }
     if !prives.is_empty() {
@@ -330,7 +380,10 @@ pub fn fichier(index: &Index, demande: &str) -> Result<Sortie> {
             macros * 100 / lignes.max(1)
         ));
     }
-    let n = symboles.len() - tests;
+    let n = symboles
+        .iter()
+        .filter(|s| s["est_test"] != 1 && s["genre"] != "champ")
+        .count();
     let titre =
         format!("fichier {chemin} · {lignes} lignes · {n} symboles ({documentes} documentés)");
     Ok(finaliser(

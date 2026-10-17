@@ -30,7 +30,7 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 
 ## 🧩 Constats de la v1 à traiter
 
-- [ ] **Indexer le front** (TypeScript, v2) : EF-045 et les composants du wiki ne sont pas encore couverts par l'index.
+- [x] **Indexer le front** (TypeScript, v2) : fait, EF-045 est citée par `front/src/lib/hook.ts` ; les `.svelte` restent à faire.
 - [ ] **`check` sur un gros projet** : un `git blame` par fichier documenté ; à mesurer au-delà de 50 000 lignes, cache déjà en place.
 - [ ] **Appels de méthode** : seuls les noms uniques sont résolus (`probable`) ; envisager une résolution par type des champs `self.x.f()`.
 
@@ -57,7 +57,11 @@ Tout ce qui a été volontairement laissé de côté pendant l'analyse du 17/10.
 - [ ] **Édition dans le navigateur** pour la zone Projet (Q5 : non en v1).
 
 ### 🗣️ Langages supplémentaires (A4)
-- [ ] **TypeScript / JavaScript** : terrain d'essai shelley (après l'outil lui-même et ATS).
+- [x] **TypeScript** : v2 (EF-070 à EF-075, SPEC-15, MESURE-02 sur shelley-studio-llm).
+- [ ] **JavaScript** (`.js`, `.jsx`, `.mjs`) avec la grammaire TSX.
+- [ ] **Svelte** : extraire la partie `<script lang="ts">` des `.svelte` (front de wikik).
+- [ ] **Gabarits Angular** : appels de méthodes depuis les templates HTML (heuristique, comme `view!` en Rust).
+- [ ] **Alias `tsconfig`** (`paths`) pour résoudre `@scope/paquet` vers les fichiers du dépôt.
 - [ ] **Python**.
 
 ### 🤖 Interface agent

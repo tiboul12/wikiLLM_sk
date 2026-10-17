@@ -12,8 +12,48 @@ use anyhow::Result;
 use rusqlite::{Transaction, params};
 use std::collections::{BTreeMap, HashMap};
 
-/// Noms de méthodes trop courants dans la bibliothèque standard pour être devinés (SPEC-03).
+/// Noms de méthodes trop courants dans les bibliothèques standard (Rust, JavaScript) pour être devinés
+/// (SPEC-03, SPEC-15).
 const METHODES_COURANTES: &[&str] = &[
+    // JavaScript / TypeScript
+    "add",
+    "apply",
+    "assign",
+    "bind",
+    "call",
+    "catch",
+    "clear",
+    "concat",
+    "delete",
+    "emit",
+    "endsWith",
+    "entries",
+    "error",
+    "every",
+    "forEach",
+    "has",
+    "includes",
+    "indexOf",
+    "keys",
+    "log",
+    "pipe",
+    "reduce",
+    "reject",
+    "replace",
+    "resolve",
+    "slice",
+    "some",
+    "sort",
+    "startsWith",
+    "stringify",
+    "subscribe",
+    "then",
+    "toLowerCase",
+    "toString",
+    "toUpperCase",
+    "values",
+    "warn",
+    // Rust
     "as_ref",
     "as_str",
     "borrow",
@@ -70,6 +110,16 @@ struct Sym {
     genre: String,
     type_parent: Option<String>,
     segments: Vec<String>,
+    /// Fichier sans extension : désigne le module dans un import TypeScript (`front/src/lib/api`).
+    module: String,
+}
+
+/// `front/src/lib/api.ts` → `front/src/lib/api` ; `x/index.ts` → `x/index`.
+fn sans_extension(fichier: &str) -> String {
+    match fichier.rsplit_once('.') {
+        Some((base, _)) if !base.ends_with('/') && !base.is_empty() => base.to_string(),
+        _ => fichier.to_string(),
+    }
 }
 
 /// Arêtes à écrire, dédoublonnées : (source, cible, genre) → (confiance, ligne).
@@ -130,7 +180,7 @@ fn se_termine_par(segs: &[String], suffixe: &[String]) -> bool {
 }
 
 /// Recalcule toutes les arêtes et la cible des liens de documents.
-/// @relu 2026-10-17 36135ae7
+/// @relu 2026-10-17 134e06db
 pub fn recalculer(tx: &Transaction) -> Result<()> {
     let symboles: Vec<Sym> = {
         let mut st = tx.prepare(
@@ -143,6 +193,7 @@ pub fn recalculer(tx: &Transaction) -> Result<()> {
             segments.extend(segments_chemin(&nq));
             Ok(Sym {
                 id: r.get(0)?,
+                module: sans_extension(&fichier),
                 fichier,
                 nom: r.get(2)?,
                 genre: r.get(4)?,
@@ -313,7 +364,7 @@ fn resoudre(
             .get(nom)
             .unwrap_or(&vide)
             .iter()
-            .filter(|s| matches!(s.genre.as_str(), "fn" | "composant"))
+            .filter(|s| matches!(s.genre.as_str(), "fn" | "composant" | "classe"))
             .copied()
             .collect()
     };
@@ -335,6 +386,15 @@ fn resoudre(
                 return locales.iter().map(|s| (s.id.clone(), "certain")).collect();
             }
             if let Some(chemin) = imports.get(&(src.fichier.clone(), cible.to_string())) {
+                // Import TypeScript d'un fichier du projet : `<module>::<nom>`.
+                if let Some((module, nom)) = chemin.rsplit_once("::")
+                    && module.contains('/')
+                {
+                    let r = du_module(module, nom, par_nom);
+                    if !r.is_empty() {
+                        return r.iter().map(|s| (s.id.clone(), "certain")).collect();
+                    }
+                }
                 let r = par_suffixe(&normaliser_chemin(chemin, src, ctx), par_nom);
                 if r.len() == 1 {
                     return vec![(r[0].id.clone(), "certain")];
@@ -385,6 +445,16 @@ fn resoudre(
                     .collect();
                 if let Some(s) = r.iter().find(|s| s.fichier == src.fichier).or(r.first()) {
                     return vec![(s.id.clone(), "certain")];
+                }
+            }
+            // `m.f()` où `m` est un import `* as m` d'un module TypeScript du projet.
+            if let Some(objet) = qualif.and_then(|q| q.strip_prefix("obj:"))
+                && let Some(chemin) = imports.get(&(src.fichier.clone(), objet.to_string()))
+                && let Some((module, "*")) = chemin.rsplit_once("::")
+            {
+                let r = du_module(module, cible, par_nom);
+                if !r.is_empty() {
+                    return r.iter().map(|s| (s.id.clone(), "certain")).collect();
                 }
             }
             if METHODES_COURANTES.contains(&cible) {
@@ -443,6 +513,17 @@ fn normaliser_chemin(chemin: &str, src: &Sym, ctx: &Contexte) -> Vec<String> {
         segs.remove(0);
     }
     segs
+}
+
+/// Symboles de premier niveau `nom` du module TypeScript `module` (`x.ts`, `x.tsx` ou `x/index.ts`).
+fn du_module<'a>(module: &str, nom: &str, par_nom: &HashMap<&str, Vec<&'a Sym>>) -> Vec<&'a Sym> {
+    let index = format!("{module}/index");
+    par_nom.get(nom).map_or_else(Vec::new, |v| {
+        v.iter()
+            .filter(|s| s.type_parent.is_none() && (s.module == module || s.module == index))
+            .copied()
+            .collect()
+    })
 }
 
 fn par_suffixe<'a>(segs: &[String], par_nom: &HashMap<&str, Vec<&'a Sym>>) -> Vec<&'a Sym> {

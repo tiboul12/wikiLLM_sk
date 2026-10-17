@@ -1,6 +1,7 @@
 //! Langages supportés : un module par langage derrière le trait [`Langage`] (SPEC-03 R1).
 
 pub mod rust;
+pub mod typescript;
 
 use crate::modele::ExtraitFichier;
 
@@ -15,11 +16,14 @@ pub trait Langage: Send + Sync {
 }
 
 /// Langages activés par la configuration ; un nom inconnu est ignoré.
+/// @relu 2026-10-17 d26d6209
 pub fn actives(noms: &[String]) -> Vec<Box<dyn Langage>> {
     let mut v: Vec<Box<dyn Langage>> = vec![];
     for n in noms {
-        if n == "rust" {
-            v.push(Box::new(rust::Rust));
+        match n.as_str() {
+            "rust" => v.push(Box::new(rust::Rust)),
+            "typescript" => v.push(Box::new(typescript::TypeScript)),
+            _ => {}
         }
     }
     v

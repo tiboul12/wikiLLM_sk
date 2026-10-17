@@ -46,7 +46,7 @@
     <p class="discret">Pas de bloc d'en-tête <code>//!</code>.</p>
   {/if}
   {#each cellules as c (c.id)}
-    <Cellule cellule={c} ouverte={ancre === c.nom_qualifie && !c.doc} />
+    <Cellule cellule={c} langage={page.langage} ouverte={ancre === c.nom_qualifie && !c.doc} />
   {/each}
   {#if tests}
     <button class="secondaire" onclick={() => (montrerTests = !montrerTests)}>

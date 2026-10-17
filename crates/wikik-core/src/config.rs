@@ -29,7 +29,7 @@ impl Default for ConfigIndex {
     fn default() -> Self {
         Self {
             exclure: vec![],
-            langages: vec!["rust".into()],
+            langages: vec!["rust".into(), "typescript".into()],
         }
     }
 }

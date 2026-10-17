@@ -1,5 +1,7 @@
 // Rendu Markdown du wiki : liens [[...]] résolus par l'index, code coloré, Mermaid à la demande,
 // HTML toujours assaini par DOMPurify (ENF-004 : un document ne peut pas exécuter de script).
+//
+// @req EF-042, ENF-004
 import { Marked, type Tokens, type TokenizerAndRendererExtension } from "marked";
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";

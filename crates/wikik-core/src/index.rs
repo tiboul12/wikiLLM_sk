@@ -268,6 +268,10 @@ impl Index {
                 continue;
             }
             let ext = absolu.extension().and_then(|e| e.to_str()).unwrap_or("");
+            // Déclarations TypeScript générées ou importées : pas de code à documenter (SPEC-15 R1).
+            if relatif.ends_with(".d.ts") {
+                continue;
+            }
             let genre = if let Some(i) = langages.iter().position(|l| l.extensions().contains(&ext))
             {
                 Genre::Code(i)

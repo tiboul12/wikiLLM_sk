@@ -96,11 +96,13 @@ pub struct Cellule {
     pub appeles: Vec<Lien>,
 }
 
-/// Page d'un fichier de code.
+/// Page d'un fichier de code : en-tête, balises d'en-tête et une cellule par symbole.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct PageFichier {
     pub chemin: String,
+    /// `rust` ou `typescript` : sert à la coloration du code.
+    pub langage: String,
     /// En-tête `//!` sans ses lignes de balises.
     pub entete: Option<String>,
     pub balises_entete: Vec<BaliseVue>,
@@ -185,12 +187,13 @@ fn u(v: i64) -> u32 {
 }
 
 /// Accueil : fichiers avec leur rôle, documents, statistiques.
+/// @relu 2026-10-17 f033f9f2
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
         "SELECT f.chemin, f.entete, f.lignes,
-                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0),
-                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0 AND s.doc IS NOT NULL)
+                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0 AND s.genre <> 'champ'),
+                (SELECT COUNT(*) FROM symboles s WHERE s.fichier = f.chemin AND s.est_test = 0 AND s.genre <> 'champ' AND s.doc IS NOT NULL)
          FROM fichiers f ORDER BY f.chemin",
     )?;
     let mut lignes = 0;
@@ -387,13 +390,14 @@ type LigneSymbole = (
 );
 
 /// Page d'un fichier : une cellule par symbole avec doc, statut, balises, voisins et code.
+/// @relu 2026-10-17 59cbf684
 pub fn fichier(index: &Index, chemin: &str) -> Result<PageFichier> {
     let c = &index.conn;
-    let Some((entete, lignes, macros)): Option<(Option<String>, i64, i64)> = c
+    let Some((entete, lignes, macros, langage)): Option<(Option<String>, i64, i64, String)> = c
         .query_row(
-            "SELECT entete, lignes, lignes_macros FROM fichiers WHERE chemin = ?1",
+            "SELECT entete, lignes, lignes_macros, langage FROM fichiers WHERE chemin = ?1",
             [chemin],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )
         .optional()?
     else {
@@ -477,6 +481,7 @@ pub fn fichier(index: &Index, chemin: &str) -> Result<PageFichier> {
         .collect();
     Ok(PageFichier {
         chemin: chemin.into(),
+        langage,
         entete: entete.map(|e| sans_balises(&e)).filter(|e| !e.is_empty()),
         balises_entete,
         lignes: u(lignes),

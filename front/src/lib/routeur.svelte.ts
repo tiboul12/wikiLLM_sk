@@ -1,4 +1,7 @@
 // Routeur minimal à l'API History : URL stables (SPEC-05 R7) sans dépendance.
+//
+// @req EF-041, EF-042
+/** Page à afficher, déduite de l'URL. */
 export type Route =
   | { page: "accueil" }
   | { page: "fichier"; chemin: string; ancre: string }
@@ -17,8 +20,10 @@ function analyser(): Route {
   return { page: "accueil" };
 }
 
+/** Route courante, réactive : l'application se redessine quand elle change. */
 export const routeur = $state({ route: analyser() as Route });
 
+/** Navigue sans recharger la page ; ne fait rien si l'URL est déjà la bonne. */
 export function aller(url: string) {
   if (url === location.pathname + location.search + location.hash) return;
   history.pushState(null, "", url);
@@ -38,6 +43,7 @@ addEventListener("click", (e) => {
   aller(href);
 });
 
+/** Fabrique des URL stables : `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`. */
 export const url = {
   fichier: (chemin: string, ancre?: string) =>
     `/produit/${chemin.split("/").map(encodeURIComponent).join("/")}${ancre ? "#" + encodeURIComponent(ancre) : ""}`,

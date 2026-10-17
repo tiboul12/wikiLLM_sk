@@ -3,9 +3,13 @@ import type { BaliseVue } from "./BaliseVue";
 import type { Cellule } from "./Cellule";
 
 /**
- * Page d'un fichier de code.
+ * Page d'un fichier de code : en-tête, balises d'en-tête et une cellule par symbole.
  */
 export type PageFichier = { chemin: string, 
+/**
+ * `rust` ou `typescript` : sert à la coloration du code.
+ */
+langage: string, 
 /**
  * En-tête `//!` sans ses lignes de balises.
  */

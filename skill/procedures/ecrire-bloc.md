@@ -20,6 +20,20 @@ pub fn compile(/* … */) { /* … */ }
 - **Balises** en fin de bloc, une par ligne : `@req`, `@adr`, `@topic`, `@pitfall`, `@relu`.
 - **En-tête de fichier** `//!` : rôle du fichier en une phrase, puis entrées, sorties, choix de conception.
 
+## En TypeScript
+
+Même règles, en JSDoc : `/** … */` juste avant la déclaration (ou son `export`), décorateurs compris. En-tête de fichier : commentaires `//` en tête, ou un `/** … */` avec `@file`. Les balises JSDoc (`@param`, `@returns`…) sont permises à côté des balises wikik.
+
+```ts
+/**
+ * Relance la campagne en cours après une coupure réseau ; sans effet si rien ne tourne.
+ *
+ * @param id identifiant de campagne
+ * @req EF-021
+ */
+export function reprendre(id: number): void { /* … */ }
+```
+
 ## À éviter
 
 - Paraphraser la signature (« Renvoie le nom de l'utilisateur » sur `fn user_name() -> String`) : `check` le signale en info.

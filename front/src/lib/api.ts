@@ -1,10 +1,13 @@
 // Client de l'API en lecture seule de `wikik serve` (SPEC-09). Types générés depuis Rust (ts-rs).
+//
+// @req EF-040
 import type { Projet } from "../types/Projet";
 import type { PageFichier } from "../types/PageFichier";
 import type { PageDocument } from "../types/PageDocument";
 import type { Graphe } from "../types/Graphe";
 import type { Resultat } from "../types/Resultat";
 
+/** Diagnostic de `wikik check` (même forme que le JSON de SPEC-04). */
 export type Diagnostic = {
   fichier: string;
   ligne: number;
@@ -13,6 +16,7 @@ export type Diagnostic = {
   severite: string;
   message: string;
 };
+/** Rapport complet de `wikik check`. */
 export type RapportCheck = {
   mode_reference: string;
   diagnostics: Diagnostic[];
@@ -36,6 +40,7 @@ async function lire<T>(chemin: string, params: Record<string, string | number | 
   return r.json() as Promise<T>;
 }
 
+/** Une fonction par route de l'API ; une réponse en erreur lève une exception avec le message du serveur. */
 export const api = {
   projet: () => lire<Projet>("/api/projet"),
   fichier: (chemin: string) => lire<PageFichier>("/api/fichier", { chemin }),
