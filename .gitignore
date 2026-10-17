@@ -3,3 +3,8 @@ __pycache__/
 .DS_Store
 .wikillm_projets.json
 .doc/
+
+# Refonte Rust (plan docs/projet/plan-v1.md)
+.wikik/
+spikes/
+target/
