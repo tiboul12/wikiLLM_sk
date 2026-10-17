@@ -36,7 +36,9 @@ description: >-
 
 Identifiant de symbole : `chemin/fichier.rs::Type::methode` ; un nom partiel (`methode`, `Type::methode`) suffit s'il est unique. Chaque sortie commence par `# … · ~N tokens`.
 
-Si `wikik` n'est pas dans le PATH : `cargo install --path crates/wikik` depuis le dépôt wikiK.
+Si le serveur MCP wikik est configuré (`claude mcp add wikik -- wikik mcp`, lancé depuis la racine du projet), utiliser ses outils `carte`, `fichier`, `symbole`, `impact`, `cherche`, `adr`, `exigence`, `perimes`, `ref`, `check` plutôt que le shell : mêmes sorties.
+
+Si `wikik` n'est pas dans le PATH : `make install` depuis le dépôt wikiK.
 
 ## Procédures (à lire quand la situation se présente)
 

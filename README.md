@@ -30,6 +30,7 @@ wikik serve             # wiki sur http://127.0.0.1:8484
 | `wikik check [--format json] [--strict]` | Diagnostics, codes de retour 0 / 1 / 2 |
 | `wikik relu <id>` | Déclare un bloc relu après un changement de code |
 | `wikik index [--dump-json]` | Index explicite (les autres commandes le mettent à jour seules) |
+| `wikik mcp` | Serveur MCP (stdio) : les requêtes comme outils pour l'agent. Claude Code : `claude mcp add wikik -- wikik mcp` |
 
 Pour l'agent de code : le skill [`skill/SKILL.md`](./skill/SKILL.md) (règles d'or et procédures). Il est lié pour ce dépôt dans `.claude/skills/wikik` ; pour tous les projets : `ln -s "$PWD/skill" ~/.claude/skills/wikik`.
 

@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use wikik_core::Index;
 
+mod mcp;
 mod serve;
 
 /// Doc dans le code, index requêtable par l'agent, wiki local.
@@ -50,6 +51,8 @@ enum Commande {
         #[arg(long, value_enum, default_value = "texte", global = true)]
         format: Format,
     },
+    /// Serveur MCP sur stdio : les requêtes de l'agent comme outils (Claude Code : `claude mcp add wikik -- wikik mcp`).
+    Mcp,
     /// Marque le bloc d'un symbole comme relu (`@relu AAAA-MM-JJ <jeton du code>`).
     Relu { symbole: String },
     /// Sert le wiki en local, en lecture seule.
@@ -112,7 +115,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-17 625bba30
+/// @relu 2026-10-17 072ad631
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -172,6 +175,10 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
                 Format::Json => println!("{}", serde_json::to_string_pretty(&sortie.json)?),
             }
             Ok(i32::from(sortie.ambigu))
+        }
+        Commande::Mcp => {
+            mcp::servir(&cli.racine)?;
+            Ok(0)
         }
         Commande::Serve {
             adresse,

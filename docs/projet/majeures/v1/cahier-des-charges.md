@@ -62,6 +62,12 @@ sources: [BDR-v1-2]
 | [[exigences/ENF-005]] | Distribution en un seul binaire | must | B-008 |
 | [[exigences/ENF-006]] | Robustesse aux erreurs de parse | must | B-007 |
 
+## Ajouts de la version mineure v1.1
+
+| ID | Exigence | Priorité | Besoins |
+|---|---|---|---|
+| [[exigences/EF-060]] | Exposer les requêtes en serveur MCP | should | B-001, B-002 |
+
 ## Couverture à la clôture (17/10/2026)
 
 Toutes les exigences sont au statut `implémenté`. Chaque exigence `must` est citée par du code ou un test (`@req`) : `wikik check` ne signale aucune exigence non couverte. Exception documentée : EF-045 (hooks ⚓ du wiki) est implémentée dans le front TypeScript, que l'index ne lit pas encore (TypeScript arrive en v2).

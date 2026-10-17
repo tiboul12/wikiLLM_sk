@@ -61,7 +61,7 @@ Tout ce qui a été volontairement laissé de côté pendant l'analyse du 17/10.
 - [ ] **Python**.
 
 ### 🤖 Interface agent
-- [ ] **Serveur MCP** exposant les mêmes requêtes que la CLI.
+- [x] **Serveur MCP** exposant les mêmes requêtes que la CLI : `wikik mcp`, v1.1 (EF-060, SPEC-14).
 - [ ] **RAG structuré** (SPEC-08) : embeddings des blocs (local ou API, Q8), top-k sémantique puis expansion dans le graphe, jeu d'évaluation de 30 questions. Seulement après une v1 utilisée.
 
 ### 🎨 Atelier de conception Fast Design Thinking (A5 : hors v1)
