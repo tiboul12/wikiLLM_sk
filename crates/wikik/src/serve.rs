@@ -23,42 +23,65 @@ use wikik_core::{Index, check, wiki};
 #[folder = "../../front/dist"]
 pub(crate) struct Front;
 
-struct Etat {
-    index: Mutex<Index>,
+pub(crate) struct Etat {
+    pub(crate) index: Mutex<Index>,
+    /// Présent quand le serveur est l'atelier (`wikik atelier`).
+    pub(crate) atelier: Option<crate::atelier::Atelier>,
 }
 
-type Partage = Arc<Etat>;
+pub(crate) type Partage = Arc<Etat>;
 
 /// Démarre le serveur et bloque jusqu'à Ctrl+C.
+/// @relu 2026-10-17 6d29e55f
 pub fn servir(racine: &Path, adresse: &str, port: u16, autoriser_reseau: bool) -> Result<()> {
+    let ip = verifier_adresse(adresse, autoriser_reseau)?;
+    let mut index = Index::ouvrir(racine)?;
+    index.mettre_a_jour()?;
+    let etat: Partage = Arc::new(Etat {
+        index: Mutex::new(index),
+        atelier: None,
+    });
+    lancer(
+        routes_wiki().with_state(etat),
+        SocketAddr::new(ip, port),
+        "wikik serve",
+    )
+}
+
+/// Refuse une adresse hors boucle locale sans `--autoriser-reseau`.
+pub(crate) fn verifier_adresse(adresse: &str, autoriser_reseau: bool) -> Result<IpAddr> {
     let ip: IpAddr = adresse.parse()?;
     if !ip.is_loopback() && !autoriser_reseau {
         bail!(
             "{adresse} n'est pas une adresse locale : ajouter --autoriser-reseau pour exposer le wiki sur le réseau"
         );
     }
-    let mut index = Index::ouvrir(racine)?;
-    index.mettre_a_jour()?;
-    let etat: Partage = Arc::new(Etat {
-        index: Mutex::new(index),
-    });
-    let app = Router::new()
+    Ok(ip)
+}
+
+/// Routes de lecture du wiki, partagées avec l'atelier (SPEC-20).
+pub(crate) fn routes_wiki() -> Router<Partage> {
+    Router::new()
         .route("/api/projet", get(api_projet))
         .route("/api/fichier", get(api_fichier))
         .route("/api/document", get(api_document))
         .route("/api/graphe", get(api_graphe))
         .route("/api/cherche", get(api_cherche))
         .route("/api/check", get(api_check))
+}
+
+/// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C.
+pub(crate) fn lancer(app: Router, adresse_socket: SocketAddr, nom: &str) -> Result<()> {
+    let app = app
         .fallback(statique)
-        .layer(axum::middleware::map_response(entetes_securite))
-        .with_state(etat);
-    let adresse_socket = SocketAddr::new(ip, port);
+        .layer(axum::middleware::map_response(entetes_securite));
+    let nom = nom.to_string();
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
         .block_on(async move {
             let ecoute = tokio::net::TcpListener::bind(adresse_socket).await?;
-            eprintln!("wikik serve : http://{adresse_socket} (Ctrl+C pour arrêter)");
+            eprintln!("{nom} : http://{adresse_socket} (Ctrl+C pour arrêter)");
             axum::serve(ecoute, app)
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;
@@ -69,7 +92,7 @@ pub fn servir(racine: &Path, adresse: &str, port: u16, autoriser_reseau: bool) -
 }
 
 /// Exécute `f` sur l'index à jour, hors du fil asynchrone, et répond en JSON.
-async fn repondre<T, F>(etat: Partage, f: F) -> Response
+pub(crate) async fn repondre<T, F>(etat: Partage, f: F) -> Response
 where
     T: serde::Serialize + Send + 'static,
     F: FnOnce(&Index) -> Result<T> + Send + 'static,

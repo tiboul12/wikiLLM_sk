@@ -19,7 +19,8 @@ pub struct Config {
     pub atelier: ConfigAtelier,
 }
 
-/// Section `[atelier]` : dossier des artefacts, adresses des deux serveurs, LLM (SPEC-17 à 21).
+/// Section `[atelier]` : dossier des artefacts, adresses des deux serveurs, version majeure documentée,
+/// LLM (SPEC-17 à 21).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigAtelier {
@@ -29,6 +30,8 @@ pub struct ConfigAtelier {
     pub url: String,
     /// Adresse du wiki, pour les liens « voir dans le wiki » de l'atelier.
     pub url_wiki: String,
+    /// Version majeure que l'atelier documente (dossier `docs/projet/majeures/<version>/`).
+    pub version: String,
     pub llm: ConfigLlm,
 }
 
@@ -38,6 +41,7 @@ impl Default for ConfigAtelier {
             dossier: "docs/atelier".into(),
             url: "http://127.0.0.1:8485".into(),
             url_wiki: "http://127.0.0.1:8484".into(),
+            version: "v1".into(),
             llm: ConfigLlm::default(),
         }
     }

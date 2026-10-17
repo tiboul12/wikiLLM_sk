@@ -174,6 +174,25 @@ pub fn creer(
     Ok((id, relatif))
 }
 
+/// Comme [`creer`], mais le frontmatter et le corps sont construits une fois l'identifiant connu.
+pub fn creer_avec(
+    racine: &Path,
+    config: &Config,
+    type_nom: &str,
+    construire: impl FnOnce(&str) -> (Map<String, Value>, String),
+) -> Result<(String, String)> {
+    let ty = type_de(type_nom)?;
+    let id = prochain_id(racine, config, ty);
+    let (mut frontmatter, corps) = construire(&id);
+    frontmatter.insert("id".into(), Value::String(id.clone()));
+    frontmatter.insert("type".into(), Value::String(ty.nom.into()));
+    let relatif = chemin_relatif(config, ty, &id);
+    let chemin = racine.join(&relatif);
+    std::fs::create_dir_all(chemin.parent().unwrap())?;
+    std::fs::write(&chemin, formater(&frontmatter, &corps))?;
+    Ok((id, relatif))
+}
+
 /// Lit un artefact (frontmatter en JSON, corps) à partir de son chemin relatif.
 pub fn lire(racine: &Path, relatif: &str) -> Result<(Map<String, Value>, String)> {
     let texte = std::fs::read_to_string(racine.join(relatif))

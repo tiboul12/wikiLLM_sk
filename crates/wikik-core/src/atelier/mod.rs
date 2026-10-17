@@ -6,6 +6,9 @@
 //! @adr 10
 
 pub mod artefacts;
+pub mod fiches;
+pub mod fournisseur;
+pub mod parcours;
 
 use crate::index::Index;
 use anyhow::{Result, bail};

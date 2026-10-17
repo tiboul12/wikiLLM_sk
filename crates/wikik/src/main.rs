@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use wikik_core::Index;
 
+mod atelier;
 mod export;
 mod mcp;
 mod serve;
@@ -72,6 +73,19 @@ enum Commande {
     },
     /// Serveur MCP sur stdio : les requêtes de l'agent comme outils (Claude Code : `claude mcp add wikik -- wikik mcp`).
     Mcp,
+    /// Atelier de définition du besoin (Fast Design Thinking), avec le wiki en lecture.
+    Atelier {
+        #[arg(long, default_value = "127.0.0.1")]
+        adresse: String,
+        #[arg(long, default_value_t = 8485)]
+        port: u16,
+        /// Autorise une adresse hors boucle locale (l'atelier, qui écrit, devient visible sur le réseau).
+        #[arg(long)]
+        autoriser_reseau: bool,
+        /// Fournisseur factice : renvoie les exemples des fiches, sans LLM.
+        #[arg(long)]
+        factice: bool,
+    },
     /// Marque le bloc d'un symbole comme relu (`@relu AAAA-MM-JJ <jeton du code>`).
     Relu { symbole: String },
     /// Sert le wiki en local, en lecture seule.
@@ -138,7 +152,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-17 416507e2
+/// @relu 2026-10-17 4d0aae4b
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -243,6 +257,15 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             autoriser_reseau,
         } => {
             serve::servir(&cli.racine, &adresse, port, autoriser_reseau)?;
+            Ok(0)
+        }
+        Commande::Atelier {
+            adresse,
+            port,
+            autoriser_reseau,
+            factice,
+        } => {
+            atelier::servir(&cli.racine, &adresse, port, autoriser_reseau, factice)?;
             Ok(0)
         }
         Commande::Relu { symbole } => {

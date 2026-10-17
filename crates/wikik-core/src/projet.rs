@@ -21,6 +21,9 @@ pub const CHAMPS_LIENS: &[&str] = &[
     "parent",
 ];
 
+/// Champs de lien propres à l'atelier : une valeur qui n'a pas la forme d'un identifiant est du texte.
+const CHAMPS_ATELIER: &[&str] = &["sujet", "probleme", "axe", "parent"];
+
 /// Document Markdown de la zone Projet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Document {
@@ -59,7 +62,8 @@ pub fn normaliser_adr(v: &str) -> Option<String> {
 }
 
 /// Analyse un document. `relatif_projet` est le chemin relatif au dossier de la zone Projet,
-/// qui sert d'identifiant quand le frontmatter n'en donne pas.
+/// qui sert d'identifiant quand le frontmatter n'en donne pas. Les liens viennent du corps
+/// (`[[ID]]`) et des champs de [`CHAMPS_LIENS`].
 pub fn lire(chemin: &str, relatif_projet: &str, contenu: &str) -> Document {
     let (yaml, corps, decalage) = separer_frontmatter(contenu);
     let (frontmatter, frontmatter_invalide) = match yaml {
@@ -108,6 +112,11 @@ pub fn lire(chemin: &str, relatif_projet: &str, contenu: &str) -> Document {
             // Un chemin de fichier (hors zone Projet) est informatif, jamais vérifié : son
             // existence dépendrait de la machine (ENF-002).
             if val.contains('/') || val.ends_with(".md") {
+                continue;
+            }
+            // Les champs de l'atelier portent parfois du texte (le `probleme` d'un pitch) : une
+            // valeur avec des espaces n'est pas un identifiant.
+            if CHAMPS_ATELIER.contains(&c) && val.contains(char::is_whitespace) {
                 continue;
             }
             liens.push(LienBrut {
