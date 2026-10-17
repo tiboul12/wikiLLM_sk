@@ -4,6 +4,7 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+use wikik_core::Index;
 
 /// Doc dans le code, index requêtable par l'agent, wiki local.
 #[derive(Parser)]
@@ -91,15 +92,46 @@ enum Requete {
 
 fn main() {
     let cli = Cli::parse();
-    let _ = (&cli.racine, wikik_core::SCHEMA);
-    let nom = match cli.commande {
-        Commande::Init => "init",
-        Commande::Index { .. } => "index",
-        Commande::Check { .. } => "check",
-        Commande::Query { .. } => "query",
-        Commande::Relu { .. } => "relu",
-        Commande::Serve { .. } => "serve",
+    let code = match executer(cli) {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("wikik : {e:#}");
+            2
+        }
     };
-    eprintln!("wikik {nom} : pas encore implémenté");
-    std::process::exit(2);
+    std::process::exit(code);
+}
+
+/// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
+fn executer(cli: Cli) -> anyhow::Result<i32> {
+    match cli.commande {
+        Commande::Index { dump_json } => {
+            let mut index = Index::ouvrir(&cli.racine)?;
+            let r = index.mettre_a_jour()?;
+            eprintln!(
+                "wikik index : {} fichiers ({} analysés, {} supprimés), {} symboles, {} documents en {} ms",
+                r.fichiers, r.analyses, r.supprimes, r.symboles, r.documents, r.duree_ms
+            );
+            if let Some(dest) = dump_json {
+                let texte = serde_json::to_string_pretty(&index.dump_json()?)? + "\n";
+                if dest == "-" {
+                    print!("{texte}");
+                } else {
+                    std::fs::write(&dest, texte)?;
+                }
+            }
+            Ok(0)
+        }
+        autre => {
+            let nom = match autre {
+                Commande::Init => "init",
+                Commande::Check { .. } => "check",
+                Commande::Query { .. } => "query",
+                Commande::Relu { .. } => "relu",
+                Commande::Serve { .. } => "serve",
+                Commande::Index { .. } => unreachable!(),
+            };
+            anyhow::bail!("{nom} : pas encore implémenté")
+        }
+    }
 }

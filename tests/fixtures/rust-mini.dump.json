@@ -1,0 +1,637 @@
+{
+  "aretes": [
+    {
+      "cible": "ADR-0001",
+      "confiance": "certain",
+      "genre": "lien",
+      "ligne": 13,
+      "source": "EF-001"
+    },
+    {
+      "cible": "B-001",
+      "confiance": "certain",
+      "genre": "lien",
+      "ligne": 1,
+      "source": "EF-001"
+    },
+    {
+      "cible": "B-001",
+      "confiance": "certain",
+      "genre": "lien",
+      "ligne": 1,
+      "source": "EF-002"
+    },
+    {
+      "cible": "EF-001",
+      "confiance": "certain",
+      "genre": "lien",
+      "ligne": 3,
+      "source": "notes"
+    },
+    {
+      "cible": "ADR-0001",
+      "confiance": "certain",
+      "genre": "adr",
+      "ligne": 19,
+      "source": "src/geo.rs::Point::norme"
+    },
+    {
+      "cible": "src/geo.rs::Point::carre",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 22,
+      "source": "src/geo.rs::Point::norme"
+    },
+    {
+      "cible": "EF-999",
+      "confiance": "certain",
+      "genre": "req",
+      "ligne": 39,
+      "source": "src/geo.rs::aire"
+    },
+    {
+      "cible": "EF-001",
+      "confiance": "certain",
+      "genre": "req",
+      "ligne": 13,
+      "source": "src/lib.rs::entree"
+    },
+    {
+      "cible": "src/geo.rs::Point::new",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 16,
+      "source": "src/lib.rs::entree"
+    },
+    {
+      "cible": "src/geo.rs::Point::norme",
+      "confiance": "probable",
+      "genre": "appel",
+      "ligne": 17,
+      "source": "src/lib.rs::entree"
+    },
+    {
+      "cible": "src/geo.rs::aire",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 18,
+      "source": "src/lib.rs::entree"
+    },
+    {
+      "cible": "src/lib.rs::aide",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 18,
+      "source": "src/lib.rs::entree"
+    },
+    {
+      "cible": "src/util.rs::double",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 18,
+      "source": "src/lib.rs::entree"
+    },
+    {
+      "cible": "topic:calcul",
+      "confiance": "certain",
+      "genre": "topic",
+      "ligne": 14,
+      "source": "src/lib.rs::entree"
+    },
+    {
+      "cible": "src/util.rs::exe@cfg(not(windows))",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 16,
+      "source": "src/util.rs::double"
+    },
+    {
+      "cible": "src/util.rs::exe@cfg(windows)",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 16,
+      "source": "src/util.rs::double"
+    },
+    {
+      "cible": "src/util.rs::double",
+      "confiance": "certain",
+      "genre": "appel",
+      "ligne": 23,
+      "source": "src/util.rs::interne::profond"
+    }
+  ],
+  "documents": [
+    {
+      "chemin": "docs/projet/adr/0001-norme.md",
+      "frontmatter": {
+        "date": "2026-10-17",
+        "id": "ADR-0001",
+        "statut": "accepté",
+        "titre": "Norme euclidienne",
+        "type": "adr"
+      },
+      "frontmatter_invalide": null,
+      "genre": "adr",
+      "hash_contenu": "b5eadb4f3fd51c05",
+      "id": "ADR-0001",
+      "priorite": null,
+      "statut": "accepté",
+      "titre": "Norme euclidienne",
+      "version": null
+    },
+    {
+      "chemin": "docs/projet/besoins/B-001.md",
+      "frontmatter": {
+        "id": "B-001",
+        "sources": [],
+        "statut": "validé",
+        "titre": "Calculer une aire",
+        "type": "besoin",
+        "version": "v1"
+      },
+      "frontmatter_invalide": null,
+      "genre": "besoin",
+      "hash_contenu": "b9b316f372ae070c",
+      "id": "B-001",
+      "priorite": null,
+      "statut": "validé",
+      "titre": "Calculer une aire",
+      "version": "v1"
+    },
+    {
+      "chemin": "docs/projet/exigences/EF-001.md",
+      "frontmatter": {
+        "besoins": [
+          "B-001"
+        ],
+        "id": "EF-001",
+        "priorite": "must",
+        "statut": "validé",
+        "titre": "Aire doublée",
+        "type": "exigence",
+        "version": "v1"
+      },
+      "frontmatter_invalide": null,
+      "genre": "exigence",
+      "hash_contenu": "f6a0bf44e37d2e5d",
+      "id": "EF-001",
+      "priorite": "must",
+      "statut": "validé",
+      "titre": "Aire doublée",
+      "version": "v1"
+    },
+    {
+      "chemin": "docs/projet/exigences/EF-002.md",
+      "frontmatter": {
+        "besoins": [
+          "B-001",
+          "B-404"
+        ],
+        "id": "EF-002",
+        "priorite": "must",
+        "statut": "validé",
+        "titre": "Exigence must sans code",
+        "type": "exigence",
+        "version": "v1"
+      },
+      "frontmatter_invalide": null,
+      "genre": "exigence",
+      "hash_contenu": "50e6077ecd1d6c23",
+      "id": "EF-002",
+      "priorite": "must",
+      "statut": "validé",
+      "titre": "Exigence must sans code",
+      "version": "v1"
+    },
+    {
+      "chemin": "docs/projet/notes.md",
+      "frontmatter": {},
+      "frontmatter_invalide": null,
+      "genre": "page",
+      "hash_contenu": "cd4914d9b971eb93",
+      "id": "notes",
+      "priorite": null,
+      "statut": null,
+      "titre": "Notes libres",
+      "version": null
+    }
+  ],
+  "fichiers": [
+    {
+      "chemin": "src/geo.rs",
+      "entete": "Types et fonctions géométriques.",
+      "erreurs_parse": 0,
+      "hash_contenu": "812a11ec031c6d1c",
+      "langage": "rust",
+      "lignes": 43,
+      "lignes_macros": 1
+    },
+    {
+      "chemin": "src/lib.rs",
+      "entete": "Bibliothèque de démonstration : calculs géométriques simples.\n\nSert de fixture aux tests de wikik ; chaque construction couvre un cas de SPEC-02/03.",
+      "erreurs_parse": 0,
+      "hash_contenu": "12058aec9d570a19",
+      "langage": "rust",
+      "lignes": 24,
+      "lignes_macros": 0
+    },
+    {
+      "chemin": "src/util.rs",
+      "entete": "Utilitaires divers.",
+      "erreurs_parse": 0,
+      "hash_contenu": "ef4581a46c9ed1a3",
+      "langage": "rust",
+      "lignes": 33,
+      "lignes_macros": 1
+    }
+  ],
+  "liens_doc": [
+    {
+      "cible": "B-001",
+      "cible_brute": "B-001",
+      "ligne": 1,
+      "source": "EF-001"
+    },
+    {
+      "cible": "ADR-0001",
+      "cible_brute": "adr/0001-norme",
+      "ligne": 13,
+      "source": "EF-001"
+    },
+    {
+      "cible": null,
+      "cible_brute": "page-absente",
+      "ligne": 13,
+      "source": "EF-001"
+    },
+    {
+      "cible": "B-001",
+      "cible_brute": "B-001",
+      "ligne": 1,
+      "source": "EF-002"
+    },
+    {
+      "cible": null,
+      "cible_brute": "B-404",
+      "ligne": 1,
+      "source": "EF-002"
+    },
+    {
+      "cible": "EF-001",
+      "cible_brute": "EF-001",
+      "ligne": 3,
+      "source": "notes"
+    }
+  ],
+  "schema": 1,
+  "symboles": [
+    {
+      "balises": [],
+      "doc": "Affiche `(x, y)` avec deux décimales.",
+      "doc_ligne_debut": 31,
+      "doc_ligne_fin": 31,
+      "est_test": 0,
+      "fichier": "src/geo.rs",
+      "genre": "methode",
+      "hash_corps": "dde6d350d8d6ccc4",
+      "hash_doc": "4116760b722c2564",
+      "hash_signature": "71b40c60f37e3b17",
+      "id": "src/geo.rs::<Point as Display>::fmt",
+      "ligne_debut": 32,
+      "ligne_fin": 34,
+      "nom": "fmt",
+      "nom_qualifie": "<Point as Display>::fmt",
+      "resume": "Affiche `(x, y)` avec deux décimales.",
+      "signature": "fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result",
+      "type_parent": "Point",
+      "visibilite": "pub"
+    },
+    {
+      "balises": [],
+      "doc": "Point du plan, coordonnées en mètres.",
+      "doc_ligne_debut": 5,
+      "doc_ligne_fin": 5,
+      "est_test": 0,
+      "fichier": "src/geo.rs",
+      "genre": "struct",
+      "hash_corps": "59d08df69bf6924d",
+      "hash_doc": "98de75d3ef3fb3f4",
+      "hash_signature": "",
+      "id": "src/geo.rs::Point",
+      "ligne_debut": 6,
+      "ligne_fin": 9,
+      "nom": "Point",
+      "nom_qualifie": "Point",
+      "resume": "Point du plan, coordonnées en mètres.",
+      "signature": "pub struct Point",
+      "type_parent": null,
+      "visibilite": "pub"
+    },
+    {
+      "balises": [],
+      "doc": null,
+      "doc_ligne_debut": null,
+      "doc_ligne_fin": null,
+      "est_test": 0,
+      "fichier": "src/geo.rs",
+      "genre": "methode",
+      "hash_corps": "0a3e0a358138a2f1",
+      "hash_doc": null,
+      "hash_signature": "2c9bb89e45eba331",
+      "id": "src/geo.rs::Point::carre",
+      "ligne_debut": 25,
+      "ligne_fin": 27,
+      "nom": "carre",
+      "nom_qualifie": "Point::carre",
+      "resume": null,
+      "signature": "fn carre(&self) -> f64",
+      "type_parent": "Point",
+      "visibilite": "prive"
+    },
+    {
+      "balises": [],
+      "doc": "Crée un point ; aucune validation (les coordonnées peuvent être négatives).",
+      "doc_ligne_debut": 12,
+      "doc_ligne_fin": 12,
+      "est_test": 0,
+      "fichier": "src/geo.rs",
+      "genre": "methode",
+      "hash_corps": "31fbdef79dd9f5f3",
+      "hash_doc": "8b14f9628ddcb483",
+      "hash_signature": "7a0145f97ca499ef",
+      "id": "src/geo.rs::Point::new",
+      "ligne_debut": 13,
+      "ligne_fin": 15,
+      "nom": "new",
+      "nom_qualifie": "Point::new",
+      "resume": "Crée un point ; aucune validation (les coordonnées peuvent être négatives).",
+      "signature": "pub fn new(x: f64, y: f64) -> Self",
+      "type_parent": "Point",
+      "visibilite": "pub"
+    },
+    {
+      "balises": [
+        {
+          "ligne": 19,
+          "nom": "adr",
+          "valeur": "1"
+        },
+        {
+          "ligne": 20,
+          "nom": "pitfall",
+          "valeur": "NaN si une coordonnée est NaN."
+        }
+      ],
+      "doc": "Distance à l'origine.\n\n@adr 1\n@pitfall NaN si une coordonnée est NaN.",
+      "doc_ligne_debut": 17,
+      "doc_ligne_fin": 20,
+      "est_test": 0,
+      "fichier": "src/geo.rs",
+      "genre": "methode",
+      "hash_corps": "f83d0b2704767e46",
+      "hash_doc": "a3e406d870e879ae",
+      "hash_signature": "8bf207dd4af7b13f",
+      "id": "src/geo.rs::Point::norme",
+      "ligne_debut": 21,
+      "ligne_fin": 23,
+      "nom": "norme",
+      "nom_qualifie": "Point::norme",
+      "resume": "Distance à l'origine.",
+      "signature": "pub fn norme(&self) -> f64",
+      "type_parent": "Point",
+      "visibilite": "pub"
+    },
+    {
+      "balises": [
+        {
+          "ligne": 39,
+          "nom": "req",
+          "valeur": "EF-999"
+        },
+        {
+          "ligne": 40,
+          "nom": "inconnue",
+          "valeur": "valeur"
+        }
+      ],
+      "doc": "Aire d'un carré de côté `cote`.\n\n@req EF-999\n@inconnue valeur",
+      "doc_ligne_debut": 37,
+      "doc_ligne_fin": 40,
+      "est_test": 0,
+      "fichier": "src/geo.rs",
+      "genre": "fn",
+      "hash_corps": "b0b50d1c413a7d52",
+      "hash_doc": "86a86606c51cb0d1",
+      "hash_signature": "d93b159a108b6def",
+      "id": "src/geo.rs::aire",
+      "ligne_debut": 41,
+      "ligne_fin": 43,
+      "nom": "aire",
+      "nom_qualifie": "aire",
+      "resume": "Aire d'un carré de côté `cote`.",
+      "signature": "pub fn aire(cote: f64) -> f64",
+      "type_parent": null,
+      "visibilite": "pub"
+    },
+    {
+      "balises": [],
+      "doc": "Ajoute une marge de sécurité de 1 %.",
+      "doc_ligne_debut": 21,
+      "doc_ligne_fin": 21,
+      "est_test": 0,
+      "fichier": "src/lib.rs",
+      "genre": "fn",
+      "hash_corps": "733614281948bcdf",
+      "hash_doc": "3cd0fa4c43e6edda",
+      "hash_signature": "056571ce719ce069",
+      "id": "src/lib.rs::aide",
+      "ligne_debut": 22,
+      "ligne_fin": 24,
+      "nom": "aide",
+      "nom_qualifie": "aide",
+      "resume": "Ajoute une marge de sécurité de 1 %.",
+      "signature": "fn aide(x: f64) -> f64",
+      "type_parent": null,
+      "visibilite": "prive"
+    },
+    {
+      "balises": [
+        {
+          "ligne": 13,
+          "nom": "req",
+          "valeur": "EF-001"
+        },
+        {
+          "ligne": 14,
+          "nom": "topic",
+          "valeur": "calcul"
+        }
+      ],
+      "doc": "Point d'entrée : aire doublée d'un carré de côté `cote`.\n\n@req EF-001\n@topic calcul",
+      "doc_ligne_debut": 11,
+      "doc_ligne_fin": 14,
+      "est_test": 0,
+      "fichier": "src/lib.rs",
+      "genre": "fn",
+      "hash_corps": "13455f16860a1f3c",
+      "hash_doc": "b09ef94bbe85cff8",
+      "hash_signature": "e9cfb64d614a524c",
+      "id": "src/lib.rs::entree",
+      "ligne_debut": 15,
+      "ligne_fin": 19,
+      "nom": "entree",
+      "nom_qualifie": "entree",
+      "resume": "Point d'entrée : aire doublée d'un carré de côté `cote`.",
+      "signature": "pub fn entree(cote: f64) -> f64",
+      "type_parent": null,
+      "visibilite": "pub"
+    },
+    {
+      "balises": [],
+      "doc": null,
+      "doc_ligne_debut": null,
+      "doc_ligne_fin": null,
+      "est_test": 0,
+      "fichier": "src/util.rs",
+      "genre": "fn",
+      "hash_corps": "34e50edebcf85426",
+      "hash_doc": null,
+      "hash_signature": "fa34cfe313bf6737",
+      "id": "src/util.rs::double",
+      "ligne_debut": 15,
+      "ligne_fin": 18,
+      "nom": "double",
+      "nom_qualifie": "double",
+      "resume": null,
+      "signature": "pub fn double(x: f64) -> f64",
+      "type_parent": null,
+      "visibilite": "pub"
+    },
+    {
+      "balises": [],
+      "doc": "Nom de l'exécutable ailleurs.",
+      "doc_ligne_debut": 9,
+      "doc_ligne_fin": 9,
+      "est_test": 0,
+      "fichier": "src/util.rs",
+      "genre": "fn",
+      "hash_corps": "cd1a0d2eafbe8b28",
+      "hash_doc": "dbcd1cc8532158af",
+      "hash_signature": "dd9eb152af7530e4",
+      "id": "src/util.rs::exe@cfg(not(windows))",
+      "ligne_debut": 11,
+      "ligne_fin": 13,
+      "nom": "exe",
+      "nom_qualifie": "exe",
+      "resume": "Nom de l'exécutable ailleurs.",
+      "signature": "fn exe() -> &'static str",
+      "type_parent": null,
+      "visibilite": "prive"
+    },
+    {
+      "balises": [],
+      "doc": "Nom de l'exécutable sous Windows.",
+      "doc_ligne_debut": 3,
+      "doc_ligne_fin": 3,
+      "est_test": 0,
+      "fichier": "src/util.rs",
+      "genre": "fn",
+      "hash_corps": "9cc4b946acbd13c2",
+      "hash_doc": "914b4982c03f4f6b",
+      "hash_signature": "dd9eb152af7530e4",
+      "id": "src/util.rs::exe@cfg(windows)",
+      "ligne_debut": 5,
+      "ligne_fin": 7,
+      "nom": "exe",
+      "nom_qualifie": "exe",
+      "resume": "Nom de l'exécutable sous Windows.",
+      "signature": "fn exe() -> &'static str",
+      "type_parent": null,
+      "visibilite": "prive"
+    },
+    {
+      "balises": [],
+      "doc": null,
+      "doc_ligne_debut": null,
+      "doc_ligne_fin": null,
+      "est_test": 0,
+      "fichier": "src/util.rs",
+      "genre": "mod",
+      "hash_corps": "4bc6cbdb4f56fb70",
+      "hash_doc": null,
+      "hash_signature": "",
+      "id": "src/util.rs::interne",
+      "ligne_debut": 20,
+      "ligne_fin": 25,
+      "nom": "interne",
+      "nom_qualifie": "interne",
+      "resume": null,
+      "signature": "pub mod interne",
+      "type_parent": null,
+      "visibilite": "pub"
+    },
+    {
+      "balises": [],
+      "doc": "Fonction d'un module en ligne.",
+      "doc_ligne_debut": 21,
+      "doc_ligne_fin": 21,
+      "est_test": 0,
+      "fichier": "src/util.rs",
+      "genre": "fn",
+      "hash_corps": "9ce3263a2ff00f1c",
+      "hash_doc": "c899f4df8e06464b",
+      "hash_signature": "0c2e5c2d631d5077",
+      "id": "src/util.rs::interne::profond",
+      "ligne_debut": 22,
+      "ligne_fin": 24,
+      "nom": "profond",
+      "nom_qualifie": "interne::profond",
+      "resume": "Fonction d'un module en ligne.",
+      "signature": "pub fn profond() -> u8",
+      "type_parent": null,
+      "visibilite": "pub"
+    },
+    {
+      "balises": [],
+      "doc": null,
+      "doc_ligne_debut": null,
+      "doc_ligne_fin": null,
+      "est_test": 1,
+      "fichier": "src/util.rs",
+      "genre": "mod",
+      "hash_corps": "4ae380cd357776f9",
+      "hash_doc": null,
+      "hash_signature": "",
+      "id": "src/util.rs::tests",
+      "ligne_debut": 28,
+      "ligne_fin": 33,
+      "nom": "tests",
+      "nom_qualifie": "tests",
+      "resume": null,
+      "signature": "mod tests",
+      "type_parent": null,
+      "visibilite": "prive"
+    },
+    {
+      "balises": [],
+      "doc": null,
+      "doc_ligne_debut": null,
+      "doc_ligne_fin": null,
+      "est_test": 1,
+      "fichier": "src/util.rs",
+      "genre": "fn",
+      "hash_corps": "570a54077495478c",
+      "hash_doc": null,
+      "hash_signature": "4a125f41fe405b1e",
+      "id": "src/util.rs::tests::ok",
+      "ligne_debut": 30,
+      "ligne_fin": 32,
+      "nom": "ok",
+      "nom_qualifie": "tests::ok",
+      "resume": null,
+      "signature": "fn ok()",
+      "type_parent": null,
+      "visibilite": "prive"
+    }
+  ]
+}

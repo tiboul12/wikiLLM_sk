@@ -17,7 +17,7 @@ L'humain et l'agent doivent écrire la doc de la même façon, à un seul endroi
 ## Exigences
 
 1. **R1** La doc d'un symbole est un **commentaire de doc natif** du langage. En Rust : `///` avant l'item, `//!` en tête de fichier. Aucune syntaxe propriétaire (pas de `@wiki … @end`).
-2. **R2** La **première ligne** d'un bloc est le **résumé** : une phrase, 120 caractères au plus. C'est elle qu'affichent `carte`, `fichier` et les listes du wiki.
+2. **R2** La **première phrase** du premier paragraphe d'un bloc est le **résumé** (elle peut courir sur deux lignes ; 120 caractères conseillés, coupée à 200). C'est elle qu'affichent `carte`, `fichier` et les listes du wiki.
 3. **R3** Le reste du bloc dit ce que le code ne dit pas : **intention, contrat** (entrées admises, erreurs, effets de bord, `panic`), **pièges**, **raison d'un choix**. Il ne paraphrase pas le code.
 4. **R4** Les **balises** sont en fin de bloc, une par ligne, en début de ligne : `@adr`, `@req`, `@topic`, `@pitfall`, `@relu`. Liste fermée en v1 ; une balise inconnue produit un avertissement.
 5. **R5** Doivent avoir un bloc : les items `pub` (fonctions, méthodes, types, traits, constantes, macros exportées). Les autres sont libres. Les tests (`#[test]`, `mod tests` sous `#[cfg(test)]`) sont exclus. Seuil réglable dans `wikik.toml` (`pub`, `pub-crate`, `tout`).

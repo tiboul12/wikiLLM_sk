@@ -49,43 +49,40 @@ Pour un type, une constante ou une macro, `corps` porte sur l'item entier et `si
 
 ### Schéma SQLite (version 1)
 
+Schéma de référence : `SCHEMA_SQL` dans `crates/wikik-core/src/index.rs`, recopié ici.
+
 ```sql
-CREATE TABLE meta      (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL);           -- schema=1, outil=x.y.z
-CREATE TABLE fichiers  (chemin TEXT PRIMARY KEY, langage TEXT NOT NULL,
-                        hash_contenu TEXT NOT NULL, entete TEXT,               -- bloc //! complet
-                        lignes INTEGER NOT NULL, lignes_macros INTEGER NOT NULL,
-                        erreurs_parse INTEGER NOT NULL);
-CREATE TABLE symboles  (id TEXT PRIMARY KEY, fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
-                        nom TEXT NOT NULL, nom_qualifie TEXT NOT NULL, genre TEXT NOT NULL,  -- fn, methode, composant, struct, enum, trait, type, const, static, macro, mod
-                        visibilite TEXT NOT NULL,                                            -- pub, pub-crate, prive
-                        ligne_debut INTEGER NOT NULL, ligne_fin INTEGER NOT NULL,
-                        doc_ligne_debut INTEGER,                                             -- NULL si pas de bloc
-                        signature TEXT NOT NULL, resume TEXT, doc TEXT,
-                        hash_corps TEXT NOT NULL, hash_signature TEXT NOT NULL, hash_doc TEXT,
-                        est_test INTEGER NOT NULL);
-CREATE TABLE balises   (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,
-                        nom TEXT NOT NULL, valeur TEXT NOT NULL, ligne INTEGER NOT NULL);
-CREATE TABLE appels_bruts (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,  -- sites d'appel non résolus,
-                        forme TEXT NOT NULL, cible TEXT NOT NULL, qualificatif TEXT,         -- re-résolus globalement (SPEC-03)
-                        ligne INTEGER NOT NULL);
-CREATE TABLE imports   (fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
-                        alias TEXT NOT NULL, chemin_import TEXT NOT NULL);
-CREATE TABLE aretes    (source TEXT NOT NULL, cible TEXT NOT NULL,
-                        genre TEXT NOT NULL,          -- appel, rend, adr, req, topic, lien
-                        confiance TEXT NOT NULL,      -- certain, probable
-                        ligne INTEGER,
-                        PRIMARY KEY (source, cible, genre));
-CREATE TABLE documents (id TEXT PRIMARY KEY, chemin TEXT NOT NULL UNIQUE, genre TEXT NOT NULL,  -- type du frontmatter, sinon « page »
-                        titre TEXT NOT NULL, statut TEXT, version TEXT, priorite TEXT,
-                        frontmatter TEXT NOT NULL,    -- JSON canonique (clés triées)
-                        corps TEXT NOT NULL, hash_contenu TEXT NOT NULL);
-CREATE TABLE liens_doc (source TEXT NOT NULL, cible_brute TEXT NOT NULL, cible TEXT,  -- cible NULL = lien cassé
-                        ligne INTEGER NOT NULL);
+CREATE TABLE meta (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL);
+CREATE TABLE etat (chemin TEXT PRIMARY KEY, taille INTEGER NOT NULL, mtime INTEGER NOT NULL, hash TEXT NOT NULL);
+CREATE TABLE fichiers (chemin TEXT PRIMARY KEY, langage TEXT NOT NULL, hash_contenu TEXT NOT NULL, entete TEXT,
+  lignes INTEGER NOT NULL, lignes_macros INTEGER NOT NULL, erreurs_parse INTEGER NOT NULL);
+CREATE TABLE symboles (id TEXT PRIMARY KEY, fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
+  nom TEXT NOT NULL, nom_qualifie TEXT NOT NULL, genre TEXT NOT NULL, visibilite TEXT NOT NULL,
+  ligne_debut INTEGER NOT NULL, ligne_fin INTEGER NOT NULL, doc_ligne_debut INTEGER, doc_ligne_fin INTEGER,
+  signature TEXT NOT NULL, resume TEXT, doc TEXT, hash_corps TEXT NOT NULL, hash_signature TEXT NOT NULL,
+  hash_doc TEXT, est_test INTEGER NOT NULL, type_parent TEXT);
+CREATE INDEX symboles_fichier ON symboles(fichier);
+CREATE INDEX symboles_nom ON symboles(nom);
+CREATE TABLE balises (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,
+  nom TEXT NOT NULL, valeur TEXT NOT NULL, ligne INTEGER NOT NULL);
+CREATE TABLE appels_bruts (symbole TEXT NOT NULL REFERENCES symboles(id) ON DELETE CASCADE,
+  forme TEXT NOT NULL, cible TEXT NOT NULL, qualificatif TEXT, ligne INTEGER NOT NULL);
+CREATE TABLE imports (fichier TEXT NOT NULL REFERENCES fichiers(chemin) ON DELETE CASCADE,
+  alias TEXT NOT NULL, chemin_import TEXT NOT NULL);
+CREATE TABLE aretes (source TEXT NOT NULL, cible TEXT NOT NULL, genre TEXT NOT NULL, confiance TEXT NOT NULL,
+  ligne INTEGER, PRIMARY KEY (source, cible, genre));
+CREATE INDEX aretes_cible ON aretes(cible);
+CREATE TABLE documents (id TEXT PRIMARY KEY, chemin TEXT NOT NULL UNIQUE, genre TEXT NOT NULL, titre TEXT NOT NULL,
+  statut TEXT, version TEXT, priorite TEXT, frontmatter TEXT NOT NULL, frontmatter_invalide TEXT,
+  corps TEXT NOT NULL, hash_contenu TEXT NOT NULL);
+CREATE TABLE liens_doc (source TEXT NOT NULL, cible_brute TEXT NOT NULL, cible TEXT, ligne INTEGER NOT NULL);
 CREATE VIRTUAL TABLE recherche USING fts5(cle UNINDEXED, genre UNINDEXED, titre, texte,
-                        tokenize = 'unicode61 remove_diacritics 2');
+  tokenize = 'unicode61 remove_diacritics 2');
 ```
 
 Règles :
+- `etat` (taille, date, hash par fichier) sert au test de fraîcheur ; il n'apparaît pas dans le dump.
+- `type_parent` (type de l'impl englobant) sert à résoudre `self.f()` et `Self::f()` ; `doc_ligne_fin` sert à `check` (SPEC-04).
 - Les arêtes `adr`, `req`, `topic` viennent des balises ; `lien` des liens `[[...]]` et des champs de frontmatter qui listent des identifiants (`besoins`, `exigences`, `decisions`, `sources`, `remplace`, `remplace_par`).
 - La cible d'une arête peut ne pas exister (balise cassée) : c'est `check` qui le signale, l'index ne refuse rien.
 - L'index vit dans `.wikik/index.sqlite`, non versionné (ADR-0003).
