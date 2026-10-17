@@ -239,9 +239,10 @@
                 <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Dossier</label>
                 <select id="nouveau-dossier" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200">
                     <option value="">Racine (wiki/)</option>
+                    <option value="architecture">architecture (Architecture & Code Map)</option>
+                    <option value="documentation">documentation (Guides, Tutoriels & Référence)</option>
                     <option value="decisions">decisions (Choix & ADR)</option>
                     <option value="sessions">sessions (Comptes-rendus)</option>
-                    <option value="architecture">architecture (Spécifications)</option>
                     <option value="taches">taches (Roadmap & Backlog)</option>
                 </select>
             </div>
@@ -299,7 +300,13 @@
             analyserUrlInitiale();
         });
 
-        // Analyse de l'URL du navigateur (ex: /wikiK/taches/backlog ou ?projet=wikiK)
+        /**
+         * Analyse l'URL du navigateur (ex: `/wikiK/taches/backlog` ou `?projet=wikiK&note=...`)
+         * pour identifier le projet actif et la note à charger au démarrage de l'application.
+         * 
+         * @async
+         * @returns {Promise<void>}
+         */
         async function analyserUrlInitiale() {
             const pathParts = window.location.pathname.split('/').filter(Boolean);
             const params = new URLSearchParams(window.location.search);
@@ -318,7 +325,22 @@
             await chargerProjetCourant(noteNom);
         }
 
-        // Met à jour l'URL dans la barre du navigateur sans recharger la page
+        /**
+         * Met à jour l'URL dans la barre du navigateur sans recharger la page via l'API HTML5 History.
+         * 
+         * <!-- Embedded Architecture Decision Record (ADR Block) -->
+         * # 🏛️ Architecture Decision (ADR)
+         * # Statut : Accepté
+         * # Contexte : Maintenir la navigabilité (boutons Précédent/Suivant) et le partage d'URLs directes sans rechargement.
+         * # Décision : Utilisation de `window.history.pushState` avec état d'historique `{projet, note}`.
+         * # Conséquences & Trade-offs :
+         * # - 🟢 Avantages : Expérience SPA fluide, URLs propres compatibles deep-linking.
+         * # - 🔴 Limites : Requiert la capture de l'événement `popstate` pour la navigation arrière.
+         * 
+         * @param {string} projNom - Nom de l'identifiant du projet.
+         * @param {string|null} [noteChemin=null] - Chemin relatif de la note active.
+         * @returns {void}
+         */
         function mettreAJourUrl(projNom, noteChemin = null) {
             let nouvelleUrl = `/${encodeURIComponent(projNom)}`;
             if (noteChemin) {
@@ -335,7 +357,13 @@
             }
         };
 
-        // Charger la liste des projets connus
+        /**
+         * Charge le registre des projets connus depuis l'API `/api/projets` et alimente le menu déroulant.
+         * 
+         * @async
+         * @param {string|null} [projetPrefere=null] - Projet à présélectionner si disponible.
+         * @returns {Promise<void>}
+         */
         async function chargerListeProjets(projetPrefere = null) {
             try {
                 const res = await fetch('/api/projets');
@@ -361,7 +389,14 @@
             }
         }
 
-        // Basculer vers un autre projet
+        /**
+         * Bascule le contexte actif vers un autre projet et déclenche le chargement de son wiki.
+         * 
+         * @async
+         * @param {string} nomProjet - Identifiant du projet cible.
+         * @param {string|null} [noteASelectionner=null] - Chemin relatif éventuel d'une note à ouvrir.
+         * @returns {Promise<void>}
+         */
         async function changerProjet(nomProjet, noteASelectionner = null) {
             projetActuel = nomProjet;
             fichierActuel = null; // Réinitialise impérativement la note pour forcer le rafraîchissement
@@ -373,7 +408,13 @@
             }
         }
 
-        // Charger le projet sélectionné
+        /**
+         * Récupère les métadonnées du projet actif via `/api/projet_info` et charge la liste des fichiers.
+         * 
+         * @async
+         * @param {string|null} [noteASelectionner=null] - Note à ouvrir après chargement.
+         * @returns {Promise<void>}
+         */
         async function chargerProjetCourant(noteASelectionner = null) {
             try {
                 const url = projetActuel ? `/api/projet_info?projet=${encodeURIComponent(projetActuel)}` : '/api/projet_info';
@@ -391,7 +432,13 @@
             }
         }
 
-        // Charger les notes du projet actif
+        /**
+         * Récupère la liste de toutes les notes Markdown du projet actif via `/api/fichiers`.
+         * 
+         * @async
+         * @param {string|null} [cheminASelectionner=null] - Chemin de la note à sélectionner automatiquement.
+         * @returns {Promise<void>}
+         */
         async function chargerFichiers(cheminASelectionner = null) {
             try {
                 const res = await fetch(`/api/fichiers?projet=${encodeURIComponent(projetActuel)}`);
@@ -431,51 +478,171 @@
             }
         }
 
-        // Afficher l'arborescence des dossiers
+        /**
+         * Construit et insère dans le DOM la liste organisée par dossiers thématiques avec badges et icônes.
+         * 
+         * @param {Array<{nom: string, chemin: string, dossier: string, taille: number}>} fichiers - Tableau des notes.
+         * @returns {void}
+         */
         function afficherArborescence(fichiers) {
             const container = document.getElementById('liste-fichiers');
             container.innerHTML = '';
 
-            const groupes = {};
-            fichiers.forEach(f => {
-                const grp = f.dossier || 'Racine';
-                if (!groupes[grp]) groupes[grp] = [];
-                groupes[grp].push(f);
-            });
+            // 1. Extraction des éléments clés du haut (Index et Backlog)
+            const fichierIndex = fichiers.find(f => f.chemin === 'index.md' || f.nom === 'index.md');
+            const fichierBacklog = fichiers.find(f => f.chemin === 'taches/backlog.md' || f.nom === 'backlog.md' || f.chemin === 'backlog.md');
+            
+            // Fichiers traités pour ne pas les dupliquer
+            const traites = new Set();
+            if (fichierIndex) traites.add(fichierIndex.chemin);
+            if (fichierBacklog) traites.add(fichierBacklog.chemin);
 
-            const emojisDossiers = {
-                'Racine': '📌',
-                'decisions': '⚖️',
-                'sessions': '⏱️',
-                'architecture': '🏗️',
-                'taches': '📋'
+            // Conteneur Navigation Haute (Index & Backlog)
+            const hautDiv = document.createElement('div');
+            hautDiv.className = 'space-y-1 pb-2 border-b border-slate-700/60';
+
+            const creerBoutonNote = (f, icone = '📄', labelPerso = null) => {
+                const itemBtn = document.createElement('button');
+                const estActif = fichierActuel === f.chemin;
+                itemBtn.className = `w-full text-left text-xs px-3 py-1.5 rounded-lg truncate flex items-center space-x-2 transition ${
+                    estActif ? 'bg-blue-600/20 text-blue-400 font-semibold border border-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`;
+                const titre = labelPerso || f.nom.replace('.md', '');
+                itemBtn.innerHTML = `<span>${icone}</span><span class="truncate">${titre}</span>`;
+                itemBtn.onclick = () => ouvrirFichier(f.chemin);
+                return itemBtn;
             };
 
-            for (const [dossier, items] of Object.entries(groupes)) {
-                const grpDiv = document.createElement('div');
-                grpDiv.className = 'space-y-1';
+            if (fichierIndex) {
+                hautDiv.appendChild(creerBoutonNote(fichierIndex, '📖', 'Accueil'));
+            }
+            if (fichierBacklog) {
+                hautDiv.appendChild(creerBoutonNote(fichierBacklog, '📋', 'Backlog & Feuille de Route'));
+            }
 
-                const titreGrp = document.createElement('div');
-                titreGrp.className = 'text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1 flex items-center space-x-1.5';
-                titreGrp.innerHTML = `<span>${emojisDossiers[dossier] || '📁'}</span><span>${dossier}</span>`;
-                grpDiv.appendChild(titreGrp);
+            // Autres fichiers racines éventuels (hors index et backlog)
+            const autresRacines = fichiers.filter(f => (!f.dossier || f.dossier === 'Racine') && !traites.has(f.chemin));
+            autresRacines.forEach(f => {
+                traites.add(f.chemin);
+                hautDiv.appendChild(creerBoutonNote(f, '📌'));
+            });
 
-                items.forEach(item => {
-                    const itemBtn = document.createElement('button');
-                    const estActif = fichierActuel === item.chemin;
-                    itemBtn.className = `w-full text-left text-xs px-3 py-1.5 rounded-lg truncate block transition ${
-                        estActif ? 'bg-blue-600/20 text-blue-400 font-semibold border border-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                    }`;
-                    itemBtn.innerText = item.nom.replace('.md', '');
-                    itemBtn.onclick = () => ouvrirFichier(item.chemin);
-                    grpDiv.appendChild(itemBtn);
+            container.appendChild(hautDiv);
+
+            // 2. Sous-dossier : Sessions
+            const fichiersSessions = fichiers.filter(f => f.dossier === 'sessions');
+            if (fichiersSessions.length > 0) {
+                const sessionsDiv = document.createElement('div');
+                sessionsDiv.className = 'space-y-1 pt-1';
+
+                const titreSessions = document.createElement('div');
+                titreSessions.className = 'text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1 flex items-center space-x-1.5';
+                titreSessions.innerHTML = `<span>⏱️</span><span>Sessions (${fichiersSessions.length})</span>`;
+                sessionsDiv.appendChild(titreSessions);
+
+                fichiersSessions.forEach(f => {
+                    traites.add(f.chemin);
+                    sessionsDiv.appendChild(creerBoutonNote(f, '⏱️'));
                 });
 
-                container.appendChild(grpDiv);
+                container.appendChild(sessionsDiv);
+            }
+
+            // 3. Groupe Principal : Documentation & Architecture
+            const fichiersArchi = fichiers.filter(f => f.dossier === 'architecture');
+            const fichiersDoc = fichiers.filter(f => f.dossier === 'documentation');
+            const fichiersDecisions = fichiers.filter(f => f.dossier === 'decisions');
+
+            if (fichiersArchi.length > 0 || fichiersDoc.length > 0 || fichiersDecisions.length > 0) {
+                const docArchiDiv = document.createElement('div');
+                docArchiDiv.className = 'space-y-2 pt-2 border-t border-slate-700/40';
+
+                const grandTitre = document.createElement('div');
+                grandTitre.className = 'text-[11px] font-extrabold uppercase tracking-wider text-blue-400 px-2 py-1 flex items-center space-x-1.5 bg-slate-900/60 rounded-md';
+                grandTitre.innerHTML = `<span>📁</span><span>Documentation & Architecture</span>`;
+                docArchiDiv.appendChild(grandTitre);
+
+                // Sous-catégorie 1 : Architecture
+                if (fichiersArchi.length > 0) {
+                    const sousArchi = document.createElement('div');
+                    sousArchi.className = 'space-y-1 pl-2 border-l border-slate-700/60 ml-2';
+                    const sousTitre = document.createElement('div');
+                    sousTitre.className = 'text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5 flex items-center space-x-1';
+                    sousTitre.innerHTML = `<span>🏗️</span><span>Architecture</span>`;
+                    sousArchi.appendChild(sousTitre);
+
+                    fichiersArchi.forEach(f => {
+                        traites.add(f.chemin);
+                        sousArchi.appendChild(creerBoutonNote(f, '📐'));
+                    });
+                    docArchiDiv.appendChild(sousArchi);
+                }
+
+                // Sous-catégorie 2 : Documentation
+                if (fichiersDoc.length > 0) {
+                    const sousDoc = document.createElement('div');
+                    sousDoc.className = 'space-y-1 pl-2 border-l border-slate-700/60 ml-2';
+                    const sousTitre = document.createElement('div');
+                    sousTitre.className = 'text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5 flex items-center space-x-1';
+                    sousTitre.innerHTML = `<span>📚</span><span>Documentation</span>`;
+                    sousDoc.appendChild(sousTitre);
+
+                    fichiersDoc.forEach(f => {
+                        traites.add(f.chemin);
+                        sousDoc.appendChild(creerBoutonNote(f, '📄'));
+                    });
+                    docArchiDiv.appendChild(sousDoc);
+                }
+
+                // Sous-catégorie 3 : Décisions (ADR)
+                if (fichiersDecisions.length > 0) {
+                    const sousDec = document.createElement('div');
+                    sousDec.className = 'space-y-1 pl-2 border-l border-slate-700/60 ml-2';
+                    const sousTitre = document.createElement('div');
+                    sousTitre.className = 'text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5 flex items-center space-x-1';
+                    sousTitre.innerHTML = `<span>⚖️</span><span>Décisions (ADR)</span>`;
+                    sousDec.appendChild(sousTitre);
+
+                    fichiersDecisions.forEach(f => {
+                        traites.add(f.chemin);
+                        sousDec.appendChild(creerBoutonNote(f, '⚖️'));
+                    });
+                    docArchiDiv.appendChild(sousDec);
+                }
+
+                container.appendChild(docArchiDiv);
+            }
+
+            // 4. Dossiers complémentaires éventuels
+            const autresFichiers = fichiers.filter(f => !traites.has(f.chemin));
+            const autresGroupes = {};
+            autresFichiers.forEach(f => {
+                const grp = f.dossier || 'Autres';
+                if (!autresGroupes[grp]) autresGroupes[grp] = [];
+                autresGroupes[grp].push(f);
+            });
+
+            for (const [dossier, items] of Object.entries(autresGroupes)) {
+                const extraDiv = document.createElement('div');
+                extraDiv.className = 'space-y-1 pt-2';
+                const extraTitre = document.createElement('div');
+                extraTitre.className = 'text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1 flex items-center space-x-1.5';
+                extraTitre.innerHTML = `<span>📁</span><span>${dossier}</span>`;
+                extraDiv.appendChild(extraTitre);
+
+                items.forEach(item => {
+                    extraDiv.appendChild(creerBoutonNote(item, '📄'));
+                });
+                container.appendChild(extraDiv);
             }
         }
 
-        // Filtrage en direct par recherche
+        /**
+         * Filtre dynamiquement les notes affichées selon le texte saisi dans le champ de recherche.
+         * 
+         * @param {string} recherche - Terme de recherche saisi.
+         * @returns {void}
+         */
         function filtrerFichiers(recherche) {
             const mot = recherche.toLowerCase().trim();
             if (!mot) {
@@ -486,7 +653,14 @@
             afficherArborescence(filtres);
         }
 
-        // Ouvrir une note
+        /**
+         * Récupère le contenu d'un fichier Markdown depuis `/api/fichier`, met à jour l'interface et le rendu.
+         * 
+         * @async
+         * @param {string} chemin - Chemin relatif de la note (ex: `architecture/vue-ensemble.md`).
+         * @param {boolean} [mettreUrl=true] - Si vrai, met à jour l'URL du navigateur.
+         * @returns {Promise<void>}
+         */
         async function ouvrirFichier(chemin, mettreUrl = true) {
             try {
                 const res = await fetch(`/api/fichier?projet=${encodeURIComponent(projetActuel)}&chemin=${encodeURIComponent(chemin)}`);
@@ -512,7 +686,21 @@
             }
         }
 
-        // Rendu Markdown et résolution des liens Wiki [[Cible|Texte]] ou [[Cible]]
+        /**
+         * Parse et effectue le rendu Markdown avec prise en charge des diagrammes Mermaid et liens Wiki `[[cible|texte]]`.
+         * 
+         * <!-- Embedded Architecture Decision Record (ADR Block) -->
+         * # 🏛️ Architecture Decision (ADR)
+         * # Statut : Accepté
+         * # Contexte : Préserver les blocs de code contre les faux-positifs lors du remplacement des WikiLinks `[[...]]`.
+         * # Décision : Protection préalable par placeholders `___CODE_BLOCK_N___` avant parsing regex des wikilinks.
+         * # Conséquences & Trade-offs :
+         * # - 🟢 Avantages : Aucun effet de bord sur le code source affiché dans les blocs pre/code.
+         * # - 🔴 Limites : Nécessite une étape de substitution aller-retour en mémoire.
+         * 
+         * @param {string} texte - Contenu Markdown brut.
+         * @returns {void}
+         */
         function rendreMarkdown(texte) {
             // Protège les blocs de code et le code inline contre la substitution des liens
             const placeholders = [];
@@ -553,7 +741,22 @@
             }
         }
 
-        // Injection des Hooks pour l'Agent sur chaque titre, bloc de code, tableau, citation
+        /**
+         * Injecte dynamiquement des ancres sémantiques et des boutons d'ancrage "Hook Agent"
+         * sur chaque élément structuré (titres h1-h4, code blocks pre, citations blockquote, tableaux table).
+         * 
+         * <!-- Embedded Architecture Decision Record (ADR Block) -->
+         * # 🏛️ Architecture Decision (ADR)
+         * # Statut : Accepté
+         * # Contexte : Permettre aux développeurs et aux agents IA de cibler et citer un extrait exact de la documentation.
+         * # Décision : Génération d'ID normalisés avec fallback incrémental et bouton de copie instantanée au format `@wiki:projet/note#ancre`.
+         * # Conséquences & Trade-offs :
+         * # - 🟢 Avantages : Précision chirurgicale pour le prompting d'agent sans ambiguïté contextuelle.
+         * # - 🔴 Limites : Mutation du DOM post-rendu Markdown.
+         * 
+         * @param {HTMLElement} container - Élément conteneur du Markdown rendu.
+         * @returns {void}
+         */
         function injecterHooks(container) {
             if (!container) return;
 
@@ -606,7 +809,14 @@
             verifierHashUrl();
         }
 
-        // Copier le Hook Agent dans le presse-papier
+        /**
+         * Copie le Hook Agent dans le presse-papier au format standardisé `@wiki:projet/note#ancre`
+         * et met à jour l'URL avec l'ancre active.
+         * 
+         * @param {string} ancreId - Identifiant d'ancre HTML de l'élément.
+         * @param {HTMLElement|null} [elementCible=null] - Élément DOM recevant l'animation d'accentuation visuelle.
+         * @returns {void}
+         */
         function copierHook(ancreId, elementCible) {
             if (!projetActuel || !fichierActuel) return;
             const cheminClean = fichierActuel.replace(/\.md$/, '');
@@ -636,7 +846,11 @@
             }
         }
 
-        // Vérifier si un hash d'ancre est présent dans l'URL au chargement
+        /**
+         * Vérifie si un hash d'ancre `#ancre` est présent dans l'URL et effectue un défilement fluide vers la section ciblée.
+         * 
+         * @returns {void}
+         */
         function verifierHashUrl() {
             if (window.location.hash) {
                 const ancre = window.location.hash.substring(1);
@@ -652,7 +866,12 @@
             }
         }
 
-        // Afficher une notification toast
+        /**
+         * Affiche une notification toast temporaire avec animation d'apparition.
+         * 
+         * @param {string} messageHtml - Contenu HTML du message toast.
+         * @returns {void}
+         */
         function afficherToast(messageHtml) {
             const toast = document.getElementById('toast-notification');
             const messageContainer = document.getElementById('toast-message');
@@ -668,7 +887,12 @@
             }, 3800);
         }
 
-        // Algorithme robuste de résolution des liens vers les notes existantes
+        /**
+         * Résout une cible de lien Wiki selon une recherche progressive (chemin complet, nom seul, suffixe).
+         * 
+         * @param {string} cibleBrute - Chaîne du lien cliqué (ex: `quickstart`, `tutoriels/quickstart`, `quickstart.md`).
+         * @returns {{nom: string, chemin: string, dossier: string, taille: number}|null} Métadonnées de la note trouvée ou null.
+         */
         function trouverNote(cibleBrute) {
             if (!cibleBrute) return null;
             let c = cibleBrute.trim();
@@ -694,7 +918,12 @@
             return null;
         }
 
-        // Clic sur un lien interne du wiki
+        /**
+         * Gère le clic sur un lien interne du wiki `[[cible]]` et ouvre la note ou propose sa création rapide.
+         * 
+         * @param {string} cible - Cible du lien Wiki cliqué.
+         * @returns {void}
+         */
         function clicSurLienWiki(cible) {
             const note = trouverNote(cible);
             if (note) {
@@ -709,6 +938,13 @@
             }
         }
 
+        /**
+         * Crée une nouvelle page Markdown avec squelette par défaut via l'API `/api/sauvegarder`.
+         * 
+         * @async
+         * @param {string} nomFichier - Chemin relatif du fichier à créer.
+         * @returns {Promise<void>}
+         */
         async function creerPageRapide(nomFichier) {
             await fetch('/api/sauvegarder', {
                 method: 'POST',
@@ -722,7 +958,12 @@
             await chargerFichiers(nomFichier);
         }
 
-        // Bascule Lecture / Édition
+        /**
+         * Bascule l'interface utilisateur entre le mode visualisation (Markdown) et le mode éditeur (Textarea).
+         * 
+         * @param {'lecture'|'edition'} mode - Mode d'affichage désiré.
+         * @returns {void}
+         */
         function basculerMode(mode) {
             modeActuel = mode;
             const btnLecture = document.getElementById('btn-mode-lecture');
@@ -747,7 +988,12 @@
             }
         }
 
-        // Sauvegarder la note en cours
+        /**
+         * Sauvegarde le contenu de la note active sur le disque via `/api/sauvegarder`.
+         * 
+         * @async
+         * @returns {Promise<void>}
+         */
         async function sauvegarderFichierActuel() {
             if (!fichierActuel) return;
             const contenu = document.getElementById('editeur-texte').value;
@@ -768,7 +1014,12 @@
             }
         }
 
-        // Supprimer la note
+        /**
+         * Supprime définitivement la note active via `/api/supprimer` après confirmation utilisateur.
+         * 
+         * @async
+         * @returns {Promise<void>}
+         */
         async function supprimerFichierActuel() {
             if (!fichierActuel) return;
             if (!confirm(`Supprimer définitivement "${fichierActuel}" ?`)) return;
@@ -791,7 +1042,12 @@
             }
         }
 
-        // Vue Graphe
+        /**
+         * Bascule l'affichage principal entre la vue Document (Notes) et le graphe relationnel interactif.
+         * 
+         * @param {'notes'|'graphe'} vue - Vue à afficher.
+         * @returns {void}
+         */
         function changerVue(vue) {
             vueActuelle = vue;
             const tabNotes = document.getElementById('tab-notes');
@@ -815,6 +1071,21 @@
             }
         }
 
+        /**
+         * Initialise ou rafraîchit le graphe relationnel interactif vis-network alimenté par `/api/graphe`.
+         * 
+         * <!-- Embedded Architecture Decision Record (ADR Block) -->
+         * # 🏛️ Architecture Decision (ADR)
+         * # Statut : Accepté
+         * # Contexte : Fournir une cartographie visuelle navigable des connexions conceptuelles entre notes.
+         * # Décision : Utilisation de `vis-network` en standalone avec physique Barnes-Hut.
+         * # Conséquences & Trade-offs :
+         * # - 🟢 Avantages : Rendu dynamique avec regroupement par couleurs des répertoires thématiques.
+         * # - 🔴 Limites : Charge CPU plus élevée sur les graphes de plus de 1000 nœuds.
+         * 
+         * @async
+         * @returns {Promise<void>}
+         */
         async function initialiserGraphe() {
             try {
                 const res = await fetch(`/api/graphe?projet=${encodeURIComponent(projetActuel)}`);
@@ -857,15 +1128,29 @@
             }
         }
 
-        // Modale de Scan de Projets
+        /**
+         * Ouvre la boîte de dialogue modale du scanner de projets.
+         * @returns {void}
+         */
         function ouvrirModalScanner() {
             document.getElementById('modal-scanner').classList.remove('hidden');
             document.getElementById('input-chemin-scan').focus();
         }
+
+        /**
+         * Ferme la boîte de dialogue modale du scanner de projets.
+         * @returns {void}
+         */
         function fermerModalScanner() {
             document.getElementById('modal-scanner').classList.add('hidden');
         }
 
+        /**
+         * Déclenche un scan de détection de projets via `/api/scanner` et génère les cartes de résultats.
+         * 
+         * @async
+         * @returns {Promise<void>}
+         */
         async function lancerScan() {
             const dossier = document.getElementById('input-chemin-scan').value.trim();
             const container = document.getElementById('resultats-scan');
@@ -905,6 +1190,14 @@
             }
         }
 
+        /**
+         * Enregistre et active un projet scanné via `/api/activer_projet`.
+         * 
+         * @async
+         * @param {string} nom - Nom d'affichage du projet.
+         * @param {string} chemin - Chemin absolu du répertoire du projet.
+         * @returns {Promise<void>}
+         */
         async function activerProjetScanne(nom, chemin) {
             try {
                 await fetch('/api/activer_projet', {
@@ -920,15 +1213,30 @@
             }
         }
 
-        // Modale de Création de Note
+        /**
+         * Ouvre la boîte de dialogue modale de création d'une nouvelle note.
+         * @returns {void}
+         */
         function ouvrirModalCreation() {
             document.getElementById('modal-creation').classList.remove('hidden');
             document.getElementById('nouveau-nom').focus();
         }
+
+        /**
+         * Ferme la boîte de dialogue modale de création d'une nouvelle note et réinitialise le champ.
+         * @returns {void}
+         */
         function fermerModalCreation() {
             document.getElementById('modal-creation').classList.add('hidden');
             document.getElementById('nouveau-nom').value = '';
         }
+
+        /**
+         * Valide le formulaire de création de note, crée le fichier sur le disque et l'ouvre en édition.
+         * 
+         * @async
+         * @returns {Promise<void>}
+         */
         async function validerCreation() {
             const dossier = document.getElementById('nouveau-dossier').value;
             let nom = document.getElementById('nouveau-nom').value.trim();
