@@ -40,7 +40,7 @@ Pour l'agent de code : le skill [`skill/SKILL.md`](./skill/SKILL.md) (règles d'
 - 🗺️ [Plan de la v1](./docs/projet/plan-v1.md) et son tableau de suivi
 - 📋 [Besoin (BDR)](./docs/projet/majeures/v1/bdr-2-definition.md) · [Cahier des charges](./docs/projet/majeures/v1/cahier-des-charges.md)
 - 📐 [Specs](./docs/projet/specs/) · ⚖️ [Décisions (ADR)](./docs/projet/adr/)
-- 🔭 [Suite du projet (backlog)](./wiki/taches/backlog.md)
+- 🔭 [Suite du projet (backlog)](./docs/projet/backlog.md)
 - 🤖 [Consignes pour Claude Code](./CLAUDE.md)
 
 Le mieux reste de lancer `wikik serve` à la racine de ce dépôt : wikik se documente avec lui-même.
@@ -56,7 +56,5 @@ Le mieux reste de lancer `wikik serve` à la racine de ce dépôt : wikik se doc
 ├── skill/               # SKILL.md et procédures pour l'agent
 ├── templates/           # gabarits de la zone Projet (embarqués par `wikik init`)
 ├── tests/fixtures/      # projet Rust de test et son instantané d'index
-├── docs/projet/         # zone Projet de wikik lui-même
-├── wiki/                # wiki de la v0 (migré en Phase 9)
-└── legacy/              # v0 Python (tag `v0-python`), retirée en Phase 9
+└── docs/projet/         # zone Projet de wikik lui-même (la v0 Python est au tag `v0-python`)
 ```

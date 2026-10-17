@@ -1,16 +1,38 @@
+---
+id: BACKLOG
+type: backlog
+titre: "Backlog et suite du projet"
+statut: vivant
+date: 2026-10-17
+sources: [PLAN-v1]
+---
+
 # 📋 Backlog & Feuille de Route
 
-**Dernière mise à jour** : 2026-10-17  
-**Référence** : [[index|Sommaire du Wiki]]  
-**Source des décisions** : `.doc/reflexion et evolution/analyse-2026-10-17.md` (décisions A1 à A6)
+**Dernière mise à jour** : 2026-10-17
+**Source des décisions** : `.doc/reflexion et evolution/analyse-2026-10-17.md` (décisions A1 à A6) et [[plan-v1]]
 
 ---
 
 ## 🧭 Cap actuel (17/10/2026)
 
-Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, index SQLite, `check`, CLI de requêtes pour l'agent, puis wiki généré avec un front TypeScript. v1 **solo et en local**, architecture prête pour l'équipe. Plan détaillé de la v1 : `docs/projet/plan-v1.md` (phases 0 à 9).
+Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, index SQLite, `check`, CLI de requêtes pour l'agent, puis wiki généré avec un front TypeScript. v1 **solo et en local**, architecture prête pour l'équipe. Plan détaillé de la v1 : [[plan-v1]] (phases 0 à 9).
 
 ---
+
+## ✋ À faire avec Tibo pour passer de `v1.0-rc1` à `v1.0`
+
+- [ ] **Relire et valider** la BDR, le cahier des charges, les specs et les ADR produits par délégation le 17/10 (statut `proposé`), et corriger ce qui ne convient pas.
+- [ ] **Mesure en session réelle** sur ATS (protocole dans MESURE-01).
+- [ ] **Installer** : `make install`, puis le skill pour tous les projets (`ln -s "$PWD/skill" ~/.claude/skills/wikik`) en remplacement de `doc-as-code` et `wiki-dev-sync`.
+- [ ] **Amorcer ATS** (procédure `skill/procedures/amorcer.md`) : `wikik init`, puis les blocs manquants module par module ; migrer `ATS/wiki/` et le cahier des charges d'ATS vers `docs/projet/` (convertir `AC-009`, `F1`… en `EF-xxx`).
+- [ ] **Trancher Leptos ou Svelte** pour le front (SPEC-05) : Svelte a été choisi par défaut.
+
+## 🧩 Constats de la v1 à traiter
+
+- [ ] **Indexer le front** (TypeScript, v2) : EF-045 et les composants du wiki ne sont pas encore couverts par l'index.
+- [ ] **`check` sur un gros projet** : un `git blame` par fichier documenté ; à mesurer au-delà de 50 000 lignes, cache déjà en place.
+- [ ] **Appels de méthode** : seuls les noms uniques sont résolus (`probable`) ; envisager une résolution par type des champs `self.x.f()`.
 
 ## 🗄️ Reporté après la v1 (à reprendre pour la suite du projet)
 

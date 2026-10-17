@@ -871,6 +871,8 @@ pub fn exigence(index: &Index, demande: &str) -> Result<Sortie> {
 }
 
 /// `ref` : résout une référence `@wiki:` copiée depuis le wiki (EF-028).
+///
+/// Une ancre `#section` désigne la section dont le titre a cet identifiant, calculé comme le wiki ([`ancre`]).
 pub fn reference(index: &Index, brute: &str) -> Result<Sortie> {
     let r = brute.trim().trim_start_matches("@wiki:");
     if let Some((chemin, sym)) = r.split_once("::") {
@@ -903,15 +905,9 @@ pub fn reference(index: &Index, brute: &str) -> Result<Sortie> {
     let d = document(index, id)?.unwrap_or_default();
     let corps_doc = d["corps"].as_str().unwrap_or_default();
     let texte = match ancre {
-        Some(a) => corps_doc
-            .lines()
-            .find(|l| {
-                l.trim_start_matches('#')
-                    .trim()
-                    .eq_ignore_ascii_case(&a.replace('-', " "))
-            })
-            .and_then(|l| section(corps_doc, l.trim_start_matches('#').trim(), 1500))
-            .unwrap_or_else(|| tronquer(corps_doc, 1500)),
+        Some(a) => {
+            section_par_ancre(corps_doc, a, 1500).unwrap_or_else(|| tronquer(corps_doc, 1500))
+        }
         None => tronquer(corps_doc, 1500),
     };
     let titre = format!(
@@ -923,6 +919,50 @@ pub fn reference(index: &Index, brute: &str) -> Result<Sortie> {
         format!("{texte}\n"),
         json!({ "document": d, "ancre": ancre }),
     ))
+}
+
+/// Identifiant d'ancre d'un titre, comme le calcule le wiki (`ancre()` dans `front/src/lib/markdown.ts`) :
+/// minuscules, accents retirés, tout le reste devient `-`.
+pub fn ancre(titre: &str) -> String {
+    let mut s = String::new();
+    for c in titre.to_lowercase().chars() {
+        let base = match c {
+            'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => 'a',
+            'ç' => 'c',
+            'è' | 'é' | 'ê' | 'ë' => 'e',
+            'ì' | 'í' | 'î' | 'ï' => 'i',
+            'ñ' => 'n',
+            'ò' | 'ó' | 'ô' | 'õ' | 'ö' => 'o',
+            'ù' | 'ú' | 'û' | 'ü' => 'u',
+            'ý' | 'ÿ' => 'y',
+            c if c.is_ascii_alphanumeric() => c,
+            _ => '-',
+        };
+        if base != '-' || !s.ends_with('-') {
+            s.push(base);
+        }
+    }
+    s.trim_matches('-').to_string()
+}
+
+/// Section dont le titre (tout niveau) a pour ancre `a`, jusqu'au prochain titre de niveau égal ou supérieur.
+fn section_par_ancre(corps: &str, a: &str, max: usize) -> Option<String> {
+    let mut niveau = None;
+    let mut lignes = vec![];
+    for l in corps.lines() {
+        let n = l.chars().take_while(|c| *c == '#').count();
+        let est_titre = n > 0 && l[n..].starts_with(' ');
+        match niveau {
+            None if est_titre && ancre(&l[n..]) == a => {
+                niveau = Some(n);
+                lignes.push(l);
+            }
+            Some(n0) if est_titre && n <= n0 => break,
+            Some(_) => lignes.push(l),
+            None => {}
+        }
+    }
+    (!lignes.is_empty()).then(|| tronquer(&lignes.join("\n"), max))
 }
 
 fn tronquer(t: &str, max: usize) -> String {

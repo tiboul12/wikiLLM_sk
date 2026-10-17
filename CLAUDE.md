@@ -5,9 +5,10 @@ wikiK est en **refonte** : la v0 Python (wiki Markdown éditable) devient un bin
 ## Où on en est
 
 - **Plan de référence** : `docs/projet/plan-v1.md` (phases 0 à 9, tableau de suivi en section 7). Le lire avant toute tâche.
-- **Ce qui est reporté après la v1** : `wiki/taches/backlog.md`, section « Reporté après la v1 ».
+- **Ce qui est reporté après la v1** : `docs/projet/backlog.md`, section « Reporté après la v1 ».
 - **Réflexions d'origine et analyse** : `.doc/reflexion et evolution/` (non versionné).
-- **v0 Python** : `legacy/` (lancer avec `python3 legacy/serveur.py`), tag `v0-python`. Ne pas la faire évoluer ; elle est supprimée en Phase 9.
+- **v0 Python** : retirée du dépôt, consultable au tag `v0-python` (ADR-0007).
+- **Outil à utiliser sur ce dépôt** : `wikik` lui-même (skill `skill/SKILL.md`, lié dans `.claude/skills/wikik`). `make check` avant chaque commit ; `wikik check` doit rester à zéro erreur.
 
 ## Règles
 

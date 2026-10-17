@@ -101,3 +101,15 @@ fn exigence_adr_cherche_ref() {
     let r = query::reference(&i, "@wiki:exigences/EF-001").unwrap();
     assert!(r.texte.contains("# document EF-001"), "{}", r.texte);
 }
+
+#[test]
+fn ancres_identiques_au_wiki() {
+    assert_eq!(query::ancre("EF-001 : Aire doublée"), "ef-001-aire-doublee");
+    assert_eq!(
+        query::ancre("1. Ce que la v1 doit livrer"),
+        "1-ce-que-la-v1-doit-livrer"
+    );
+    let (_d, i) = index_fixture();
+    let r = query::reference(&i, "@wiki:rust-mini/EF-001#ef-001-aire-doublee").unwrap();
+    assert!(r.texte.contains("Énoncé"), "{}", r.texte);
+}

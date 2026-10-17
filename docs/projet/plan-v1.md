@@ -7,7 +7,7 @@ date: 2026-10-17
 sources:
   - .doc/reflexion et evolution/analyse-2026-10-17.md
   - .doc/reflexion et evolution/roadmap-fusion-wikillm-docascode.md
-  - wiki/taches/backlog.md
+  - docs/projet/backlog.md
 ---
 
 # Plan de développement : wikiK v1 (refonte Rust)
@@ -32,12 +32,12 @@ sources:
 | A5 | Index et requêtes agent d'abord, wiki ensuite. Atelier Fast Design Thinking hors v1. |
 | A6 | Processus allégé : spike, BDR + cahier des charges courts, 4 specs socle, ADR 002 à 005 ; les autres specs juste avant leur phase. |
 
-**La v1 est terminée quand** (définition de fini) :
-1. Sur ATS, une session Claude Code répond à « que dois-je relire avant de modifier X ? » via `wikik impact` sans ouvrir de fichier source, et le coût en tokens est mesuré contre une session sans l'outil.
-2. `wikik check` signale toute fonction dont le code a changé sans que son bloc de doc suive.
-3. `wikik serve` affiche le wiki de wikiK et d'ATS : zone Produit (générée depuis le code) et zone Projet (`docs/projet/`).
-4. Chaque exigence `must` du cahier des charges v1 est implémentée et citée par du code ou un test (`@req`).
-5. wikiK se documente avec lui-même : son propre wiki v0 est migré, `serveur.py` et `index.html` sont retirés.
+**La v1 est terminée quand** (définition de fini ; état au 17/10/2026 entre crochets) :
+1. Sur ATS, une session Claude Code répond à « que dois-je relire avant de modifier X ? » via `wikik impact` sans ouvrir de fichier source, et le coût en tokens est mesuré contre une session sans l'outil. [🟡 mesure approchée faite (MESURE-01 : ÷ 22 à ÷ 84) ; mesure en session réelle à faire par Tibo]
+2. `wikik check` signale toute fonction dont le code a changé sans que son bloc de doc suive. [✅ scénario git de SPEC-04 ; 21 cas réels sur ATS]
+3. `wikik serve` affiche le wiki de wikiK et d'ATS : zone Produit (générée depuis le code) et zone Projet (`docs/projet/`). [✅ vérifié en navigateur ; ATS n'a pas encore de zone Projet]
+4. Chaque exigence `must` du cahier des charges v1 est implémentée et citée par du code ou un test (`@req`). [✅ `wikik check` : 0 exigence non couverte]
+5. wikiK se documente avec lui-même : son propre wiki v0 est migré, `serveur.py` et `index.html` sont retirés. [✅ ADR-0007, test `depot_migre_et_sans_erreur`]
 
 ---
 
@@ -291,7 +291,7 @@ Format de spec : celui de la section 7 de la roadmap du 29/09, avec frontmatter 
 
 Chaque majeure commence par sa BDR et son cahier des charges (D13). Ordre recommandé, à réévaluer à la clôture de la v1 avec l'usage réel :
 
-| Majeure | Contenu (détail dans `wiki/taches/backlog.md`) | Pourquoi cet ordre |
+| Majeure | Contenu (détail dans [[backlog]]) | Pourquoi cet ordre |
 |---|---|---|
 | v1.x | Serveur MCP sur les mêmes requêtes | Petit, gain direct pour l'agent. |
 | v2 | TypeScript + terrain shelley | Élargit l'usage à tes autres projets. |
@@ -354,4 +354,4 @@ ATS est déjà écrit avec **Leptos** (Rust/WASM) et Tauri. Tu maîtrises donc u
 | 6 check | ✅ terminée (ATS : 21 docs périmées réelles en 1,2 s ; wikiK : 0 diagnostic) | 2026-10-17 |
 | 7 Requêtes + skill (v1-agent) | ✅ terminée (MESURE-01 : contexte ÷ 22 à ÷ 84 sur ATS) ; reste à faire avec Tibo : amorçage d'ATS (autre dépôt), installation globale du skill, mesure en session réelle | 2026-10-17 |
 | 8 Wiki local | ✅ terminée : `wikik serve`, front Svelte embarqué, testé en navigateur (XSS, fraîcheur, mobile, sombre) | 2026-10-17 |
-| 9 Clôture (v1.0) | ⏳ | |
+| 9 Clôture (v1.0) | ✅ terminée → tag `v1.0-rc1` ; `v1.0` après la relecture de Tibo et la mesure en session réelle | 2026-10-17 |

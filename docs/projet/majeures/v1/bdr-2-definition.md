@@ -17,7 +17,7 @@ sources: [BDR-v1-1]
 
 ## Périmètre
 
-| Inclus | Exclu (voir `wiki/taches/backlog.md`) |
+| Inclus | Exclu (voir [[backlog]]) |
 |---|---|
 | Projets Rust ; wikiK et ATS comme terrains | TypeScript, Python |
 | Doc dans le code, index, détection de doc périmée | CI de doc, publication en équipe |
