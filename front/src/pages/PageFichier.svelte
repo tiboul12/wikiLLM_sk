@@ -1,5 +1,6 @@
 <script lang="ts">
   // Page fichier (EF-041) : en-tête //! puis une cellule par symbole.
+  // @relu 2026-10-17 6ed59742
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre } from "../lib/markdown";

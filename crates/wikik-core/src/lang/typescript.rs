@@ -59,56 +59,106 @@ impl Langage for TypeScript {
                 ..Default::default()
             };
         }
-        let mut parser = Parser::new();
         let grammaire = if chemin.ends_with(".tsx") {
             tree_sitter_typescript::LANGUAGE_TSX
         } else {
             tree_sitter_typescript::LANGUAGE_TYPESCRIPT
         };
-        parser
-            .set_language(&grammaire.into())
-            .expect("grammaire tree-sitter-typescript incompatible");
-        let Some(arbre) = parser.parse(source, None) else {
-            return ExtraitFichier {
-                lignes: compter_lignes(source),
-                erreurs_parse: 1,
-                ..Default::default()
-            };
-        };
-        let racine = arbre.root_node();
-        let (entete, balises_entete, commentaires_entete) = entete(racine, source);
-        let mut ctx = Ctx {
-            src: source,
-            chemin,
-            symboles: vec![],
-            exclus: commentaires_entete,
-            fichier_de_test: est_fichier_de_test(chemin),
-        };
-        parcourir(racine, &Portee::default(), &mut ctx);
-        let mut symboles = ctx.symboles;
-        desambiguiser(&mut symboles);
-        symboles.sort_by(|a, b| a.ligne_debut.cmp(&b.ligne_debut).then(a.id.cmp(&b.id)));
+        extraire_ts(chemin, source, &grammaire.into())
+    }
+}
 
-        let mut imports = vec![];
-        let mut c = racine.walk();
-        for enfant in racine.children(&mut c) {
-            if enfant.kind() == "import_statement" {
-                lire_import(enfant, source, chemin, &mut imports);
-            }
-        }
-        imports.sort_by(|a, b| a.alias.cmp(&b.alias).then(a.chemin.cmp(&b.chemin)));
-        imports.dedup();
+/// Langage JavaScript : même extraction que TypeScript, avec la grammaire TSX (qui accepte le JSX).
+pub struct JavaScript;
 
-        ExtraitFichier {
-            entete,
-            balises_entete,
-            symboles,
-            imports,
+impl Langage for JavaScript {
+    fn nom(&self) -> &'static str {
+        "javascript"
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &["js", "jsx", "mjs", "cjs"]
+    }
+
+    fn extraire(&self, chemin: &str, source: &[u8]) -> ExtraitFichier {
+        extraire_ts(chemin, source, &tree_sitter_typescript::LANGUAGE_TSX.into())
+    }
+}
+
+/// Extraction commune à TypeScript, JavaScript et aux scripts Svelte.
+pub(crate) fn extraire_ts(
+    chemin: &str,
+    source: &[u8],
+    grammaire: &tree_sitter::Language,
+) -> ExtraitFichier {
+    let mut parser = Parser::new();
+    parser
+        .set_language(grammaire)
+        .expect("grammaire tree-sitter-typescript incompatible");
+    let Some(arbre) = parser.parse(source, None) else {
+        return ExtraitFichier {
             lignes: compter_lignes(source),
-            lignes_macros: 0,
-            erreurs_parse: compter_erreurs(racine),
+            erreurs_parse: 1,
+            ..Default::default()
+        };
+    };
+    let racine = arbre.root_node();
+    let (entete, balises_entete, commentaires_entete) = entete(racine, source);
+    let mut ctx = Ctx {
+        src: source,
+        chemin,
+        symboles: vec![],
+        exclus: commentaires_entete,
+        fichier_de_test: est_fichier_de_test(chemin),
+    };
+    parcourir(racine, &Portee::default(), &mut ctx);
+    let mut symboles = ctx.symboles;
+    desambiguiser(&mut symboles);
+    symboles.sort_by(|a, b| a.ligne_debut.cmp(&b.ligne_debut).then(a.id.cmp(&b.id)));
+
+    let mut imports = vec![];
+    let mut c = racine.walk();
+    for enfant in racine.children(&mut c) {
+        if enfant.kind() == "import_statement" {
+            lire_import(enfant, source, chemin, &mut imports);
         }
     }
+    imports.sort_by(|a, b| a.alias.cmp(&b.alias).then(a.chemin.cmp(&b.chemin)));
+    imports.dedup();
+
+    ExtraitFichier {
+        entete,
+        balises_entete,
+        symboles,
+        imports,
+        lignes: compter_lignes(source),
+        lignes_macros: 0,
+        erreurs_parse: compter_erreurs(racine),
+    }
+}
+
+/// Appels faits par les instructions de premier niveau (hors déclarations) : la logique d'un
+/// composant Svelte qui s'exécute à son montage.
+pub(crate) fn appels_niveau_module(
+    source: &[u8],
+    grammaire: &tree_sitter::Language,
+) -> Vec<AppelBrut> {
+    let mut parser = Parser::new();
+    if parser.set_language(grammaire).is_err() {
+        return vec![];
+    }
+    let Some(arbre) = parser.parse(source, None) else {
+        return vec![];
+    };
+    let racine = arbre.root_node();
+    let mut appels = vec![];
+    let mut c = racine.walk();
+    for n in racine.named_children(&mut c) {
+        if n.kind() == "expression_statement" {
+            collecter_appels(n, source, &mut appels);
+        }
+    }
+    appels
 }
 
 fn est_fichier_de_test(chemin: &str) -> bool {
@@ -153,7 +203,7 @@ fn qualifier(prefixe: &str, nom: &str) -> String {
 }
 
 /// Lignes d'un commentaire `/** … */` sans les marqueurs ni les `*` de début de ligne.
-fn lignes_jsdoc(t: &str) -> Vec<String> {
+pub(crate) fn lignes_jsdoc(t: &str) -> Vec<String> {
     let interieur = t.trim_start_matches("/**").trim_end_matches("*/");
     let mut lignes: Vec<String> = interieur
         .lines()
@@ -176,7 +226,7 @@ fn lignes_jsdoc(t: &str) -> Vec<String> {
 }
 
 /// En-tête : commentaires `//` de tête, ou `/** */` de tête marqué `@file`/`@module` ou suivi d'une ligne vide.
-fn entete(racine: Node, src: &[u8]) -> (Option<String>, Vec<Balise>, HashSet<usize>) {
+pub(crate) fn entete(racine: Node, src: &[u8]) -> (Option<String>, Vec<Balise>, HashSet<usize>) {
     let mut lignes = vec![];
     let mut ids = HashSet::new();
     let mut premiere = None;
@@ -433,6 +483,7 @@ fn parcourir(noeud: Node, portee: &Portee, ctx: &mut Ctx) {
 }
 
 /// `d` : la déclaration ; `cible` : le nœud qui porte doc et décorateurs (l'`export` s'il existe).
+/// @relu 2026-10-17 0a363323
 fn declaration(d: Node, cible: Node, visibilite: &str, portee: &Portee, ctx: &mut Ctx) {
     let src = ctx.src;
     match d.kind() {
@@ -509,7 +560,15 @@ fn declaration(d: Node, cible: Node, visibilite: &str, portee: &Portee, ctx: &mu
                             false,
                         )
                     }
-                    _ => ajouter(ctx, &nom, "const", visibilite, porteur, None, portee, true),
+                    _ => {
+                        ajouter(ctx, &nom, "const", visibilite, porteur, None, portee, true);
+                        // `const api = { projet: () => lire(…) }` : les appels de la valeur sont ceux de la constante.
+                        if let Some(val) = valeur
+                            && let Some(dernier) = ctx.symboles.last_mut()
+                        {
+                            collecter_appels(val, src, &mut dernier.appels);
+                        }
+                    }
                 }
             }
         }
@@ -571,7 +630,7 @@ fn membres(corps: Node, portee: &Portee, ctx: &mut Ctx) {
     }
 }
 
-fn collecter_appels(corps: Node, src: &[u8], sortie: &mut Vec<AppelBrut>) {
+pub(crate) fn collecter_appels(corps: Node, src: &[u8], sortie: &mut Vec<AppelBrut>) {
     let mut pile = vec![corps];
     while let Some(x) = pile.pop() {
         let ligne = x.start_position().row + 1;
@@ -675,6 +734,25 @@ fn lire_import(n: Node, src: &[u8], chemin: &str, sortie: &mut Vec<Import>) {
         return;
     };
     let spec = txt(source, src).trim_matches(['"', '\'', '`']);
+    // `import Cellule from "./Cellule.svelte"` : le composant porte le nom de son fichier.
+    if let Some(sans) = spec.strip_suffix(".svelte") {
+        let module = resoudre_module(chemin, sans);
+        let tige = module.rsplit('/').next().unwrap_or(&module).to_string();
+        let mut c = n.walk();
+        for clause in n.children(&mut c).filter(|e| e.kind() == "import_clause") {
+            let mut c2 = clause.walk();
+            if let Some(id) = clause
+                .named_children(&mut c2)
+                .find(|e| e.kind() == "identifier")
+            {
+                sortie.push(Import {
+                    alias: txt(id, src).into(),
+                    chemin: format!("{module}::{tige}"),
+                });
+            }
+        }
+        return;
+    }
     let module = resoudre_module(chemin, spec);
     let mut c = n.walk();
     for clause in n.children(&mut c).filter(|e| e.kind() == "import_clause") {

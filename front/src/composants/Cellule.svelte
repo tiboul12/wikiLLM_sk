@@ -1,5 +1,6 @@
 <script lang="ts">
   // Cellule de symbole (EF-041) : en-tête, doc rendue, balises, voisins, code replié.
+  // @relu 2026-10-17 c9c4bd41
   import type { Cellule } from "../types/Cellule";
   import { rendre, colorer } from "../lib/markdown";
   import { reference, copier } from "../lib/hook";
@@ -10,7 +11,9 @@
   let { cellule, ouverte = false, langage = "rust" }: { cellule: Cellule; ouverte?: boolean; langage?: string } = $props();
   let copie = $state(false);
   const doc = $derived(cellule.doc ? rendre(cellule.doc) : "");
-  const code = $derived(colorer(cellule.code, langage));
+  // Pas de grammaire Svelte dans highlight.js : le script est du TypeScript.
+  const langageCode = $derived(langage === "svelte" ? "typescript" : langage);
+  const code = $derived(colorer(cellule.code, langageCode));
   const nbLignes = $derived(cellule.ligne_fin - cellule.ligne_debut + 1);
   const classeStatut = $derived(cellule.statut === "périmé" ? "perime" : cellule.statut === "sans doc" ? "sansdoc" : "ajour");
 
@@ -29,7 +32,7 @@
     <a class="action" href={url.graphe(cellule.id)} title="Graphe local">◎</a>
     <button class="hook" class:copie onclick={hook} title="Copier la référence pour un prompt">⚓</button>
   </header>
-  <pre class="signature"><code class="hljs">{@html colorer(cellule.signature, langage)}</code></pre>
+  <pre class="signature"><code class="hljs">{@html colorer(cellule.signature, langageCode)}</code></pre>
   {#if doc}
     <div class="doc prose">{@html doc}</div>
   {:else}

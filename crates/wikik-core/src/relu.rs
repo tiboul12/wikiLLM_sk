@@ -37,7 +37,8 @@ pub fn jeton(hash_signature: &str, hash_corps: &str) -> String {
     crate::hash::empreinte(format!("{hash_signature}{hash_corps}").as_bytes())[..8].to_string()
 }
 
-/// Ajoute ou remplace la ligne `@relu <date> <jeton>` à la fin du bloc de `id` ; renvoie le fichier modifié.
+/// Ajoute ou remplace `@relu <date> <jeton>` à la fin du bloc de `id`, dans le format du bloc
+/// (`///`, `/** */` ou `//`) ; renvoie le fichier modifié.
 pub fn marquer(index: &Index, id: &str, date: &str) -> Result<String> {
     let (fichier, debut, fin, corps, sig): (String, Option<i64>, Option<i64>, String, String) = index
         .conn
@@ -55,37 +56,13 @@ pub fn marquer(index: &Index, id: &str, date: &str) -> Result<String> {
     let fin_ligne = if texte.contains("\r\n") { "\r\n" } else { "\n" };
     let mut lignes: Vec<String> = texte.lines().map(str::to_string).collect();
     let (d, f) = (debut as usize - 1, fin as usize - 1);
-    let existante = (d..=f).find(|&i| {
-        lignes[i]
-            .trim_start()
-            .trim_start_matches("///")
-            .trim_start()
-            .starts_with("@relu")
-    });
-    match existante {
-        Some(i) => {
-            let indentation: String = lignes[i]
-                .chars()
-                .take_while(|c| c.is_whitespace())
-                .collect();
-            lignes[i] = format!("{indentation}/// @relu {date} {}", jeton(&sig, &corps));
-        }
-        None => {
-            if !lignes[f].trim_start().starts_with("///") {
-                bail!(
-                    "{id} : bloc `/** */` non pris en charge par relu, ajouter `@relu {date}` à la main"
-                );
-            }
-            let indentation: String = lignes[f]
-                .chars()
-                .take_while(|c| c.is_whitespace())
-                .collect();
-            lignes.insert(
-                f + 1,
-                format!("{indentation}/// @relu {date} {}", jeton(&sig, &corps)),
-            );
-        }
-    }
+    poser_relu(
+        &mut lignes,
+        d,
+        f,
+        &format!("@relu {date} {}", jeton(&sig, &corps)),
+    )
+    .with_context(|| format!("{id} : bloc de doc dans un format non reconnu"))?;
     let mut sortie = lignes.join(fin_ligne);
     if texte.ends_with('\n') {
         sortie.push_str(fin_ligne);
@@ -94,8 +71,89 @@ pub fn marquer(index: &Index, id: &str, date: &str) -> Result<String> {
     Ok(fichier)
 }
 
+/// Écrit `balise` dans le bloc des lignes `d..=f` en respectant son format : `///` (Rust),
+/// `/** … */` (JSDoc, éventuellement sur une seule ligne) ou `//` (en-tête de script).
+fn poser_relu(lignes: &mut Vec<String>, d: usize, f: usize, balise: &str) -> Option<()> {
+    let indentation = |l: &str| {
+        l.chars()
+            .take_while(|c| c.is_whitespace())
+            .collect::<String>()
+    };
+    // Une ligne `@relu` existe déjà : on remplace ce qui suit `@relu`.
+    if let Some(i) = (d..=f).find(|&i| lignes[i].contains("@relu")) {
+        let l = &lignes[i];
+        let p = l.find("@relu")?;
+        let fin_jsdoc = if l.trim_end().ends_with("*/") {
+            " */"
+        } else {
+            ""
+        };
+        lignes[i] = format!("{}{balise}{fin_jsdoc}", &l[..p]);
+        return Some(());
+    }
+    let derniere = lignes[f].clone();
+    let t = derniere.trim_start();
+    let ind = indentation(&derniere);
+    if t.starts_with("///") {
+        lignes.insert(f + 1, format!("{ind}/// {balise}"));
+    } else if let Some(p) = derniere.rfind("*/") {
+        let avant = derniere[..p].trim_end();
+        let ind_bloc = indentation(&lignes[d]);
+        if avant.trim().is_empty() || avant.trim() == "*" {
+            // Fermeture seule sur sa ligne : la balise juste avant.
+            lignes.insert(f, format!("{ind_bloc} * {balise}"));
+        } else {
+            // `/** Texte. */` ou `… texte */` : on ouvre le bloc sur plusieurs lignes.
+            lignes[f] = avant.to_string();
+            lignes.insert(f + 1, format!("{ind_bloc} * {balise}"));
+            lignes.insert(f + 2, format!("{ind_bloc} */"));
+        }
+    } else if t.starts_with("//") {
+        lignes.insert(f + 1, format!("{ind}// {balise}"));
+    } else {
+        return None;
+    }
+    Some(())
+}
+
 #[cfg(test)]
 mod tests {
+    use super::poser_relu;
+
+    fn poser(texte: &str, d: usize, f: usize) -> String {
+        let mut l: Vec<String> = texte.lines().map(str::to_string).collect();
+        poser_relu(&mut l, d, f, "@relu 2026-01-01 abcd1234").unwrap();
+        l.join("\n")
+    }
+
+    #[test]
+    fn formats_de_bloc() {
+        assert_eq!(
+            poser("/// Doc.\nfn f() {}", 0, 0),
+            "/// Doc.\n/// @relu 2026-01-01 abcd1234\nfn f() {}"
+        );
+        assert_eq!(
+            poser("  /** Doc. */\n  f() {}", 0, 0),
+            "  /** Doc.\n   * @relu 2026-01-01 abcd1234\n   */\n  f() {}"
+        );
+        assert_eq!(
+            poser("/**\n * Doc.\n */\nfunction f() {}", 0, 2),
+            "/**\n * Doc.\n * @relu 2026-01-01 abcd1234\n */\nfunction f() {}"
+        );
+        assert_eq!(
+            poser("  // Rôle.\n  import x;", 0, 0),
+            "  // Rôle.\n  // @relu 2026-01-01 abcd1234\n  import x;"
+        );
+        assert_eq!(
+            poser("/// Doc.\n/// @relu 2025-01-01 00000000\nfn f() {}", 0, 1),
+            "/// Doc.\n/// @relu 2026-01-01 abcd1234\nfn f() {}"
+        );
+        assert_eq!(
+            poser("/** Doc. @relu 2025-01-01 00000000 */", 0, 0),
+            "/** Doc. @relu 2026-01-01 abcd1234 */"
+        );
+    }
+
     #[test]
     fn dates() {
         assert_eq!(super::date_civile(0), "1970-01-01");

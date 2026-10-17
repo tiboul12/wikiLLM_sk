@@ -206,3 +206,60 @@ fn check_typescript() {
         "{codes:?}"
     );
 }
+
+/// Composants Svelte (symbole composant, doc `@component`, `<Vue />` rendu) et JavaScript.
+///
+/// @req EF-076, EF-077
+#[test]
+fn svelte_et_javascript() {
+    let f = fixture();
+    let d = dump(f.path());
+    let vue = symbole(&d, "src/Vue.svelte::Vue");
+    assert_eq!(
+        (
+            vue["genre"].as_str().unwrap(),
+            vue["resume"].as_str().unwrap()
+        ),
+        ("composant", "Affiche une valeur doublée.")
+    );
+    let affichee = symbole(&d, "src/Vue.svelte::affichee");
+    assert_eq!(
+        affichee["ligne_debut"], 12,
+        "les lignes du script restent celles du fichier"
+    );
+    assert_eq!(symbole(&d, "src/util.js::formater")["genre"], "fn");
+    let fichier_js = d["fichiers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["chemin"] == "src/util.js")
+        .unwrap();
+    assert_eq!(fichier_js["langage"], "javascript");
+    let aretes: Vec<(String, String, String)> = d["aretes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| {
+            (
+                a["source"].as_str().unwrap().into(),
+                a["cible"].as_str().unwrap().into(),
+                a["genre"].as_str().unwrap().into(),
+            )
+        })
+        .collect();
+    for (s, c, g) in [
+        ("src/Page.svelte::Page", "src/Vue.svelte::Vue", "rend"),
+        ("src/Page.svelte::Page", "src/app.ts::total", "appel"),
+        (
+            "src/Vue.svelte::affichee",
+            "src/lib/calcul.ts::doubler",
+            "appel",
+        ),
+        ("src/Vue.svelte::Vue", "EF-001", "req"),
+    ] {
+        assert!(
+            aretes.contains(&(s.into(), c.into(), g.into())),
+            "{s} -> {c} ({g}) absent"
+        );
+    }
+}

@@ -22,6 +22,13 @@ sources: [BDR-v2-2]
 | [[exigences/EF-074]] | Accepter les balises JSDoc natives | must | B-010 |
 | [[exigences/EF-075]] | Documenter le front de wikik | should | B-010 |
 
+## Ajouts de la version mineure v2.1
+
+| ID | Exigence | Priorité | Besoins |
+|---|---|---|---|
+| [[exigences/EF-076]] | Indexer le JavaScript | should | B-010 |
+| [[exigences/EF-077]] | Indexer les composants Svelte | should | B-010 |
+
 ## Exigences modifiées ou abandonnées
 
 Aucune.

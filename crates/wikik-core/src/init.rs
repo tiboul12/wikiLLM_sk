@@ -34,7 +34,7 @@ const CONFIG: &str = r#"# Configuration wikik (toutes les clés sont optionnelle
 [index]
 # Motifs exclus de l'index, en plus du .gitignore.
 exclure = []
-langages = ["rust", "typescript"]
+langages = ["rust", "typescript", "javascript", "svelte"]
 
 [projet]
 dossier = "docs/projet"

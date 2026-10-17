@@ -24,6 +24,8 @@ pub fn compile(/* … */) { /* … */ }
 
 Même règles, en JSDoc : `/** … */` juste avant la déclaration (ou son `export`), décorateurs compris. En-tête de fichier : commentaires `//` en tête, ou un `/** … */` avec `@file`. Les balises JSDoc (`@param`, `@returns`…) sont permises à côté des balises wikik.
 
+Composant Svelte : `<!-- @component … -->` en tête de fichier (convention Svelte), ou des commentaires `//` en tête du script.
+
 ```ts
 /**
  * Relance la campagne en cours après une coupure réseau ; sans effet si rien ne tourne.

@@ -474,6 +474,16 @@ fn resoudre(
             }
         }
         "rend" => {
+            // Composant importé (`import Cellule from "./Cellule.svelte"`) : cible certaine.
+            if let Some(chemin) = imports.get(&(src.fichier.clone(), cible.to_string()))
+                && let Some((module, nom)) = chemin.rsplit_once("::")
+                && module.contains('/')
+            {
+                let r = du_module(module, nom, par_nom);
+                if !r.is_empty() {
+                    return r.iter().map(|s| (s.id.clone(), "certain")).collect();
+                }
+            }
             let r = fonctions(cible);
             if r.len() == 1 {
                 vec![(r[0].id.clone(), "probable")]

@@ -58,8 +58,8 @@ Tout ce qui a été volontairement laissé de côté pendant l'analyse du 17/10.
 
 ### 🗣️ Langages supplémentaires (A4)
 - [x] **TypeScript** : v2 (EF-070 à EF-075, SPEC-15, MESURE-02 sur shelley-studio-llm).
-- [ ] **JavaScript** (`.js`, `.jsx`, `.mjs`) avec la grammaire TSX.
-- [ ] **Svelte** : extraire la partie `<script lang="ts">` des `.svelte` (front de wikik).
+- [x] **JavaScript** (`.js`, `.jsx`, `.mjs`, `.cjs`) avec la grammaire TSX : v2.1 (EF-076).
+- [x] **Svelte** : script extrait, composant comme symbole, `<Composant>` rendus : v2.1 (EF-077).
 - [ ] **Gabarits Angular** : appels de méthodes depuis les templates HTML (heuristique, comme `view!` en Rust).
 - [ ] **Alias `tsconfig`** (`paths`) pour résoudre `@scope/paquet` vers les fichiers du dépôt.
 - [ ] **Python**.

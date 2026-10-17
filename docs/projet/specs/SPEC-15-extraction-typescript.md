@@ -67,6 +67,12 @@ Les appels de l'initialiseur d'un champ (`api = inject(Api)`, `total = computed(
 
 Le reste suit SPEC-03 (local, nom unique, méthodes courantes exclues).
 
+## JavaScript et Svelte (v2.1)
+
+- **JavaScript** (`js`, `jsx`, `mjs`, `cjs`, hors `.min.js`) : même extraction, grammaire TSX, langage `javascript`.
+- **Svelte** : tout ce qui est hors des balises `<script>` est remplacé par des espaces (retours à la ligne gardés), puis le script passe par l'extraction TypeScript ; lignes et colonnes restent exactes. Le fichier devient un symbole `composant` nommé comme le fichier (`Cellule.svelte` → `Cellule`) : doc `<!-- @component … -->`, sinon les commentaires `//` en tête du script ; appels des instructions de premier niveau du script ; balises `<Majuscule>` du balisage en arêtes « rend », certaines si le composant est importé (`import Cellule from "./Cellule.svelte"`).
+- **`wikik relu`** écrit la balise dans le format du bloc : `///`, ` * ` dans un `/** */` (ouvert sur plusieurs lignes s'il tenait sur une), ou `//`.
+
 ## Alternatives écartées
 
 - **Compilateur TypeScript (`tsc`) pour résoudre les types** : dépendance Node, lent, hors de l'esprit « un binaire ».
