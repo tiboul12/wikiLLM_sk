@@ -559,20 +559,22 @@ fn perimes_git(
     Ok(())
 }
 
-/// Ligne de doc qui ne contient qu'une balise autre que `@relu` (`/// @req EF-1`, ` * @adr 3`, `// @topic x`).
+/// Ligne de doc sans texte à relire : vide (`///`, ` *`) ou réduite à une balise autre que `@relu`
+/// (`/// @req EF-1`, ` * @adr 3`, `// @topic x`).
 fn est_ligne_de_balise(ligne: &str) -> bool {
     let t = ligne
         .trim_start()
         .trim_start_matches('/')
         .trim_start_matches('!')
         .trim_start_matches('*')
-        .trim_start();
-    t.starts_with('@')
-        && !t.starts_with("@relu")
-        && t[1..]
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_lowercase())
+        .trim();
+    t.is_empty()
+        || (t.starts_with('@')
+            && !t.starts_with("@relu")
+            && t[1..]
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_lowercase()))
 }
 
 /// Hash (corps, signature) des symboles d'un fichier à un commit, relus avec l'extracteur de son langage ;

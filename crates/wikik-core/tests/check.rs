@@ -135,7 +135,10 @@ fn scenario_specs04() {
     d.ecrire(&v.replace("wrapping_mul(2) | 0", "wrapping_mul(2) | 1"));
     d.commit("3d : corps");
     let v = std::fs::read_to_string(d.chemin().join("src/lib.rs")).unwrap();
-    d.ecrire(&v.replace("/// @req EF-001\n", "/// @req EF-001\n/// @topic calcul\n"));
+    d.ecrire(&v.replace(
+        "/// @req EF-001\n",
+        "/// @req EF-001\n///\n/// @topic calcul\n",
+    ));
     d.commit("3e : balise seule");
     assert_eq!(
         d.codes(),
