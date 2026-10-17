@@ -499,11 +499,18 @@ fn perimes_git(
         let Some(blame) = depot.blame(fichier) else {
             continue;
         };
+        let texte = std::fs::read_to_string(index.racine.join(fichier)).unwrap_or_default();
+        let contenu: Vec<&str> = texte.lines().collect();
         for s in syms.into_iter().filter(|s| !relus.contains(&s.id)) {
             let (Some(d), Some(f)) = (s.doc_ligne_debut, s.doc_ligne_fin) else {
                 continue;
             };
-            let lignes: Vec<_> = (d..=f).filter_map(|n| blame.get(n - 1)).collect();
+            // Les lignes de balises (`@req`, `@adr`…) relient le bloc sans en changer le sens : les ajouter
+            // ne vaut pas relecture. Seul `@relu` (et le texte) date le bloc.
+            let lignes: Vec<_> = (d..=f)
+                .filter(|n| contenu.get(n - 1).is_none_or(|l| !est_ligne_de_balise(l)))
+                .filter_map(|n| blame.get(n - 1))
+                .collect();
             if lignes.is_empty() || lignes.iter().any(|l| l.commit == NON_COMMITE) {
                 continue;
             }
@@ -550,6 +557,22 @@ fn perimes_git(
         }
     }
     Ok(())
+}
+
+/// Ligne de doc qui ne contient qu'une balise autre que `@relu` (`/// @req EF-1`, ` * @adr 3`, `// @topic x`).
+fn est_ligne_de_balise(ligne: &str) -> bool {
+    let t = ligne
+        .trim_start()
+        .trim_start_matches('/')
+        .trim_start_matches('!')
+        .trim_start_matches('*')
+        .trim_start();
+    t.starts_with('@')
+        && !t.starts_with("@relu")
+        && t[1..]
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase())
 }
 
 /// Hash (corps, signature) des symboles d'un fichier à un commit, relus avec l'extracteur de son langage ;

@@ -130,6 +130,26 @@ fn scenario_specs04() {
     assert!(d.codes().is_empty(), "relu le même jour : {:?}", d.codes());
     d.commit("3c : relu");
 
+    // 3d : corps modifié, puis seulement une balise ajoutée au bloc → toujours périmé.
+    let v = std::fs::read_to_string(d.chemin().join("src/lib.rs")).unwrap();
+    d.ecrire(&v.replace("wrapping_mul(2) | 0", "wrapping_mul(2) | 1"));
+    d.commit("3d : corps");
+    let v = std::fs::read_to_string(d.chemin().join("src/lib.rs")).unwrap();
+    d.ecrire(&v.replace("/// @req EF-001\n", "/// @req EF-001\n/// @topic calcul\n"));
+    d.commit("3e : balise seule");
+    assert_eq!(
+        d.codes(),
+        vec!["perime-corps"],
+        "une balise ajoutée ne vaut pas relecture"
+    );
+    {
+        let mut i = Index::ouvrir(d.chemin()).unwrap();
+        i.mettre_a_jour().unwrap();
+        wikik_core::relu::marquer(&i, "src/lib.rs::f", "2026-01-02").unwrap();
+    }
+    d.commit("3f : relu");
+    assert!(d.codes().is_empty(), "{:?}", d.codes());
+
     // 4 : reformatage seul → rien.
     let fmt = Command::new("rustfmt")
         .args([
