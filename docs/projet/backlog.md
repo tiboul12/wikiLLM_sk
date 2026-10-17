@@ -29,6 +29,13 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 - [ ] **Amorcer ATS** (procédure `skill/procedures/amorcer.md`) : `wikik init`, puis les blocs manquants module par module ; migrer `ATS/wiki/` et le cahier des charges d'ATS vers `docs/projet/` (convertir `AC-009`, `F1`… en `EF-xxx`).
 - [ ] **Trancher Leptos ou Svelte** pour le front (SPEC-05) : Svelte a été choisi par défaut.
 
+## ✋ À faire avec Tibo pour passer de `v4.0-rc1` à `v4.0` (atelier)
+
+- [ ] **Lancer le projet « météo »** dans l'atelier en mode Express : `mkdir meteo && cd meteo && git init && wikik init && wikik atelier`, puis http://127.0.0.1:8485 (procédure `skill/procedures/atelier.md`). Le pitch et le free writing sont à toi. Compléter MESURE-03 (durée de la séance, propositions gardées / rejetées, ressenti).
+- [ ] **Rappel sur ATS** : accepter que l'atelier écrive `docs/atelier/clarifications/` dans ATS, rouvrir `AC-019` (question C17 / `add_keyword`, déjà essayée sur un clone : MESURE-03) et conclure.
+- [ ] **Relire** la BDR v4, le cahier des charges v4, SPEC-17 à 21 et les 12 fiches de `atelier/techniques/`.
+- [ ] Réinstaller le binaire (`make install`) pour avoir `wikik atelier`.
+
 ## 🧩 Constats de la v1 à traiter
 
 - [x] **Indexer le front** (TypeScript, v2) : fait, EF-045 est citée par `front/src/lib/hook.ts` ; les `.svelte` restent à faire.
@@ -69,14 +76,17 @@ Tout ce qui a été volontairement laissé de côté pendant l'analyse du 17/10.
 - [x] **Serveur MCP** exposant les mêmes requêtes que la CLI : `wikik mcp`, v1.1 (EF-060, SPEC-14).
 - [ ] **RAG structuré** (SPEC-08) : embeddings des blocs (local ou API, Q8), top-k sémantique puis expansion dans le graphe, jeu d'évaluation de 30 questions. Seulement après une v1 utilisée.
 
-### 🎨 Atelier de conception Fast Design Thinking (A5 : hors v1)
-- [ ] **Réécrire le framework en spécifications déclaratives** : un fichier par technique (entrées, sorties, prompts, schéma d'artefact, règles de validation) au lieu du méga-prompt de 216 Ko.
-- [ ] **Procédure conversationnelle « ouvrir une mise à jour majeure »** en mode Express, brouillons dans `.doc/atelier/vN/`, puis BDR et cahier des charges.
-- [ ] **Étape 0 « Pitch »** (problème, cible, valeur, contraintes, critères de succès, hors périmètre).
-- [ ] **Atelier dans l'UI, mode local uniquement**, avec appels LLM par étape (contexte limité aux pages sources).
-- [ ] **Écrans dédiés** : free writing, mind map, grille SCAMPER, storyboards R.E.C.I.T., tri des besoins.
-- [ ] **Vue « Parcours »** : stepper des phases, compteurs, pages en attente de validation.
-- [ ] **Modes Express et Complet**, variantes générées en lot et validées par sélection.
+### 🎨 Atelier de conception Fast Design Thinking (A5 : hors v1, livré en v4.0-rc1)
+- [ ] **Écrans dédiés restants** : Analogies, 5W1H et Cubing utilisent l'écran générique (SPEC-20).
+- [ ] **Images des vignettes** (R.E.C.I.T.) : les prompts sont écrits, la génération d'images est reportée.
+- [ ] **Autres fournisseurs LLM** (API, modèle local) derrière le trait `Fournisseur`.
+- [x] **Réécrire le framework en spécifications déclaratives** : un fichier par technique (entrées, sorties, prompts, schéma d'artefact, règles de validation) au lieu du méga-prompt de 216 Ko.
+- [ ] ~~**Procédure conversationnelle « ouvrir une mise à jour majeure »**~~ remplacée par l'atelier (v4, décision B2) ; en mode Express, brouillons dans `.doc/atelier/vN/`, puis BDR et cahier des charges.
+- [x] **Étape 0 « Pitch »** (problème, cible, valeur, contraintes, critères de succès, hors périmètre).
+- [x] **Atelier dans l'UI, mode local uniquement**, avec appels LLM par étape (contexte limité aux pages sources).
+- [x] **Écrans dédiés** : free writing, mind map, grille SCAMPER, storyboards R.E.C.I.T., tri des besoins.
+- [x] **Vue « Parcours »** : stepper des phases, compteurs, pages en attente de validation.
+- [x] **Modes Express et Complet**, variantes générées en lot et validées par sélection.
 
 ### 📐 Cycle des mises à jour majeures
 - [ ] **Vue consolidée du cahier des charges** générée en rejouant les versions (Q9).

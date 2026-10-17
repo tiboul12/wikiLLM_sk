@@ -175,4 +175,5 @@ Définition de fini cochée, backlog mis à jour, tag `v4.0`.
 | 6 Interface | ✅ tableau de bord, écran générique (garder / corriger / rejeter / redemander), sélection, synthèse avec aperçu ; écrans pitch, free writing (minuteur), SCAMPER en colonnes, planche de storyboard, tri MoSCoW, roadmap en trois colonnes, clarification ; 39 captures clair / sombre / téléphone sans erreur de console, parcours cliqué en headless | 2026-10-18 |
 | 7 Production de la doc | ✅ besoins (qui, besoin, pourquoi), BDR 1 (irritants prouvés par les verbatims) et 2 (périmètre, cas d'usage = storyboards), cahier des charges, roadmap : rubriques des gabarits, statut proposé, sources dans l'atelier | 2026-10-18 |
 | 8 Liens et rappel | ✅ wiki : « ouvrir dans l'atelier » et « clarifier » (besoins, exigences, artefacts) ; atelier : écran `/clarifier/<id>`, wiki servi sur place ; `/api/mode` ; essai réel : Claude Code ouvre `CLAR-004` par `atelier_rappel` en 5,9 s | 2026-10-18 |
-| 9 à 10 | ⏳ | |
+| 9 Lancement réel | 🟡 répétition Express complète avec le vrai LLM (23 appels, 225 s, 0 échec) et rappel d'`AC-019` sur un clone d'ATS : [[MESURE-03]] ; reste à Tibo : le projet « météo » et le rappel sur le vrai ATS | 2026-10-18 |
+| 10 Clôture | ✅ tag `v4.0-rc1` ; définition de fini : points 3, 4, 5 tenus, points 1 et 2 en attente de Tibo | 2026-10-18 |

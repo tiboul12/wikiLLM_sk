@@ -39,6 +39,8 @@ wikik atelier           # atelier sur http://127.0.0.1:8485 (LLM : `claude -p`, 
 | `wikik atelier [--factice]` | Atelier de définition du besoin ; `--factice` rejoue les exemples des fiches, sans LLM |
 | `wikik mcp` | Serveur MCP (stdio) : les requêtes comme outils pour l'agent. Claude Code : `claude mcp add wikik -- wikik mcp` |
 
+Pour lancer un projet avec l'atelier, ou y rappeler un point flou pendant le développement : [`skill/procedures/atelier.md`](./skill/procedures/atelier.md).
+
 Pour l'agent de code : le skill [`skill/SKILL.md`](./skill/SKILL.md) (règles d'or et procédures). Il est lié pour ce dépôt dans `.claude/skills/wikik` ; pour tous les projets : `ln -s "$PWD/skill" ~/.claude/skills/wikik`.
 
 ---

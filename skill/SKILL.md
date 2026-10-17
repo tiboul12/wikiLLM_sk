@@ -38,7 +38,7 @@ description: >-
 
 Identifiant de symbole : `chemin/fichier.rs::Type::methode` ; un nom partiel (`methode`, `Type::methode`) suffit s'il est unique. Chaque sortie commence par `# … · ~N tokens`.
 
-Si le serveur MCP wikik est configuré (`claude mcp add wikik -- wikik mcp`, lancé depuis la racine du projet), utiliser ses outils `carte`, `fichier`, `symbole`, `impact`, `cherche`, `adr`, `exigence`, `perimes`, `ref`, `check` plutôt que le shell : mêmes sorties.
+Si le serveur MCP wikik est configuré (`claude mcp add wikik -- wikik mcp`, lancé depuis la racine du projet), utiliser ses outils `carte`, `fichier`, `symbole`, `impact`, `cherche`, `adr`, `exigence`, `perimes`, `ref`, `check` plutôt que le shell : mêmes sorties. Outils de l'atelier : `atelier`, `document`, et `atelier_rappel` quand un point du besoin est flou (voir `procedures/atelier.md`).
 
 Si `wikik` n'est pas dans le PATH : `make install` depuis le dépôt wikiK.
 
@@ -49,3 +49,4 @@ Si `wikik` n'est pas dans le PATH : `make install` depuis le dépôt wikiK.
 - `procedures/amorcer.md` : documenter un projet existant par lots.
 - `procedures/adr.md` : créer un ADR et le relier au code.
 - `procedures/majeure.md` : ouvrir une mise à jour majeure (BDR puis cahier des charges).
+- `procedures/atelier.md` : définir le besoin avec l'atelier, ou y rappeler un point flou pendant le développement.
