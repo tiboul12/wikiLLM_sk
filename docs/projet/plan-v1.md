@@ -348,7 +348,7 @@ ATS est déjà écrit avec **Leptos** (Rust/WASM) et Tauri. Tu maîtrises donc u
 | 0 Ménage | ✅ terminée | 2026-10-17 |
 | 1 Spike | ✅ terminée (SPIKE-01) | 2026-10-17 |
 | 2 BDR + CdC | ✅ terminée (proposé, validation déléguée) | 2026-10-17 |
-| 3 Specs + ADR (porte) | ⏳ | |
+| 3 Specs + ADR (porte) | ✅ terminée : SPEC-01 à 04, ADR-0001 à 0006 (porte franchie par délégation) | 2026-10-17 |
 | 4 Squelette | ⏳ | |
 | 5 Extracteur + index | ⏳ | |
 | 6 check | ⏳ | |
