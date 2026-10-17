@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Mise en page : en-tête (projet, recherche), barre latérale (zones Produit et Projet), page courante.
+  // Mise en page : en-tête (projet, recherche), barre latérale (zones Produit, Projet, Atelier), page courante.
+  // Servie par `wikik atelier`, l'application ajoute les écrans de l'atelier (SPEC-20).
   // @relu 2026-10-17 69847974
   import { api } from "./lib/api";
   import { routeur, aller, url } from "./lib/routeur.svelte";
@@ -11,6 +12,10 @@
   import PageDocument from "./pages/PageDocument.svelte";
   import Recherche from "./pages/Recherche.svelte";
   import PageGraphe from "./pages/PageGraphe.svelte";
+  import Tableau from "./pages/atelier/Tableau.svelte";
+  import Etape from "./pages/atelier/Etape.svelte";
+  import Clarification from "./pages/atelier/Clarification.svelte";
+  import { atelier, detecter } from "./lib/atelier.svelte";
 
   let projet = $state<Projet | null>(null);
   let erreur = $state("");
@@ -25,6 +30,17 @@
       document.title = `${p.nom} · wikik`;
     })
     .catch((e) => (erreur = String(e)));
+  detecter().then((oui) => {
+    if (oui && projet) document.title = `${projet.nom} · atelier wikik`;
+  });
+
+  // Durée de l'appel au LLM en cours, pour le bandeau.
+  let maintenant = $state(Date.now());
+  $effect(() => {
+    if (!atelier.occupe) return;
+    const t = setInterval(() => (maintenant = Date.now()), 500);
+    return () => clearInterval(t);
+  });
 
   function chercher(e: SubmitEvent) {
     e.preventDefault();
@@ -43,8 +59,14 @@
   <form class="recherche" onsubmit={chercher} role="search">
     <input type="search" placeholder="Rechercher dans la doc…" bind:value={saisie} aria-label="Rechercher" />
   </form>
+  {#if atelier.actif}<a class="lien-atelier" href={url.atelier()}>Atelier</a>{/if}
   <a class="lien-graphe" href={url.graphe()}>Graphe</a>
 </header>
+{#if atelier.occupe}
+  <div class="bandeau-llm" role="status">
+    Le LLM réfléchit ({Math.round((maintenant - atelier.depuis) / 1000)} s) : il lit le projet par MCP et prépare ses propositions.
+  </div>
+{/if}
 
 <div class="cadre">
   <aside class="barre" class:ouverte={barreOuverte}>
@@ -65,6 +87,14 @@
       {#key routeur.route.q}<Recherche q={routeur.route.q} />{/key}
     {:else if routeur.route.page === "graphe"}
       {#key routeur.route.centre}<PageGraphe centre={routeur.route.centre} />{/key}
+    {:else if atelier.actif && atelier.etat && routeur.route.page === "etape"}
+      {#key routeur.route.etape}<Etape etape={routeur.route.etape} />{/key}
+    {:else if atelier.actif && atelier.etat && routeur.route.page === "clarification"}
+      {#key routeur.route.id}<Clarification id={routeur.route.id} />{/key}
+    {:else if atelier.actif && atelier.etat && (routeur.route.page === "atelier" || routeur.route.page === "accueil")}
+      <Tableau />
+    {:else if routeur.route.page !== "accueil"}
+      <p class="discret">{atelier.actif ? "Chargement…" : "Cette page n'existe que dans l'atelier (wikik atelier)."}</p>
     {:else}
       <Accueil {projet} />
     {/if}

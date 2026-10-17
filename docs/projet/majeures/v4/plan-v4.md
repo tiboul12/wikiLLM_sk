@@ -172,4 +172,5 @@ Définition de fini cochée, backlog mis à jour, tag `v4.0`.
 | 3 Fiches + specs (porte) | ✅ 12 fiches (atelier/techniques/), SPEC-17 à 21 ; porte franchie par délégation | 2026-10-18 |
 | 4 Modèle de données | ✅ atelier indexé, traçabilité contrôlée, outils MCP atelier / document / atelier_rappel | 2026-10-18 |
 | 5 Serveur atelier | ✅ fiches embarquées, moteur de parcours, fournisseurs cli / factice, `wikik atelier` ; essai réel : pitch 7,6 s, axes 6,1 s | 2026-10-18 |
-| 6 à 10 | ⏳ | |
+| 6 Interface | ✅ tableau de bord, écran générique (garder / corriger / rejeter / redemander), sélection, synthèse avec aperçu ; écrans pitch, free writing (minuteur), SCAMPER en colonnes, planche de storyboard, tri MoSCoW, roadmap en trois colonnes, clarification ; 39 captures clair / sombre / téléphone sans erreur de console, parcours cliqué en headless | 2026-10-18 |
+| 7 à 10 | ⏳ | |

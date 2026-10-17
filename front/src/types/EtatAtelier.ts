@@ -2,12 +2,27 @@
 import type { ArtefactResume } from "./ArtefactResume";
 import type { Consommation } from "./Consommation";
 import type { EtatEtape } from "./EtatEtape";
+import type { Fiche } from "./Fiche";
+import type { Lot } from "./Lot";
 
 /**
- * État complet de l'atelier, servi à l'interface.
+ * État complet de l'atelier, servi à l'interface : étapes, artefacts, clarifications et leurs
+ * propositions, fournisseur, consommation de l'abonnement.
  */
 export type EtatAtelier = { 
 /**
  * Titre du projet (pitch), s'il existe.
  */
-projet: string | null, etapes: Array<EtatEtape>, clarifications: Array<ArtefactResume>, fournisseur: string, consommation: Consommation | null, url_wiki: string, };
+projet: string | null, etapes: Array<EtatEtape>, 
+/**
+ * Tous les artefacts de l'atelier, besoins et exigences compris (sélections, liens).
+ */
+artefacts: Array<ArtefactResume>, clarifications: Array<ArtefactResume>, 
+/**
+ * Fiche de la clarification, hors parcours (écran de rappel).
+ */
+fiche_clarification: Fiche, 
+/**
+ * Propositions des clarifications (une par clarification).
+ */
+lots_clarification: Array<Lot>, fournisseur: string, consommation: Consommation | null, url_wiki: string, };

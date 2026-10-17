@@ -32,6 +32,21 @@ Même front que le wiki (Svelte 5 + TypeScript, embarqué), servi par `wikik ate
 
 Les écrans non listés (Analogies, 5W1H, Cubing) utilisent l'écran générique en v4.
 
+## API de l'atelier
+
+Servie par `wikik atelier` en plus de l'API de lecture du wiki. Les écritures sont en `POST` JSON ; une requête dont l'en-tête `Origin` ne correspond pas à l'hôte est refusée (403), un corps non JSON aussi (415).
+
+| Route | Corps | Effet |
+|---|---|---|
+| `GET /api/atelier/etat` | | étapes (fiche, état, mode, artefacts, sélections, lots), tous les artefacts, clarifications, fournisseur, consommation |
+| `POST /api/atelier/piloter` | `etape`, `action` (`ouvrir`, `terminer`, `sauter`, `rouvrir`, `mode`), `mode` | état ou mode d'une étape |
+| `POST /api/atelier/selection` | `etape`, `sous_etape`, `ids` | sélection d'une sous-étape `selection` |
+| `POST /api/atelier/proposer` | `etape`, `sous_etape`, `cible`, `entree` | appel au LLM, propositions ajoutées au lot |
+| `POST /api/atelier/decider` | `etape`, `sous_etape`, `cible`, `indice`, `decision` (`garder`, `rejeter`), `donnees` (correction) | artefact créé ou complété |
+| `POST /api/atelier/saisir` | `etape`, `sous_etape`, `cible`, `donnees` | pitch, texte libre, tri des besoins, conclusion |
+| `POST /api/atelier/synthetiser` | `etape`, `sous_etape` | rapport assemblé ; renvoie les fichiers écrits |
+| `POST /api/atelier/rappel` | `sujet`, `question` | clarification `CLAR-xxx` |
+
 ## Critères d'acceptation
 
 Chaque écran s'affiche sur la fixture d'atelier, sans erreur de console, en clair et en sombre (contrôle en navigateur headless).

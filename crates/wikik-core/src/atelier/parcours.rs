@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use ts_rs::TS;
 
-/// Artefact affiché dans une étape.
+/// Artefact affiché dans une étape ou proposé dans une sélection, avec son frontmatter.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct ArtefactResume {
@@ -31,6 +31,9 @@ pub struct ArtefactResume {
     pub statut: String,
     pub chemin: String,
     pub sources: Vec<String>,
+    /// Frontmatter complet (priorité, levier, vignettes…), pour les écrans dédiés.
+    #[ts(type = "Record<string, unknown>")]
+    pub frontmatter: Value,
 }
 
 /// Une proposition du LLM et la décision prise.
@@ -70,14 +73,21 @@ pub struct EtatEtape {
     pub lots: Vec<Lot>,
 }
 
-/// État complet de l'atelier, servi à l'interface.
+/// État complet de l'atelier, servi à l'interface : étapes, artefacts, clarifications et leurs
+/// propositions, fournisseur, consommation de l'abonnement.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct EtatAtelier {
     /// Titre du projet (pitch), s'il existe.
     pub projet: Option<String>,
     pub etapes: Vec<EtatEtape>,
+    /// Tous les artefacts de l'atelier, besoins et exigences compris (sélections, liens).
+    pub artefacts: Vec<ArtefactResume>,
     pub clarifications: Vec<ArtefactResume>,
+    /// Fiche de la clarification, hors parcours (écran de rappel).
+    pub fiche_clarification: Fiche,
+    /// Propositions des clarifications (une par clarification).
+    pub lots_clarification: Vec<Lot>,
     pub fournisseur: String,
     pub consommation: Option<Consommation>,
     pub url_wiki: String,
@@ -244,6 +254,7 @@ fn resume(d: &Doc) -> ArtefactResume {
         statut: d.statut.clone(),
         chemin: d.chemin.clone(),
         sources: chaines(d.fm.get("sources")),
+        frontmatter: d.fm.clone(),
     }
 }
 
@@ -294,7 +305,7 @@ fn selection(p: &Map<String, Value>, docs: &[Doc], fiche: &Fiche, se: &SousEtape
 
 // ---------------------------------------------------------------- état servi à l'interface
 
-/// État de l'atelier pour l'interface.
+/// État de l'atelier pour l'interface : chaque étape avec ses artefacts, sélections et lots.
 pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
     let p = charger_parcours(index);
     let docs = documents(index)?;
@@ -309,33 +320,12 @@ pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
             .map(resume)
             .collect();
         let mut selections = BTreeMap::new();
-        let mut lots = vec![];
         for se in &f.sous_etapes {
             if se.genre == "selection" {
                 selections.insert(se.id.clone(), selection(&p, &docs, f, se));
             }
-            if se.genre == "propositions" || se.brouillon {
-                let prefixe = format!("{}__{}__", f.id, se.id);
-                if let Ok(entrees) = std::fs::read_dir(dossier_travail(index).join("propositions"))
-                {
-                    let mut noms: Vec<String> = entrees
-                        .flatten()
-                        .map(|e| e.file_name().to_string_lossy().to_string())
-                        .collect();
-                    noms.sort();
-                    for n in noms.into_iter().filter(|n| n.starts_with(&prefixe)) {
-                        if let Some(lot) = std::fs::read_to_string(
-                            dossier_travail(index).join("propositions").join(&n),
-                        )
-                        .ok()
-                        .and_then(|t| serde_json::from_str::<Lot>(&t).ok())
-                        {
-                            lots.push(lot);
-                        }
-                    }
-                }
-            }
         }
+        let lots = lots_de(index, f);
         let e = p.get("etapes").and_then(|e| e.get(&f.id));
         etapes.push(EtatEtape {
             fiche: f.clone(),
@@ -359,14 +349,46 @@ pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
         .filter(|d| d.genre == "clarification")
         .map(resume)
         .collect();
+    let tous = docs
+        .iter()
+        .filter(|d| d.genre != "parcours" && artefacts::type_de(&d.genre).is_ok())
+        .map(resume)
+        .collect();
     Ok(EtatAtelier {
         projet,
         etapes,
+        artefacts: tous,
         clarifications,
+        fiche_clarification: fiches::fiche("clarification")?.clone(),
+        lots_clarification: lots_de(index, fiches::fiche("clarification")?),
         fournisseur: fournisseur.into(),
         consommation: derniere_consommation(index),
         url_wiki: index.config.atelier.url_wiki.clone(),
     })
+}
+
+/// Lots de propositions enregistrés pour les sous-étapes d'une fiche, dans l'ordre des noms de fichier.
+fn lots_de(index: &Index, f: &Fiche) -> Vec<Lot> {
+    let dossier = dossier_travail(index).join("propositions");
+    let Ok(entrees) = std::fs::read_dir(&dossier) else {
+        return vec![];
+    };
+    let mut noms: Vec<String> = entrees
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .collect();
+    noms.sort();
+    let prefixes: Vec<String> = f
+        .sous_etapes
+        .iter()
+        .filter(|se| se.genre == "propositions" || se.brouillon)
+        .map(|se| format!("{}__{}__", f.id, se.id))
+        .collect();
+    noms.into_iter()
+        .filter(|n| prefixes.iter().any(|p| n.starts_with(p)))
+        .filter_map(|n| std::fs::read_to_string(dossier.join(n)).ok())
+        .filter_map(|t| serde_json::from_str::<Lot>(&t).ok())
+        .collect()
 }
 
 fn derniere_consommation(index: &Index) -> Option<Consommation> {
