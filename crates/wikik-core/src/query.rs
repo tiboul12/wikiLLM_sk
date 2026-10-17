@@ -860,7 +860,8 @@ fn ligne_champ(corps: &str, champ: &str) -> Option<String> {
     })
 }
 
-/// `exigence` : énoncé, besoins, et ce qui l'implémente ou la teste (EF-027).
+/// `exigence` : énoncé, besoins, et ce qui l'implémente ou la teste (EF-027). Une exigence écrite dans
+/// un autre format que le gabarit wikik (scénario, attendu…) est montrée telle quelle, tronquée.
 pub fn exigence(index: &Index, demande: &str) -> Result<Sortie> {
     let id = demande.trim().to_ascii_uppercase();
     let Some(d) = document(index, &id)? else {
@@ -884,9 +885,22 @@ pub fn exigence(index: &Index, demande: &str) -> Result<Sortie> {
             .collect();
         corps.push_str(&format!("besoins : {}\n", l.join(" ; ")));
     }
+    let mut trouve = false;
     for (champ, nom) in [("Énoncé", "énoncé"), ("Critère d'acceptation", "critère")] {
         if let Some(v) = ligne_champ(corps_doc, champ) {
             corps.push_str(&format!("{nom} : {v}\n"));
+            trouve = true;
+        }
+    }
+    // Autre format (scénario / attendu / vérification…) : le texte de l'exigence, sans son titre.
+    if !trouve {
+        let texte: Vec<&str> = corps_doc
+            .lines()
+            .filter(|l| !l.starts_with("# ") && !l.trim().is_empty())
+            .collect();
+        if !texte.is_empty() {
+            corps.push_str(&tronquer(&texte.join("\n"), 800));
+            corps.push('\n');
         }
     }
     let syms = citants(index, &id, "req")?;
