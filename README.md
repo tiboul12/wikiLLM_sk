@@ -25,7 +25,7 @@ wikik serve             # wiki sur http://127.0.0.1:8484
 wikik atelier           # atelier + wiki sur http://127.0.0.1:8485 (LLM : `claude -p`, abonnement Claude Code)
 ```
 
-Pour ouvrir le wiki ou l'atelier depuis un autre poste, mettre une fois `reseau = true` dans la section `[serveur]` de `wikik.toml` (ou lancer avec `--reseau`) : au démarrage, le serveur affiche l'adresse à ouvrir (`→ depuis un autre poste : http://10.0.0.21:8485`). L'atelier sert aussi le wiki : une seule commande suffit.
+Pour ouvrir le wiki ou l'atelier depuis un autre poste, mettre une fois `reseau = true` dans la section `[serveur]` de `wikik.toml` (ou lancer avec `--reseau`) : au démarrage, le serveur affiche l'adresse à ouvrir (`→ depuis un autre poste : http://10.0.0.21:8485`). L'atelier sert aussi le wiki : une seule commande suffit. Plusieurs projets ouverts en même temps prennent chacun le port suivant libre (8485, 8486…), affiché au démarrage avec le nom du projet.
 
 | Commande | Rôle |
 |---|---|

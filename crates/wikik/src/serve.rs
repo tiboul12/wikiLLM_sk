@@ -31,21 +31,35 @@ pub(crate) struct Etat {
 
 pub(crate) type Partage = Arc<Etat>;
 
-/// Démarre le serveur et bloque jusqu'à Ctrl+C.
-/// @relu 2026-10-17 6d29e55f
-pub fn servir(racine: &Path, adresse: &str, port: u16, autoriser_reseau: bool) -> Result<()> {
+/// Port d'écoute : celui demandé (`--port`), ou le port par défaut et, s'il est pris (un autre projet
+/// ouvert), les suivants.
+#[derive(Clone, Copy)]
+pub struct Port {
+    pub numero: u16,
+    pub automatique: bool,
+}
+
+impl Port {
+    /// `--port` s'il est donné, sinon `defaut` avec recherche automatique.
+    pub fn choisir(demande: Option<u16>, defaut: u16) -> Port {
+        Port {
+            numero: demande.unwrap_or(defaut),
+            automatique: demande.is_none(),
+        }
+    }
+}
+
+/// Démarre le serveur du wiki sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C.
+pub fn servir(racine: &Path, adresse: &str, port: Port, autoriser_reseau: bool) -> Result<()> {
     let ip = verifier_adresse(adresse, autoriser_reseau)?;
     let mut index = Index::ouvrir(racine)?;
     index.mettre_a_jour()?;
+    let racine = index.racine.clone();
     let etat: Partage = Arc::new(Etat {
         index: Mutex::new(index),
         atelier: None,
     });
-    lancer(
-        routes_wiki().with_state(etat),
-        SocketAddr::new(ip, port),
-        "wikik serve",
-    )
+    lancer(routes_wiki().with_state(etat), ip, port, &racine, "wiki")
 }
 
 /// Refuse une adresse hors boucle locale sans `--autoriser-reseau`.
@@ -77,19 +91,49 @@ async fn api_mode(State(e): State<Partage>) -> Response {
     Json(serde_json::json!({ "atelier": e.atelier.is_some() })).into_response()
 }
 
-/// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C. En écoute sur toutes les interfaces,
-/// affiche aussi l'adresse à ouvrir depuis un autre poste (IP du réseau local).
-pub(crate) fn lancer(app: Router, adresse_socket: SocketAddr, nom: &str) -> Result<()> {
+/// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C. Un port automatique déjà pris (autre
+/// projet ouvert) fait essayer les 20 suivants ; le port obtenu est noté dans `.wikik/serveurs.json`
+/// (liens et `atelier_rappel`) et retiré à l'arrêt. En écoute sur toutes les interfaces, affiche aussi
+/// l'adresse à ouvrir depuis un autre poste (IP du réseau local).
+pub(crate) fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, role: &str) -> Result<()> {
     let app = app
         .fallback(statique)
         .layer(axum::middleware::map_response(entetes_securite));
-    let nom = nom.to_string();
+    let projet = racine
+        .file_name()
+        .map_or_else(|| "projet".into(), |n| n.to_string_lossy().into_owned());
+    let nom = format!(
+        "wikik {} ({projet})",
+        if role == "wiki" { "serve" } else { role }
+    );
+    let racine = racine.to_path_buf();
+    let role = role.to_string();
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
         .block_on(async move {
-            let ecoute = tokio::net::TcpListener::bind(adresse_socket).await?;
+            let essais = if port.automatique { 20 } else { 1 };
+            let mut ecoute = None;
+            for p in (port.numero..).take(essais) {
+                match tokio::net::TcpListener::bind(SocketAddr::new(ip, p)).await {
+                    Ok(e) => {
+                        ecoute = Some(e);
+                        break;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => continue,
+                    Err(e) => return Err(e.into()),
+                }
+            }
+            let Some(ecoute) = ecoute else {
+                bail!(
+                    "port {} déjà utilisé{} : choisir un autre port avec --port",
+                    port.numero,
+                    if port.automatique { " (et les 19 suivants)" } else { "" }
+                );
+            };
+            let adresse_socket = ecoute.local_addr()?;
             let port = adresse_socket.port();
+            wikik_core::reseau::noter_port(&racine, &role, Some(port));
             if adresse_socket.ip().is_unspecified() {
                 // Écoute sur toutes les interfaces : l'adresse utile est celle du réseau local.
                 eprintln!("{nom} : http://127.0.0.1:{port} sur cette machine (Ctrl+C pour arrêter)");
@@ -100,11 +144,13 @@ pub(crate) fn lancer(app: Router, adresse_socket: SocketAddr, nom: &str) -> Resu
             } else {
                 eprintln!("{nom} : http://{adresse_socket} (Ctrl+C pour arrêter)");
             }
-            axum::serve(ecoute, app)
+            let r = axum::serve(ecoute, app)
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;
                 })
-                .await?;
+                .await;
+            wikik_core::reseau::noter_port(&racine, &role, None);
+            r?;
             Ok(())
         })
 }
@@ -242,7 +288,8 @@ mod tests {
     #[test]
     fn refuse_le_reseau_sans_option() {
         let d = std::env::temp_dir();
-        let e = super::servir(&d, "0.0.0.0", 0, false).unwrap_err();
+        let e =
+            super::servir(&d, "0.0.0.0", super::Port::choisir(Some(0), 8484), false).unwrap_err();
         assert!(e.to_string().contains("--autoriser-reseau"));
     }
 }

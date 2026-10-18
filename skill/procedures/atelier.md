@@ -17,7 +17,7 @@ wikik init                 # wikik.toml, docs/projet/, gabarits
 wikik atelier              # puis ouvrir http://127.0.0.1:8485 (le wiki est servi avec)
 ```
 
-Depuis un autre poste : `reseau = true` dans la section `[serveur]` de `wikik.toml` (une fois), puis `wikik atelier` affiche l'adresse à ouvrir. Les liens entre wiki et atelier suivent l'adresse du navigateur : aucune IP à configurer.
+Depuis un autre poste : `reseau = true` dans la section `[serveur]` de `wikik.toml` (une fois), puis `wikik atelier` affiche l'adresse à ouvrir. Les liens entre wiki et atelier suivent l'adresse du navigateur : aucune IP à configurer. Avec plusieurs projets ouverts, chaque atelier prend le port suivant libre (affiché au démarrage) ; le lien renvoyé par `atelier_rappel` vise le bon.
 
 - Mode **Express** par défaut (moins de propositions, moins de temps) ; **Complet** par étape, au besoin.
 - Le pitch et le free writing sont à toi : le LLM ne fait que proposer un brouillon (pitch) et extraire les unités de sens mot pour mot (free writing).

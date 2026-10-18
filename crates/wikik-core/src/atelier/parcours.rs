@@ -306,6 +306,7 @@ fn selection(p: &Map<String, Value>, docs: &[Doc], fiche: &Fiche, se: &SousEtape
 // ---------------------------------------------------------------- état servi à l'interface
 
 /// État de l'atelier pour l'interface : chaque étape avec ses artefacts, sélections et lots.
+/// @relu 2026-10-18 698058ee
 pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
     let p = charger_parcours(index);
     let docs = documents(index)?;
@@ -363,7 +364,7 @@ pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
         lots_clarification: lots_de(index, fiches::fiche("clarification")?),
         fournisseur: fournisseur.into(),
         consommation: derniere_consommation(index),
-        url_wiki: index.config.atelier.url_wiki.clone(),
+        url_wiki: crate::reseau::adresse_wiki(index),
     })
 }
 

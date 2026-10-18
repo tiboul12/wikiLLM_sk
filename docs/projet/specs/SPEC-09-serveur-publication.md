@@ -16,7 +16,7 @@ Servir le wiki en local à partir de l'index, sans exposer d'écriture ni dépen
 
 ## Exigences
 
-1. **R1** `wikik serve` écoute sur `127.0.0.1:8484` par défaut. Une autre adresse que la boucle locale exige `--autoriser-reseau` (EF-040). Pour le réseau local, `--reseau`, ou `[serveur] reseau = true` dans `wikik.toml` une fois pour toutes, fait écouter sur toutes les interfaces ; le serveur affiche alors l'adresse à ouvrir depuis un autre poste. Même règle pour `wikik atelier` (port 8485).
+1. **R1** `wikik serve` écoute sur `127.0.0.1:8484` par défaut. Une autre adresse que la boucle locale exige `--autoriser-reseau` (EF-040). Pour le réseau local, `--reseau`, ou `[serveur] reseau = true` dans `wikik.toml` une fois pour toutes, fait écouter sur toutes les interfaces ; le serveur affiche alors l'adresse à ouvrir depuis un autre poste. Même règle pour `wikik atelier` (port 8485). Sans `--port`, un port déjà pris (autre projet ouvert) fait prendre le suivant libre ; le port obtenu est noté dans `.wikik/serveurs.json` pour les liens wiki ↔ atelier et `atelier_rappel`, et retiré à l'arrêt.
 2. **R2** API **en lecture seule** (`GET` uniquement) ; toute autre méthode répond 405.
 3. **R3** Chaque requête d'API met l'index à jour (incrémental), comme les requêtes CLI : le wiki reflète le disque sans redémarrage.
 4. **R4** Le front est **embarqué** dans le binaire (`rust-embed`) ; les routes hors `/api/` renvoient `index.html` (application monopage).

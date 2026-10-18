@@ -78,8 +78,9 @@ enum Commande {
         /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
         #[arg(long)]
         adresse: Option<String>,
-        #[arg(long, default_value_t = 8485)]
-        port: u16,
+        /// Port (défaut : 8485, ou le suivant libre si un autre projet l'occupe).
+        #[arg(long)]
+        port: Option<u16>,
         /// Écoute sur le réseau local (comme `[serveur] reseau = true`) : l'atelier, qui écrit, devient
         /// visible des autres postes.
         #[arg(long)]
@@ -98,8 +99,9 @@ enum Commande {
         /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
         #[arg(long)]
         adresse: Option<String>,
-        #[arg(long, default_value_t = 8484)]
-        port: u16,
+        /// Port (défaut : 8484, ou le suivant libre si un autre projet l'occupe).
+        #[arg(long)]
+        port: Option<u16>,
         /// Écoute sur le réseau local (comme `[serveur] reseau = true`).
         #[arg(long)]
         reseau: bool,
@@ -161,7 +163,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-18 5502f400
+/// @relu 2026-10-18 ee72e45d
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -267,7 +269,12 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             autoriser_reseau,
         } => {
             let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
-            serve::servir(&cli.racine, &adresse, port, autoriser)?;
+            serve::servir(
+                &cli.racine,
+                &adresse,
+                serve::Port::choisir(port, 8484),
+                autoriser,
+            )?;
             Ok(0)
         }
         Commande::Atelier {
@@ -278,7 +285,13 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             factice,
         } => {
             let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
-            atelier::servir(&cli.racine, &adresse, port, autoriser, factice)?;
+            atelier::servir(
+                &cli.racine,
+                &adresse,
+                serve::Port::choisir(port, 8485),
+                autoriser,
+                factice,
+            )?;
             Ok(0)
         }
         Commande::Relu { symbole } => {

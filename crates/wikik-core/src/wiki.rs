@@ -193,6 +193,7 @@ fn u(v: i64) -> u32 {
 
 /// Accueil : fichiers avec leur rôle, documents (zone Projet ou atelier), statistiques, adresse de
 /// l'atelier quand le projet a un dossier d'atelier.
+/// @relu 2026-10-18 8504a231
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -254,7 +255,11 @@ pub fn projet(index: &Index) -> Result<Projet> {
         .racine
         .join(&index.config.atelier.dossier)
         .is_dir()
-        .then(|| index.config.atelier.url.trim_end_matches('/').to_string());
+        .then(|| {
+            crate::reseau::adresse_atelier(index)
+                .trim_end_matches('/')
+                .to_string()
+        });
     Ok(Projet {
         nom,
         fichiers,

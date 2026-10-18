@@ -19,7 +19,6 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::Value;
-use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use wikik_core::Index;
@@ -31,11 +30,11 @@ pub(crate) struct Atelier {
     pub(crate) fournisseur: Box<dyn Fournisseur>,
 }
 
-/// Démarre l'atelier et bloque jusqu'à Ctrl+C.
+/// Démarre l'atelier sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C.
 pub fn servir(
     racine: &Path,
     adresse: &str,
-    port: u16,
+    port: crate::serve::Port,
     autoriser_reseau: bool,
     factice: bool,
 ) -> Result<()> {
@@ -49,11 +48,12 @@ pub fn servir(
     let fournisseur =
         fournisseur::depuis_config(&config, &index.racine, &parcours::travail(&index.racine))?;
     eprintln!("wikik atelier : fournisseur {}", fournisseur.nom());
+    let racine = index.racine.clone();
     let etat: Partage = Arc::new(Etat {
         index: Mutex::new(index),
         atelier: Some(Atelier { fournisseur }),
     });
-    lancer(routes(etat), SocketAddr::new(ip, port), "wikik atelier")
+    lancer(routes(etat), ip, port, &racine, "atelier")
 }
 
 /// Routes du wiki et de l'atelier.

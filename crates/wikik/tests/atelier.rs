@@ -160,8 +160,11 @@ fn atelier_factice_de_bout_en_bout() {
         http(p, "GET", "/api/mode", None, &[]),
         (200, r#"{"atelier":true}"#.into())
     );
+    // Port réellement pris, noté dans .wikik/serveurs.json (plusieurs projets ouverts à la fois).
     assert!(
-        projet.contains(r#""url_atelier":"http://127.0.0.1:8485""#),
+        projet.contains(&format!(r#""url_atelier":"http://127.0.0.1:{p}""#)),
         "{projet}"
     );
+    let serveurs = std::fs::read_to_string(d.path().join(".wikik/serveurs.json")).unwrap();
+    assert_eq!(serveurs, format!(r#"{{"atelier":{p}}}"#));
 }
