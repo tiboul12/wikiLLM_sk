@@ -193,7 +193,7 @@ fn u(v: i64) -> u32 {
 
 /// Accueil : fichiers avec leur rôle, documents (zone Projet ou atelier), statistiques, adresse de
 /// l'atelier quand le projet a un dossier d'atelier.
-/// @relu 2026-10-18 8504a231
+/// @relu 2026-10-18 fd0fd887
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -225,6 +225,7 @@ pub fn projet(index: &Index) -> Result<Projet> {
         })
         .collect::<rusqlite::Result<_>>()?;
     let dossier_atelier = format!("{}/", index.config.atelier.dossier.trim_end_matches('/'));
+    let dossier_reception = format!("{}/", index.config.reception.dossier.trim_end_matches('/'));
     let mut st =
         c.prepare("SELECT id, chemin, genre, titre, statut FROM documents ORDER BY chemin")?;
     let documents = st
@@ -232,6 +233,8 @@ pub fn projet(index: &Index) -> Result<Projet> {
             let chemin: String = r.get(1)?;
             let zone = if chemin.starts_with(&dossier_atelier) {
                 "atelier"
+            } else if chemin.starts_with(&dossier_reception) {
+                "reception"
             } else {
                 "projet"
             };

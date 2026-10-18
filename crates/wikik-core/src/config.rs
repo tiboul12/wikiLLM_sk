@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Configuration d'un projet.
-/// @relu 2026-10-18 4de31176
+/// @relu 2026-10-18 341b2356
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -18,6 +18,33 @@ pub struct Config {
     pub equipe: ConfigEquipe,
     pub atelier: ConfigAtelier,
     pub serveur: ConfigServeur,
+    pub reception: ConfigReception,
+}
+
+/// Section `[reception]` : dossier du cahier de réception (carte des pages, remarques, images ; SPEC-23).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigReception {
+    pub dossier: String,
+}
+
+impl Default for ConfigReception {
+    fn default() -> Self {
+        Self {
+            dossier: "docs/reception".into(),
+        }
+    }
+}
+
+impl Config {
+    /// Dossiers dont les `.md` sont des documents de l'index : zone Projet, atelier, réception.
+    pub fn zones_documents(&self) -> [&str; 3] {
+        [
+            self.projet.dossier.trim_end_matches('/'),
+            self.atelier.dossier.trim_end_matches('/'),
+            self.reception.dossier.trim_end_matches('/'),
+        ]
+    }
 }
 
 /// Section `[serveur]` : `reseau = true` fait écouter `wikik serve` et `wikik atelier` sur le réseau

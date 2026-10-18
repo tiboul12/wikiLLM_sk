@@ -13,6 +13,7 @@ wikik-core = { path = "crates/wikik-core" }
 anyhow = "1"
 clap = { version = "4.6", features = ["derive"] }
 ignore = "0.4.33"
+regex = "1"
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -1133,3 +1133,43 @@ pub fn document_complet(index: &Index, id: &str) -> Result<Sortie> {
         json!({ "document": d, "frontmatter": fm }),
     ))
 }
+
+/// `pages` : la carte des pages de l'application (SPEC-22), celle du cahier de réception si elle a été
+/// scannée, sinon celle que le scan trouve maintenant ; une page par ligne avec sa route et son code.
+///
+/// @req EF-120
+pub fn pages(index: &Index) -> Result<Sortie> {
+    let enregistree = crate::reception::carte::lire(index);
+    let pages = if enregistree.is_empty() {
+        crate::reception::carte::detecter(index)?
+    } else {
+        enregistree
+    };
+    let mut corps = String::new();
+    let visibles: Vec<_> = pages.iter().filter(|p| !p.masque).collect();
+    for p in &visibles {
+        corps.push_str(&format!(
+            "{}{} [{}]{}{}\n",
+            p.nom,
+            p.route
+                .as_deref()
+                .map(|r| format!(" {r}"))
+                .unwrap_or_default(),
+            p.source,
+            p.symboles
+                .first()
+                .map(|s| format!(" → {s}"))
+                .unwrap_or_default(),
+            if p.exigences.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", p.exigences.join(", "))
+            }
+        ));
+    }
+    if visibles.is_empty() {
+        corps.push_str("aucune page trouvée\n");
+    }
+    let titre = format!("pages · {} page(s)", visibles.len());
+    Ok(finaliser(&titre, corps, json!({ "pages": visibles })))
+}

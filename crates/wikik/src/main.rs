@@ -146,6 +146,8 @@ enum Requete {
     Ref { reference: String },
     /// Artefacts de l'atelier par type.
     Atelier,
+    /// Pages de l'application (carte du cahier de réception, ou scan du code).
+    Pages,
     /// Un document de l'atelier ou du projet, frontmatter compris.
     Document { id: String },
 }
@@ -163,7 +165,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-18 ee72e45d
+/// @relu 2026-10-18 d7fc5883
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -250,6 +252,7 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
                 Requete::Exigence { id } => q::exigence(&index, &id)?,
                 Requete::Ref { reference } => q::reference(&index, &reference)?,
                 Requete::Atelier => q::atelier(&index)?,
+                Requete::Pages => q::pages(&index)?,
                 Requete::Document { id } => q::document_complet(&index, &id)?,
             };
             match format {

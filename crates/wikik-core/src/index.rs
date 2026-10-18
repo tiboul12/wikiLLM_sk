@@ -141,8 +141,8 @@ impl Index {
     /// Met l'index à jour : seuls les fichiers dont la taille, la date ou le contenu ont changé sont relus.
     ///
     /// Relit aussi les `Cargo.toml` (crates locales) : s'ils changent, la résolution est refaite même
-    /// si aucun fichier de code n'a changé. Les documents viennent de deux zones : la zone Projet et
-    /// l'atelier (SPEC-17).
+    /// si aucun fichier de code n'a changé. Les documents viennent de trois zones : la zone Projet,
+    /// l'atelier (SPEC-17) et le cahier de réception (SPEC-23).
     pub fn mettre_a_jour(&mut self) -> Result<Rapport> {
         let debut = Instant::now();
         let langages = lang::actives(&self.config.index.langages);
@@ -173,13 +173,12 @@ impl Index {
             rapport.supprimes += 1;
         }
 
-        let dossier_projet = self.config.projet.dossier.trim_end_matches('/').to_string();
-        let dossier_atelier = self
+        let zones: Vec<String> = self
             .config
-            .atelier
-            .dossier
-            .trim_end_matches('/')
-            .to_string();
+            .zones_documents()
+            .iter()
+            .map(|z| format!("{z}/"))
+            .collect();
         for c in &candidats {
             if let Some((taille, mtime, _)) = etat.get(&c.relatif)
                 && *taille == c.taille
@@ -206,10 +205,9 @@ impl Index {
                 }
                 Genre::Document => {
                     let texte = String::from_utf8_lossy(&octets);
-                    let relatif_projet = c
-                        .relatif
-                        .strip_prefix(&format!("{dossier_projet}/"))
-                        .or_else(|| c.relatif.strip_prefix(&format!("{dossier_atelier}/")))
+                    let relatif_projet = zones
+                        .iter()
+                        .find_map(|z| c.relatif.strip_prefix(z.as_str()))
                         .unwrap_or(&c.relatif);
                     let doc = projet::lire(&c.relatif, relatif_projet, &texte);
                     ecrire_document(&tx, &doc)?;
@@ -248,7 +246,9 @@ impl Index {
         Ok(rapport)
     }
 
-    fn lister(&self, langages: &[Box<dyn Langage>]) -> Result<(Vec<Candidat>, String)> {
+    /// Parcours des fichiers du projet avec les exclusions de l'index (`.gitignore`, `[index] exclure`,
+    /// `target`, `node_modules`, sites exportés) ; partagé avec le scan de la carte des pages.
+    pub(crate) fn marcheur(&self) -> Result<ignore::Walk> {
         let mut surcharges = ignore::overrides::OverrideBuilder::new(&self.racine);
         for motif in &self.config.index.exclure {
             surcharges.add(&format!("!{motif}"))?;
@@ -267,8 +267,17 @@ impl Index {
                         || e.path().join(MARQUEUR_EXPORT).exists()))
             })
             .build();
-        let dossier_projet = format!("{}/", self.config.projet.dossier.trim_end_matches('/'));
-        let dossier_atelier = format!("{}/", self.config.atelier.dossier.trim_end_matches('/'));
+        Ok(marcheur)
+    }
+
+    fn lister(&self, langages: &[Box<dyn Langage>]) -> Result<(Vec<Candidat>, String)> {
+        let marcheur = self.marcheur()?;
+        let zones: Vec<String> = self
+            .config
+            .zones_documents()
+            .iter()
+            .map(|z| format!("{z}/"))
+            .collect();
         let mut v = vec![];
         let mut manifestes = vec![];
         for entree in marcheur {
@@ -297,9 +306,7 @@ impl Index {
             let genre = if let Some(i) = langages.iter().position(|l| l.extensions().contains(&ext))
             {
                 Genre::Code(i)
-            } else if ext == "md"
-                && (relatif.starts_with(&dossier_projet) || relatif.starts_with(&dossier_atelier))
-            {
+            } else if ext == "md" && zones.iter().any(|z| relatif.starts_with(z.as_str())) {
                 Genre::Document
             } else {
                 continue;

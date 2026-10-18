@@ -26,4 +26,5 @@ sources: [BDR-v5-2, CDC-v5]
 | Phase | État | Date |
 |---|---|---|
 | 0 BDR, CDC, specs | ✅ | 2026-10-18 |
-| 1 à 4 | ⏳ | |
+| 1 Carte des pages | ✅ 5 détecteurs (routes Angular / Vue / React / Leptos, SvelteKit, `enum Page`, HTML, composants sous `pages/`), fusion avec corrections ; `wikik query pages` ; wikik 9 pages, ATS 6 avec libellés, shelley-studio-llm 9 routes + `Benchmark` sans route, shelley-administration 8, shelley-accueil 2 | 2026-10-18 |
+| 2 à 4 | ⏳ | |

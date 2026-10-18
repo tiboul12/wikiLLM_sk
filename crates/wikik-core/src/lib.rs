@@ -16,6 +16,7 @@ pub mod lang;
 pub mod modele;
 pub mod projet;
 pub mod query;
+pub mod reception;
 pub mod relu;
 pub mod reseau;
 pub mod resolution;
