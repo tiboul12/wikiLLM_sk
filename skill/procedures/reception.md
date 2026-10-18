@@ -1,0 +1,17 @@
+# Cahier de réception
+
+`wikik reception` (port 8487, ou le suivant libre) ouvre le cahier de réception d'un projet : la carte de ses pages, construite à partir du code (routes Angular / Vue / React / Leptos, SvelteKit, `enum Page`, pages HTML, composants sous `pages/`), et les remarques de l'utilisateur, une carte par remarque, captures comprises. Tout est écrit dans `docs/reception/` : `carte.md`, `remarques/REC-xxx.md`, `images/`.
+
+## Pour l'utilisateur
+
+1. `wikik reception` dans le projet à recevoir (avec `[serveur] reseau = true` pour l'ouvrir depuis un autre poste), puis l'adresse affichée.
+2. La carte s'est construite au premier lancement. La corriger si besoin : ✎ pour renommer, regrouper ou masquer ; « Compléter avec le LLM » cherche les écrans que le scan n'a pas vus (vues par état, étapes, fenêtres). Les corrections survivent aux scans suivants.
+3. Ouvrir une page, écrire la remarque, coller les captures (Ctrl+V) ou les glisser, choisir genre et gravité, « Ajouter la remarque » (Ctrl+Entrée). Une remarque transverse va sur « Général ».
+4. En fin de campagne : « Traiter les remarques », ou laisser l'agent de code le faire.
+
+## Pour l'agent de code
+
+1. Outil MCP `reception` (ou `wikik query reception`) : les remarques ouvertes, les bloquantes d'abord, avec le code de la page (`chemin::Symbole`), ses exigences et les chemins des captures. Lire les captures avec Read.
+2. Partir du symbole donné (`symbole`, `impact`) : pas de recherche à l'aveugle.
+3. Corriger, commiter, puis `reception_traiter` : `traitee` avec une phrase et le hash du commit ; `reportee` (va au backlog) ou `rejetee` avec la raison. Une remarque qui demande une décision produit : la laisser ouverte et la signaler à l'utilisateur.
+4. Ne jamais modifier `docs/reception/` à la main : c'est le cahier qui tient ces fichiers.

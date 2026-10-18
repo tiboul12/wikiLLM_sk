@@ -36,6 +36,11 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 - [ ] **Relire** la BDR v4, le cahier des charges v4, SPEC-17 à 21 et les 12 fiches de `atelier/techniques/`.
 - [ ] Réinstaller le binaire (`make install`) pour avoir `wikik atelier`.
 
+## ✋ À faire avec Tibo pour passer de `v5.0-rc1` à `v5.0` (cahier de réception)
+
+- [ ] **Première campagne : la réception de l'atelier.** Depuis wikiK : `wikik reception`, « Compléter avec le LLM » (il trouve les écrans d'étape : Pitch, Free writing, Planche, Tri…), puis tes remarques page par page.
+- [ ] **Relire** la BDR v5, le cahier des charges v5, SPEC-22 et 23.
+
 ## 🧩 Constats de la v1 à traiter
 
 - [x] **Indexer le front** (TypeScript, v2) : fait, EF-045 est citée par `front/src/lib/hook.ts` ; les `.svelte` restent à faire.
@@ -87,6 +92,11 @@ Tout ce qui a été volontairement laissé de côté pendant l'analyse du 17/10.
 - [x] **Écrans dédiés** : free writing, mind map, grille SCAMPER, storyboards R.E.C.I.T., tri des besoins.
 - [x] **Vue « Parcours »** : stepper des phases, compteurs, pages en attente de validation.
 - [x] **Modes Express et Complet**, variantes générées en lot et validées par sélection.
+
+### 📝 Cahier de réception (v5)
+- [ ] **Détecteurs supplémentaires** : routes Vue en fichiers (Nuxt), Next.js (`app/**/page.tsx`), navigation par état en TypeScript (union de chaînes).
+- [ ] **Remarque → exigence ou backlog** en un clic au traitement (`reportee` crée l'entrée).
+- [ ] **Export du cahier** (une page imprimable par campagne).
 
 ### 📐 Cycle des mises à jour majeures
 - [ ] **Vue consolidée du cahier des charges** générée en rejouant les versions (Q9).
