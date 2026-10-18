@@ -27,6 +27,8 @@ pub(crate) struct Etat {
     pub(crate) index: Mutex<Index>,
     /// Présent quand le serveur est l'atelier (`wikik atelier`).
     pub(crate) atelier: Option<crate::atelier::Atelier>,
+    /// Présent quand le serveur est le cahier de réception (`wikik reception`).
+    pub(crate) reception: Option<crate::reception::Reception>,
 }
 
 pub(crate) type Partage = Arc<Etat>;
@@ -50,6 +52,7 @@ impl Port {
 }
 
 /// Démarre le serveur du wiki sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C.
+/// @relu 2026-10-18 41e0c2df
 pub fn servir(racine: &Path, adresse: &str, port: Port, autoriser_reseau: bool) -> Result<()> {
     let ip = verifier_adresse(adresse, autoriser_reseau)?;
     let mut index = Index::ouvrir(racine)?;
@@ -58,6 +61,7 @@ pub fn servir(racine: &Path, adresse: &str, port: Port, autoriser_reseau: bool) 
     let etat: Partage = Arc::new(Etat {
         index: Mutex::new(index),
         atelier: None,
+        reception: None,
     });
     lancer(routes_wiki().with_state(etat), ip, port, &racine, "wiki")
 }
@@ -73,8 +77,8 @@ pub(crate) fn verifier_adresse(adresse: &str, autoriser_reseau: bool) -> Result<
     Ok(ip)
 }
 
-/// Routes de lecture du wiki, partagées avec l'atelier (SPEC-20), et `/api/mode` qui dit au front
-/// lequel des deux serveurs le sert.
+/// Routes de lecture du wiki, partagées avec l'atelier (SPEC-20) et le cahier de réception, `/api/mode`
+/// qui dit au front quel serveur le sert, et `/api/image` pour les captures des documents.
 pub(crate) fn routes_wiki() -> Router<Partage> {
     Router::new()
         .route("/api/projet", get(api_projet))
@@ -84,11 +88,56 @@ pub(crate) fn routes_wiki() -> Router<Partage> {
         .route("/api/cherche", get(api_cherche))
         .route("/api/check", get(api_check))
         .route("/api/mode", get(api_mode))
+        .route("/api/image", get(api_image))
 }
 
-/// Le front demande s'il est servi par l'atelier (SPEC-20) sans provoquer d'erreur ailleurs.
+#[derive(Deserialize)]
+struct ParamImage {
+    chemin: String,
+}
+
+/// Image d'un document (capture d'une remarque) : seulement une vraie image PNG, JPEG, GIF ou WebP
+/// rangée dans une zone de documents ; jamais un autre fichier du projet (SPEC-23 R3).
+async fn api_image(State(e): State<Partage>, Query(p): Query<ParamImage>) -> Response {
+    let r = tokio::task::spawn_blocking(move || -> Option<(Vec<u8>, &'static str)> {
+        let index = e.index.lock().unwrap_or_else(|x| x.into_inner());
+        let relatif = p.chemin.trim_start_matches('/');
+        if relatif.split('/').any(|c| c == ".." || c.starts_with('.')) {
+            return None;
+        }
+        if !index
+            .config
+            .zones_documents()
+            .iter()
+            .any(|z| relatif.starts_with(&format!("{z}/")))
+        {
+            return None;
+        }
+        let chemin = index.racine.join(relatif).canonicalize().ok()?;
+        if !chemin.starts_with(&index.racine) {
+            return None;
+        }
+        let octets = std::fs::read(&chemin).ok()?;
+        let mime = match wikik_core::reception::remarques::type_image(&octets)? {
+            "png" => "image/png",
+            "jpg" => "image/jpeg",
+            "gif" => "image/gif",
+            _ => "image/webp",
+        };
+        Some((octets, mime))
+    })
+    .await;
+    match r {
+        Ok(Some((octets, mime))) => ([(header::CONTENT_TYPE, mime)], octets).into_response(),
+        _ => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// Le front demande s'il est servi par l'atelier (SPEC-20) ou le cahier de réception (SPEC-23), sans
+/// provoquer d'erreur ailleurs.
 async fn api_mode(State(e): State<Partage>) -> Response {
-    Json(serde_json::json!({ "atelier": e.atelier.is_some() })).into_response()
+    Json(serde_json::json!({ "atelier": e.atelier.is_some(), "reception": e.reception.is_some() }))
+        .into_response()
 }
 
 /// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C. Un port automatique déjà pris (autre

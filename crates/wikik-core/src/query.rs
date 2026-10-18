@@ -1173,3 +1173,49 @@ pub fn pages(index: &Index) -> Result<Sortie> {
     let titre = format!("pages · {} page(s)", visibles.len());
     Ok(finaliser(&titre, corps, json!({ "pages": visibles })))
 }
+
+/// `reception` : les remarques ouvertes du cahier de réception, les plus graves d'abord, avec ce qu'il
+/// faut pour agir sans chercher (symboles de la page, captures) (SPEC-23 R6).
+///
+/// @req EF-125
+pub fn reception(index: &Index) -> Result<Sortie> {
+    let rang = |g: &str| {
+        crate::reception::remarques::GRAVITES
+            .iter()
+            .position(|x| *x == g)
+            .unwrap_or(9)
+    };
+    let mut ouvertes: Vec<_> = crate::reception::remarques::lister(index)?
+        .into_iter()
+        .filter(|r| r.statut == "ouverte")
+        .collect();
+    ouvertes.sort_by(|a, b| {
+        rang(&a.gravite)
+            .cmp(&rang(&b.gravite))
+            .then(a.id.cmp(&b.id))
+    });
+    let mut corps = String::new();
+    for r in &ouvertes {
+        corps.push_str(&format!(
+            "{} · {} · {} · page « {} »\n",
+            r.id, r.gravite, r.genre, r.nom_page
+        ));
+        for l in r.texte.lines() {
+            corps.push_str(&format!("  {l}\n"));
+        }
+        if !r.symboles.is_empty() {
+            corps.push_str(&format!("  code : {}\n", r.symboles.join(", ")));
+        }
+        if !r.exigences.is_empty() {
+            corps.push_str(&format!("  exigences : {}\n", r.exigences.join(", ")));
+        }
+        if !r.images.is_empty() {
+            corps.push_str(&format!("  captures : {}\n", r.images.join(", ")));
+        }
+    }
+    if ouvertes.is_empty() {
+        corps.push_str("aucune remarque ouverte\n");
+    }
+    let titre = format!("réception · {} remarque(s) ouverte(s)", ouvertes.len());
+    Ok(finaliser(&titre, corps, json!({ "remarques": ouvertes })))
+}

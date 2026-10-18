@@ -31,6 +31,7 @@ pub(crate) struct Atelier {
 }
 
 /// Démarre l'atelier sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C.
+/// @relu 2026-10-18 9f88592f
 pub fn servir(
     racine: &Path,
     adresse: &str,
@@ -52,6 +53,7 @@ pub fn servir(
     let etat: Partage = Arc::new(Etat {
         index: Mutex::new(index),
         atelier: Some(Atelier { fournisseur }),
+        reception: None,
     });
     lancer(routes(etat), ip, port, &racine, "atelier")
 }
@@ -72,7 +74,7 @@ pub(crate) fn routes(etat: Partage) -> axum::Router {
 }
 
 /// Une écriture venue d'une autre origine (page tierce ouverte dans le navigateur) est refusée.
-async fn meme_origine(requete: Request, suite: Next) -> Response {
+pub(crate) async fn meme_origine(requete: Request, suite: Next) -> Response {
     if requete.method() != Method::GET && requete.method() != Method::HEAD {
         let hote = requete
             .headers()
@@ -240,7 +242,7 @@ async fn api_rappel(State(e): State<Partage>, Json(p): Json<Rappel>) -> Response
 }
 
 /// Écriture sous verrou ; l'index est remis à jour après, pour que la lecture suivante voie le résultat.
-async fn ecrire<T, F>(e: Partage, f: F) -> Response
+pub(crate) async fn ecrire<T, F>(e: Partage, f: F) -> Response
 where
     T: serde::Serialize + Send + 'static,
     F: FnOnce(&Index) -> Result<T> + Send + 'static,
@@ -256,7 +258,7 @@ where
     resultat(r)
 }
 
-fn resultat<T: serde::Serialize>(
+pub(crate) fn resultat<T: serde::Serialize>(
     r: std::result::Result<Result<T>, tokio::task::JoinError>,
 ) -> Response {
     match r {

@@ -27,4 +27,5 @@ sources: [BDR-v5-2, CDC-v5]
 |---|---|---|
 | 0 BDR, CDC, specs | ✅ | 2026-10-18 |
 | 1 Carte des pages | ✅ 5 détecteurs (routes Angular / Vue / React / Leptos, SvelteKit, `enum Page`, HTML, composants sous `pages/`), fusion avec corrections ; `wikik query pages` ; wikik 9 pages, ATS 6 avec libellés, shelley-studio-llm 9 routes + `Benchmark` sans route, shelley-administration 8, shelley-accueil 2 | 2026-10-18 |
-| 2 à 4 | ⏳ | |
+| 2 Remarques et serveur | ✅ `REC-xxx` avec images (types vérifiés sur les octets), `/api/image`, traitement, `wikik reception` (port 8487), complément LLM, outils MCP `pages`, `reception`, `reception_traiter`, `wikik query pages / reception` | 2026-10-18 |
+| 3 à 4 | ⏳ | |

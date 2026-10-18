@@ -9,6 +9,7 @@ use wikik_core::Index;
 mod atelier;
 mod export;
 mod mcp;
+mod reception;
 mod serve;
 
 /// Doc dans le code, index requêtable par l'agent, wiki local.
@@ -92,6 +93,24 @@ enum Commande {
         #[arg(long)]
         factice: bool,
     },
+    /// Cahier de réception : carte des pages construite à partir du code, remarques page par page.
+    Reception {
+        /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
+        #[arg(long)]
+        adresse: Option<String>,
+        /// Port (défaut : 8487, ou le suivant libre si un autre projet l'occupe).
+        #[arg(long)]
+        port: Option<u16>,
+        /// Écoute sur le réseau local (comme `[serveur] reseau = true`).
+        #[arg(long)]
+        reseau: bool,
+        /// Autorise une `--adresse` hors boucle locale.
+        #[arg(long)]
+        autoriser_reseau: bool,
+        /// Fournisseur factice pour le complément de la carte (sans LLM).
+        #[arg(long)]
+        factice: bool,
+    },
     /// Marque le bloc d'un symbole comme relu (`@relu AAAA-MM-JJ <jeton du code>`).
     Relu { symbole: String },
     /// Sert le wiki en local, en lecture seule.
@@ -148,6 +167,8 @@ enum Requete {
     Atelier,
     /// Pages de l'application (carte du cahier de réception, ou scan du code).
     Pages,
+    /// Remarques ouvertes du cahier de réception.
+    Reception,
     /// Un document de l'atelier ou du projet, frontmatter compris.
     Document { id: String },
 }
@@ -165,7 +186,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-18 d7fc5883
+/// @relu 2026-10-18 c97e0a29
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -253,6 +274,7 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
                 Requete::Ref { reference } => q::reference(&index, &reference)?,
                 Requete::Atelier => q::atelier(&index)?,
                 Requete::Pages => q::pages(&index)?,
+                Requete::Reception => q::reception(&index)?,
                 Requete::Document { id } => q::document_complet(&index, &id)?,
             };
             match format {
@@ -292,6 +314,23 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
                 &cli.racine,
                 &adresse,
                 serve::Port::choisir(port, 8485),
+                autoriser,
+                factice,
+            )?;
+            Ok(0)
+        }
+        Commande::Reception {
+            adresse,
+            port,
+            reseau,
+            autoriser_reseau,
+            factice,
+        } => {
+            let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
+            reception::servir(
+                &cli.racine,
+                &adresse,
+                serve::Port::choisir(port, 8487),
                 autoriser,
                 factice,
             )?;

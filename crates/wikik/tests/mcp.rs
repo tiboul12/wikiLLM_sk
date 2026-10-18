@@ -78,6 +78,9 @@ fn dialogue_mcp() {
         "atelier",
         "document",
         "atelier_rappel",
+        "pages",
+        "reception",
+        "reception_traiter",
     ] {
         assert!(outils.contains(&o), "outil {o}");
     }

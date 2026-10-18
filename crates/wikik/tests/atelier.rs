@@ -158,7 +158,7 @@ fn atelier_factice_de_bout_en_bout() {
     // Le front sait qu'il est dans l'atelier ; le wiki connaît l'adresse de l'atelier (SPEC-21 R1).
     assert_eq!(
         http(p, "GET", "/api/mode", None, &[]),
-        (200, r#"{"atelier":true}"#.into())
+        (200, r#"{"atelier":true,"reception":false}"#.into())
     );
     // Port réellement pris, noté dans .wikik/serveurs.json (plusieurs projets ouverts à la fois).
     assert!(

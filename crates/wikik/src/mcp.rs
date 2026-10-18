@@ -114,6 +114,38 @@ const OUTILS: &[Outil] = &[
         ],
     },
     Outil {
+        nom: "pages",
+        description: "Pages (écrans) de l'application, avec leur route et le symbole qui les affiche : la carte du cahier de réception, ou ce que le scan du code trouve.",
+        parametres: &[],
+    },
+    Outil {
+        nom: "reception",
+        description: "Remarques ouvertes du cahier de réception (retours de l'utilisateur, une par carte) : page, genre, gravité, texte, symboles de la page, chemins des captures (à ouvrir avec Read). Commencer par les bloquantes.",
+        parametres: &[],
+    },
+    Outil {
+        nom: "reception_traiter",
+        description: "Enregistre le traitement d'une remarque de réception une fois la correction faite (ou décidée) : statut traitee, reportee ou rejetee, explication en une phrase, commit éventuel. N'écrit que dans la remarque.",
+        parametres: &[
+            ("id", "Identifiant de la remarque (REC-001…).", true),
+            (
+                "statut",
+                "traitee, reportee, rejetee (ou ouverte pour rouvrir).",
+                true,
+            ),
+            (
+                "resolution",
+                "Ce qui a été fait ou pourquoi c'est reporté / rejeté.",
+                true,
+            ),
+            (
+                "commit",
+                "Hash court du commit qui corrige, s'il y en a un.",
+                false,
+            ),
+        ],
+    },
+    Outil {
         nom: "check",
         description: "Diagnostics de doc : périmée, manquante, références cassées, exigences non couvertes.",
         parametres: &[],
@@ -229,7 +261,7 @@ fn texte(args: &Value, cle: &str) -> Result<String> {
 }
 
 /// Exécute un outil sur l'index à jour et renvoie la sortie texte de la CLI.
-/// @relu 2026-10-17 7b1f98c9
+/// @relu 2026-10-18 8cd7d812
 fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
     index.mettre_a_jour()?;
     let i = &*index;
@@ -259,6 +291,24 @@ fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
             return Ok(format!(
                 "Clarification {id} ouverte. L'utilisateur la traite dans l'atelier : {url}\nSa conclusion sera lisible avec l'outil document ({id})."
             ));
+        }
+        "pages" => query::pages(i)?,
+        "reception" => query::reception(i)?,
+        "reception_traiter" => {
+            let id = texte(args, "id")?;
+            let statut = texte(args, "statut")?;
+            let commit = args
+                .get("commit")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            wikik_core::reception::remarques::traiter(
+                i,
+                &id,
+                &statut,
+                &texte(args, "resolution")?,
+                commit.as_deref(),
+            )?;
+            return Ok(format!("{id} : {statut}."));
         }
         _ => anyhow::bail!("outil inconnu : {nom}"),
     };

@@ -777,6 +777,45 @@ pub fn ajouter_llm(index: &Index, propositions: &[Value]) -> Result<Vec<Page>> {
     Ok(ajoutees)
 }
 
+/// Demande au LLM les pages que les détecteurs n'ont pas trouvées (SPEC-22 R5) : (consigne, schéma).
+pub fn demande_completion(index: &Index) -> (String, Value) {
+    let connues: Vec<String> = lire(index)
+        .iter()
+        .filter(|p| p.cle != GENERAL)
+        .map(|p| {
+            format!(
+                "- {} {} {}",
+                p.nom,
+                p.route.as_deref().unwrap_or(""),
+                p.symboles.first().map(String::as_str).unwrap_or("")
+            )
+        })
+        .collect();
+    let consigne = format!(
+        "Tu prépares la réception d'une application : la liste de ses écrans, pour que l'utilisateur y dépose ses remarques.\n\
+         Lis le projet avec les outils wikik (carte, fichier, symbole, cherche, pages) ; tu n'écris rien.\n\n\
+         Écrans déjà trouvés par l'analyse du code :\n{}\n\n\
+         Trouve les écrans que l'utilisateur peut atteindre et qui manquent (vues affichées par un état, onglets, \
+         fenêtres modales importantes, pages servies par le serveur). Pour chacun : un nom court en français, sa route \
+         si elle existe, l'identifiant exact du symbole de l'index qui l'affiche (`chemin::Nom`), et en une phrase la \
+         raison. N'invente aucun symbole : s'il n'est pas dans l'index, n'ajoute pas l'écran. Réponds `elements: []` \
+         si rien ne manque.",
+        if connues.is_empty() {
+            "(aucun)".to_string()
+        } else {
+            connues.join("\n")
+        }
+    );
+    let schema = json!({
+        "type": "object", "required": ["elements"],
+        "properties": { "elements": { "type": "array", "items": {
+            "type": "object", "required": ["nom", "symbole", "raison"],
+            "properties": { "nom": {"type": "string"}, "route": {"type": "string"}, "symbole": {"type": "string"}, "raison": {"type": "string"} }
+        }}}
+    });
+    (consigne, schema)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
