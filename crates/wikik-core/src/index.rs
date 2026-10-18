@@ -92,7 +92,8 @@ enum Genre {
 
 impl Index {
     /// Ouvre (ou crée) `.wikik/index.sqlite` ; un index d'un autre schéma ou d'une autre version
-    /// d'extraction ([`crate::VERSION_EXTRACTION`]) est supprimé et recréé.
+    /// d'extraction ([`crate::VERSION_EXTRACTION`]) est supprimé et recréé. Un verrou de fichier
+    /// (`.wikik/index.lock`) sérialise cette étape entre processus lancés ensemble.
     pub fn ouvrir(racine: &Path) -> Result<Index> {
         let racine = racine
             .canonicalize()
@@ -102,7 +103,12 @@ impl Index {
         std::fs::create_dir_all(&dossier)
             .with_context(|| format!("création de {}", dossier.display()))?;
         let chemin = dossier.join("index.sqlite");
+        // Deux processus (atelier et wiki lancés ensemble) ne doivent pas recréer l'index en même temps :
+        // le second attend que le premier ait posé le schéma.
+        let verrou = std::fs::File::create(dossier.join("index.lock"))?;
+        verrou.lock()?;
         let mut conn = Connection::open(&chemin)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         let version: Option<String> = conn
             .query_row("SELECT valeur FROM meta WHERE cle = 'schema'", [], |r| {
                 r.get(0)
@@ -117,13 +123,14 @@ impl Index {
                 let _ = std::fs::remove_file(dossier.join(format!("index.sqlite{suffixe}")));
             }
             conn = Connection::open(&chemin)?;
+            conn.busy_timeout(std::time::Duration::from_secs(5))?;
             conn.execute_batch(SCHEMA_SQL)?;
             conn.execute("INSERT INTO meta VALUES ('schema', ?1)", [attendu])?;
         }
         conn.execute_batch(
             "PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;",
         )?;
-        conn.busy_timeout(std::time::Duration::from_secs(5))?;
+        drop(verrou);
         Ok(Index {
             racine,
             config,

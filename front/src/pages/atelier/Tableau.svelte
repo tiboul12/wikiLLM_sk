@@ -1,7 +1,7 @@
 <script lang="ts">
   // Tableau de bord de l'atelier : étapes du parcours (état, mode), consommation, clarifications ouvertes.
-  // @relu 2026-10-17 2fe7f36a
-  import { atelier, PHASES, ETATS } from "../../lib/atelier.svelte";
+  // @relu 2026-10-18 4f4a4680
+  import { atelier, adapterHote, PHASES, ETATS } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
 
   const etat = $derived(atelier.etat!);
@@ -44,7 +44,7 @@
 </ol>
 
 <p class="discret">
-  Le wiki du projet est servi ici aussi (barre de gauche, recherche, graphe). Pour le consulter à part : <a href={etat.url_wiki}>{etat.url_wiki}</a> (<code>wikik serve</code>).
+  Le wiki du projet est servi ici aussi (barre de gauche, recherche, graphe). Pour le consulter à part : <a href={adapterHote(etat.url_wiki)}>{adapterHote(etat.url_wiki)}</a> (<code>wikik serve</code>).
 </p>
 
 <h2>Clarifications</h2>

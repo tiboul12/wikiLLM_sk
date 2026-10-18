@@ -22,8 +22,10 @@ wikik init              # wikik.toml, docs/projet/, gabarits dans docs/modeles/,
 wikik query carte       # vue d'ensemble pour l'agent
 wikik check             # doc périmée, manquante, références cassées
 wikik serve             # wiki sur http://127.0.0.1:8484
-wikik atelier           # atelier sur http://127.0.0.1:8485 (LLM : `claude -p`, abonnement Claude Code)
+wikik atelier           # atelier + wiki sur http://127.0.0.1:8485 (LLM : `claude -p`, abonnement Claude Code)
 ```
+
+Pour ouvrir le wiki ou l'atelier depuis un autre poste, mettre une fois `reseau = true` dans la section `[serveur]` de `wikik.toml` (ou lancer avec `--reseau`) : au démarrage, le serveur affiche l'adresse à ouvrir (`→ depuis un autre poste : http://10.0.0.21:8485`). L'atelier sert aussi le wiki : une seule commande suffit.
 
 | Commande | Rôle |
 |---|---|

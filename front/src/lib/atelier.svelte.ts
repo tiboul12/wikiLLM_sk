@@ -77,11 +77,26 @@ export async function ecrire<T = unknown>(route: string, corps: unknown, llm = f
 
 /**
  * Lien vers une page de l'atelier : relatif quand l'atelier sert lui-même le wiki, absolu depuis
- * `wikik serve` ; null sans atelier.
+ * `wikik serve` (hôte adapté par [`adapterHote`]) ; null sans atelier.
  */
 export function lienAtelier(chemin: string): string | null {
   if (atelier.actif) return chemin;
-  return atelier.url ? atelier.url + chemin : null;
+  return atelier.url ? adapterHote(atelier.url) + chemin : null;
+}
+
+/**
+ * Une adresse de boucle locale (`127.0.0.1`, `localhost`, valeur par défaut de `wikik.toml`) prend l'hôte
+ * par lequel le navigateur joint déjà le serveur, en gardant son port : les liens wiki ↔ atelier marchent
+ * depuis un autre poste sans rien configurer. Une adresse explicite (nom, autre IP) est gardée telle quelle.
+ */
+export function adapterHote(adresse: string): string {
+  try {
+    const u = new URL(adresse);
+    if (["127.0.0.1", "localhost", "[::1]"].includes(u.hostname) && location.hostname) u.hostname = location.hostname;
+    return u.toString().replace(/\/$/, "");
+  } catch {
+    return adresse;
+  }
 }
 
 /** Artefacts d'un type, dans l'ordre des identifiants. */

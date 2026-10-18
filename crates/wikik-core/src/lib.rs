@@ -17,6 +17,7 @@ pub mod modele;
 pub mod projet;
 pub mod query;
 pub mod relu;
+pub mod reseau;
 pub mod resolution;
 pub mod stats;
 pub mod wiki;

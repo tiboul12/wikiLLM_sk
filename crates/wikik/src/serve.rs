@@ -77,7 +77,8 @@ async fn api_mode(State(e): State<Partage>) -> Response {
     Json(serde_json::json!({ "atelier": e.atelier.is_some() })).into_response()
 }
 
-/// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C.
+/// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C. En écoute sur toutes les interfaces,
+/// affiche aussi l'adresse à ouvrir depuis un autre poste (IP du réseau local).
 pub(crate) fn lancer(app: Router, adresse_socket: SocketAddr, nom: &str) -> Result<()> {
     let app = app
         .fallback(statique)
@@ -88,7 +89,17 @@ pub(crate) fn lancer(app: Router, adresse_socket: SocketAddr, nom: &str) -> Resu
         .build()?
         .block_on(async move {
             let ecoute = tokio::net::TcpListener::bind(adresse_socket).await?;
-            eprintln!("{nom} : http://{adresse_socket} (Ctrl+C pour arrêter)");
+            let port = adresse_socket.port();
+            if adresse_socket.ip().is_unspecified() {
+                // Écoute sur toutes les interfaces : l'adresse utile est celle du réseau local.
+                eprintln!("{nom} : http://127.0.0.1:{port} sur cette machine (Ctrl+C pour arrêter)");
+                match wikik_core::reseau::ip_locale() {
+                    Some(ip) => eprintln!("  → depuis un autre poste : http://{ip}:{port}"),
+                    None => eprintln!("  → adresse réseau introuvable : utiliser l'IP de cette machine, port {port}"),
+                }
+            } else {
+                eprintln!("{nom} : http://{adresse_socket} (Ctrl+C pour arrêter)");
+            }
             axum::serve(ecoute, app)
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;

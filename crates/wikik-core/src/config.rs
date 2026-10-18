@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Configuration d'un projet.
-/// @relu 2026-10-17 2ab96c2b
+/// @relu 2026-10-18 4de31176
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -17,6 +17,15 @@ pub struct Config {
     pub check: ConfigCheck,
     pub equipe: ConfigEquipe,
     pub atelier: ConfigAtelier,
+    pub serveur: ConfigServeur,
+}
+
+/// Section `[serveur]` : `reseau = true` fait écouter `wikik serve` et `wikik atelier` sur le réseau
+/// local sans option à retaper (équivaut à `--reseau`). Choix explicite : l'atelier écrit dans le projet.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigServeur {
+    pub reseau: bool,
 }
 
 /// Section `[atelier]` : dossier des artefacts, adresses des deux serveurs, version majeure documentée,

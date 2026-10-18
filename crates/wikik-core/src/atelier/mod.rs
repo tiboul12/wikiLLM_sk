@@ -16,7 +16,8 @@ use rusqlite::OptionalExtension;
 use serde_json::json;
 
 /// Ouvre une clarification sur un identifiant existant (besoin, exigence, artefact ou symbole) et renvoie
-/// (identifiant de la clarification, adresse de son écran dans l'atelier) (SPEC-21 R3).
+/// (identifiant de la clarification, adresse de son écran dans l'atelier) (SPEC-21 R3). Quand les serveurs
+/// écoutent sur le réseau, l'adresse porte l'IP de la machine : Tibo l'ouvre depuis son poste.
 ///
 /// @req EF-110
 pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, String)> {
@@ -55,9 +56,7 @@ pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, Str
             question.trim()
         ),
     )?;
-    let url = format!(
-        "{}/clarification/{id}",
-        index.config.atelier.url.trim_end_matches('/')
-    );
+    let atelier = crate::reseau::pour_le_reseau(&index.config.atelier.url, &index.config);
+    let url = format!("{}/clarification/{id}", atelier.trim_end_matches('/'));
     Ok((id, url))
 }

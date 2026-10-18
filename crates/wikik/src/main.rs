@@ -75,11 +75,16 @@ enum Commande {
     Mcp,
     /// Atelier de définition du besoin (Fast Design Thinking), avec le wiki en lecture.
     Atelier {
-        #[arg(long, default_value = "127.0.0.1")]
-        adresse: String,
+        /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
+        #[arg(long)]
+        adresse: Option<String>,
         #[arg(long, default_value_t = 8485)]
         port: u16,
-        /// Autorise une adresse hors boucle locale (l'atelier, qui écrit, devient visible sur le réseau).
+        /// Écoute sur le réseau local (comme `[serveur] reseau = true`) : l'atelier, qui écrit, devient
+        /// visible des autres postes.
+        #[arg(long)]
+        reseau: bool,
+        /// Autorise une `--adresse` hors boucle locale.
         #[arg(long)]
         autoriser_reseau: bool,
         /// Fournisseur factice : renvoie les exemples des fiches, sans LLM.
@@ -90,11 +95,15 @@ enum Commande {
     Relu { symbole: String },
     /// Sert le wiki en local, en lecture seule.
     Serve {
-        #[arg(long, default_value = "127.0.0.1")]
-        adresse: String,
+        /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
+        #[arg(long)]
+        adresse: Option<String>,
         #[arg(long, default_value_t = 8484)]
         port: u16,
-        /// Autorise une adresse hors boucle locale (le wiki devient visible sur le réseau).
+        /// Écoute sur le réseau local (comme `[serveur] reseau = true`).
+        #[arg(long)]
+        reseau: bool,
+        /// Autorise une `--adresse` hors boucle locale.
         #[arg(long)]
         autoriser_reseau: bool,
     },
@@ -152,7 +161,7 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-17 4d0aae4b
+/// @relu 2026-10-18 5502f400
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     match cli.commande {
         Commande::Index { dump_json } => {
@@ -254,18 +263,22 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
         Commande::Serve {
             adresse,
             port,
+            reseau,
             autoriser_reseau,
         } => {
-            serve::servir(&cli.racine, &adresse, port, autoriser_reseau)?;
+            let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
+            serve::servir(&cli.racine, &adresse, port, autoriser)?;
             Ok(0)
         }
         Commande::Atelier {
             adresse,
             port,
+            reseau,
             autoriser_reseau,
             factice,
         } => {
-            atelier::servir(&cli.racine, &adresse, port, autoriser_reseau, factice)?;
+            let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
+            atelier::servir(&cli.racine, &adresse, port, autoriser, factice)?;
             Ok(0)
         }
         Commande::Relu { symbole } => {
@@ -277,5 +290,50 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             eprintln!("wikik relu : {symbole} marqué relu le {date} ({fichier})");
             Ok(0)
         }
+    }
+}
+
+/// Adresse d'écoute d'un serveur : `--adresse` si donnée ; sinon le réseau local avec `--reseau` ou
+/// `[serveur] reseau = true` dans `wikik.toml`, la boucle locale par défaut. Renvoie (adresse, réseau
+/// autorisé).
+fn ecoute(
+    racine: &std::path::Path,
+    adresse: Option<String>,
+    reseau: bool,
+    autoriser: bool,
+) -> anyhow::Result<(String, bool)> {
+    let config_reseau = wikik_core::config::Config::charger(racine)?.serveur.reseau;
+    Ok(match adresse {
+        Some(a) => (a, autoriser || reseau),
+        None if reseau || config_reseau => ("0.0.0.0".into(), true),
+        None => ("127.0.0.1".into(), autoriser),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ecoute;
+
+    /// `[serveur] reseau = true` suffit pour écouter sur le réseau ; une `--adresse` explicite garde la main.
+    #[test]
+    fn adresse_d_ecoute() {
+        let d = tempfile::tempdir().unwrap();
+        assert_eq!(
+            ecoute(d.path(), None, false, false).unwrap(),
+            ("127.0.0.1".into(), false)
+        );
+        assert_eq!(
+            ecoute(d.path(), None, true, false).unwrap(),
+            ("0.0.0.0".into(), true)
+        );
+        std::fs::write(d.path().join("wikik.toml"), "[serveur]\nreseau = true\n").unwrap();
+        assert_eq!(
+            ecoute(d.path(), None, false, false).unwrap(),
+            ("0.0.0.0".into(), true)
+        );
+        assert_eq!(
+            ecoute(d.path(), Some("127.0.0.1".into()), false, false).unwrap(),
+            ("127.0.0.1".into(), false)
+        );
     }
 }
