@@ -19,6 +19,8 @@ sources: [BDR-v5-2]
 | [[exigences/EF-123]] | Déposer une remarque sur une page | must | B-015, B-016 |
 | [[exigences/EF-124]] | Traiter les remarques | must | B-015 |
 | [[exigences/EF-125]] | Donner les remarques à l'agent de code | must | B-016 |
+| [[exigences/EF-126]] | Ouvrir la page reçue dans l'application | should | B-015 |
+| [[exigences/EF-127]] | Modifier et supprimer une remarque, avec son historique | must | B-015 |
 
 ## Exigences non fonctionnelles
 

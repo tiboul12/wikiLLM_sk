@@ -65,6 +65,7 @@ pub fn servir(
 }
 
 /// Routes du wiki et du cahier de réception.
+/// @relu 2026-10-18 b19a58bd
 pub(crate) fn routes(etat: Partage) -> axum::Router {
     routes_wiki()
         .route("/api/reception/etat", get(api_etat))
@@ -72,6 +73,8 @@ pub(crate) fn routes(etat: Partage) -> axum::Router {
         .route("/api/reception/page", post(api_page))
         .route("/api/reception/remarque", post(api_remarque))
         .route("/api/reception/traiter", post(api_traiter))
+        .route("/api/reception/supprimer", post(api_supprimer))
+        .route("/api/reception/application", post(api_application))
         .route("/api/reception/completer", post(api_completer))
         .layer(axum::extract::DefaultBodyLimit::max(25 * 1024 * 1024))
         .layer(axum::middleware::from_fn(meme_origine))
@@ -96,38 +99,73 @@ struct Correction {
     nom: Option<String>,
     masque: Option<bool>,
     groupe: Option<String>,
+    route: Option<String>,
 }
 
 async fn api_page(State(e): State<Partage>, Json(p): Json<Correction>) -> Response {
     ecrire(e, move |i| {
-        carte::corriger(i, &p.cle, p.nom.as_deref(), p.masque, p.groupe.as_deref())
+        carte::corriger(
+            i,
+            &p.cle,
+            p.nom.as_deref(),
+            p.masque,
+            p.groupe.as_deref(),
+            p.route.as_deref(),
+        )
     })
     .await
 }
 
 #[derive(Deserialize)]
-struct NouvelleRemarque {
+struct Application {
+    url: String,
+}
+
+async fn api_application(State(e): State<Partage>, Json(p): Json<Application>) -> Response {
+    ecrire(e, move |i| carte::definir_url_application(i, &p.url)).await
+}
+
+/// Saisie d'une remarque : création (`id` absent) ou nouvelle version d'une remarque (`id`).
+#[derive(Deserialize)]
+struct SaisieRemarque {
+    id: Option<String>,
     page: String,
     texte: String,
     genre: String,
     gravite: String,
     #[serde(default)]
     images: Vec<String>,
+    #[serde(default)]
+    garder: Vec<String>,
 }
 
-async fn api_remarque(State(e): State<Partage>, Json(p): Json<NouvelleRemarque>) -> Response {
+async fn api_remarque(State(e): State<Partage>, Json(p): Json<SaisieRemarque>) -> Response {
     ecrire(e, move |i| {
-        remarques::creer(
-            i,
-            &p.page,
-            &p.texte,
-            &p.genre,
-            &p.gravite,
-            &p.images,
-            &wikik_core::relu::aujourdhui(),
-        )
+        let date = wikik_core::relu::aujourdhui();
+        let s = remarques::Saisie {
+            page: &p.page,
+            texte: &p.texte,
+            genre: &p.genre,
+            gravite: &p.gravite,
+            images: &p.images,
+            garder: &p.garder,
+            date: &date,
+        };
+        match &p.id {
+            Some(id) => remarques::modifier(i, id, &s),
+            None => remarques::creer(i, &s),
+        }
     })
     .await
+}
+
+#[derive(Deserialize)]
+struct Suppression {
+    id: String,
+}
+
+async fn api_supprimer(State(e): State<Partage>, Json(p): Json<Suppression>) -> Response {
+    ecrire(e, move |i| remarques::supprimer(i, &p.id)).await
 }
 
 #[derive(Deserialize)]

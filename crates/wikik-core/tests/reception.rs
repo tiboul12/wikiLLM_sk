@@ -107,6 +107,7 @@ fn corrections_gardees() {
         Some("Mon panier"),
         Some(true),
         Some("Boutique"),
+        None,
     )
     .unwrap();
     std::fs::write(
@@ -133,4 +134,103 @@ fn corrections_gardees() {
         )
         .unwrap();
     assert_eq!(n, 1);
+}
+
+const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+/// Modifier crée une version numérotée liée à la précédente ; supprimer retire toute la chaîne.
+///
+/// @req EF-127
+#[test]
+fn versions_et_suppression() {
+    use wikik_core::reception::remarques::{self, Saisie};
+    let (d, mut i) = fixture();
+    carte::scanner(&i).unwrap();
+    let saisie =
+        |texte: &'static str, images: &'static [String], garder: &'static [String]| Saisie {
+            page: "/panier",
+            texte,
+            genre: "bug",
+            gravite: "genant",
+            images,
+            garder,
+            date: "2026-10-18",
+        };
+    let une: &'static [String] = Box::leak(Box::new([PNG.to_string()]));
+    let id = remarques::creer(&i, &saisie("Total faux", une, &[])).unwrap();
+    assert_eq!(id, "REC-001");
+    let garder: &'static [String] =
+        Box::leak(Box::new(
+            ["docs/reception/images/REC-001-1.png".to_string()],
+        ));
+    let v2 =
+        remarques::modifier(&i, &id, &saisie("Total faux après retrait", une, garder)).unwrap();
+    assert_eq!(v2, "REC-001.2");
+    assert!(
+        remarques::modifier(&i, &id, &saisie("x", &[], &[])).is_err(),
+        "une version remplacée ne se modifie plus"
+    );
+    remarques::traiter(&i, &v2, "traitee", "Corrigé.", Some("abc")).unwrap();
+    let v3 = remarques::modifier(
+        &i,
+        &v2,
+        &saisie("Total faux après retrait d'un article", &[], &[]),
+    )
+    .unwrap();
+    assert_eq!(v3, "REC-001.3");
+    i.mettre_a_jour().unwrap();
+    let liste = remarques::lister(&i).unwrap();
+    let derniere = liste.iter().find(|r| r.id == v3).unwrap();
+    assert_eq!(derniere.historique, ["REC-001", "REC-001.2", "REC-001.3"]);
+    assert_eq!(
+        (derniere.statut.as_str(), derniere.version),
+        ("traitee", 3),
+        "le traitement suit la nouvelle version"
+    );
+    assert_eq!(liste.iter().filter(|r| r.statut == "remplacee").count(), 2);
+    assert!(remarques::traiter(&i, "REC-001", "rejetee", "x", None).is_err());
+    // Le wiki relie les versions (remplace / remplace_par), sans lien cassé.
+    let r = wikik_core::check::verifier(&i).unwrap();
+    assert!(
+        !r.diagnostics.iter().any(|x| x.code == "lien-casse"),
+        "{:?}",
+        r.diagnostics
+    );
+    // Suppression : toute la chaîne et ses images.
+    assert_eq!(
+        remarques::supprimer(&i, &v2).unwrap(),
+        ["REC-001", "REC-001.2", "REC-001.3"]
+    );
+    let reste: Vec<_> = std::fs::read_dir(d.path().join("docs/reception/remarques"))
+        .unwrap()
+        .collect();
+    assert!(reste.is_empty());
+    assert_eq!(
+        std::fs::read_dir(d.path().join("docs/reception/images"))
+            .unwrap()
+            .count(),
+        0
+    );
+}
+
+/// L'adresse de l'application et une route ajoutée à la main survivent à un nouveau scan.
+///
+/// @req EF-126
+#[test]
+fn adresse_et_route() {
+    let (_d, i) = fixture();
+    carte::scanner(&i).unwrap();
+    assert!(carte::definir_url_application(&i, "ftp://x").is_err());
+    carte::definir_url_application(&i, "http://10.0.0.21:4200/").unwrap();
+    carte::corriger(&i, "bibliotheque", None, None, None, Some("bibli")).unwrap();
+    carte::scanner(&i).unwrap();
+    assert_eq!(
+        carte::url_application(&i).as_deref(),
+        Some("http://10.0.0.21:4200")
+    );
+    let p = carte::lire(&i)
+        .into_iter()
+        .find(|p| p.cle == "bibliotheque")
+        .unwrap();
+    assert_eq!(p.route.as_deref(), Some("/bibli"));
 }

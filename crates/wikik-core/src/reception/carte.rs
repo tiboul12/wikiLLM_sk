@@ -616,24 +616,86 @@ fn page_generale() -> Page {
 }
 
 /// Carte enregistrée (`docs/reception/carte.md`), vide si le cahier n'a pas encore été scanné.
+/// @relu 2026-10-18 bff989d0
 pub fn lire(index: &Index) -> Vec<Page> {
-    let Ok(t) = std::fs::read_to_string(index.racine.join(chemin_carte(index))) else {
-        return vec![];
-    };
-    let (yaml, _, _) = crate::projet::separer_frontmatter(&t);
-    yaml.and_then(|y| serde_yaml_ng::from_str::<Value>(y).ok())
+    frontmatter_carte(index)
         .and_then(|v| v.get("pages").cloned())
         .and_then(|p| serde_json::from_value(p).ok())
         .unwrap_or_default()
 }
 
-/// Écrit la carte (frontmatter : les pages ; corps : un tableau lisible).
+fn frontmatter_carte(index: &Index) -> Option<Value> {
+    let t = std::fs::read_to_string(index.racine.join(chemin_carte(index))).ok()?;
+    let (yaml, _, _) = crate::projet::separer_frontmatter(&t);
+    yaml.and_then(|y| serde_yaml_ng::from_str::<Value>(y).ok())
+}
+
+/// Adresse de l'application reçue (SPEC-23 R7), saisie en tête de la carte.
+pub fn url_application(index: &Index) -> Option<String> {
+    frontmatter_carte(index)?
+        .get("url_application")?
+        .as_str()
+        .map(str::to_string)
+}
+
+/// Enregistre l'adresse de l'application reçue (vide : retirée).
+pub fn definir_url_application(index: &Index, url: &str) -> Result<()> {
+    let url = url.trim().trim_end_matches('/');
+    if !url.is_empty() && !(url.starts_with("http://") || url.starts_with("https://")) {
+        anyhow::bail!("adresse attendue en http:// ou https:// : {url}");
+    }
+    ecrire_avec(
+        index,
+        &lire(index),
+        Some(url).filter(|u| !u.is_empty()),
+        None,
+    )
+}
+
+/// Dernier numéro de remarque attribué : un numéro n'est jamais réutilisé, même après suppression.
+pub fn dernier_numero(index: &Index) -> u32 {
+    frontmatter_carte(index)
+        .and_then(|v| v.get("derniere_remarque")?.as_u64())
+        .map_or(0, |n| n as u32)
+}
+
+/// Note le dernier numéro de remarque attribué.
+pub fn noter_numero(index: &Index, n: u32) -> Result<()> {
+    if n > dernier_numero(index) {
+        ecrire_avec(
+            index,
+            &lire(index),
+            url_application(index).as_deref(),
+            Some(n),
+        )?;
+    }
+    Ok(())
+}
+
+/// Écrit la carte (frontmatter : les pages ; corps : un tableau lisible) ; l'adresse de l'application
+/// déjà saisie est gardée.
 pub fn ecrire(index: &Index, pages: &[Page]) -> Result<()> {
+    ecrire_avec(index, pages, url_application(index).as_deref(), None)
+}
+
+fn ecrire_avec(
+    index: &Index,
+    pages: &[Page],
+    url: Option<&str>,
+    numero: Option<u32>,
+) -> Result<()> {
+    let numero = numero.unwrap_or_else(|| dernier_numero(index));
     let mut fm = Map::new();
     fm.insert("id".into(), json!("CARTE-RECEPTION"));
     fm.insert("type".into(), json!("carte-reception"));
     fm.insert("titre".into(), json!("Carte des pages"));
     fm.insert("statut".into(), json!("brouillon"));
+    if let Some(u) = url {
+        fm.insert("url_application".into(), json!(u));
+    }
+    if numero > 0 {
+        fm.insert("derniere_remarque".into(), json!(numero));
+    }
     fm.insert("pages".into(), serde_json::to_value(pages)?);
     let mut corps = String::from(
         "# Carte des pages\n\n> Construite par `wikik reception` à partir du code ; noms, masques et groupes corrigés à l'écran sont gardés par les scans suivants.\n\n| Page | Route | Code | Source |\n|---|---|---|---|\n",
@@ -656,8 +718,8 @@ pub fn ecrire(index: &Index, pages: &[Page]) -> Result<()> {
     Ok(())
 }
 
-/// Fusionne un scan avec la carte existante (SPEC-22 R4) : corrections gardées, nouvelles pages
-/// ajoutées, pages disparues marquées.
+/// Fusionne un scan avec la carte existante (SPEC-22 R4) : corrections gardées (nom, masque, groupe,
+/// route ajoutée à la main), nouvelles pages ajoutées, pages disparues marquées.
 pub fn fusionner(anciennes: &[Page], trouvees: Vec<Page>) -> Vec<Page> {
     let par_cle: BTreeMap<&str, &Page> = anciennes.iter().map(|p| (p.cle.as_str(), p)).collect();
     let mut sortie: Vec<Page> = vec![];
@@ -668,6 +730,9 @@ pub fn fusionner(anciennes: &[Page], trouvees: Vec<Page>) -> Vec<Page> {
         {
             p.nom = a.nom.clone();
             p.masque = a.masque;
+            if a.route.is_some() {
+                p.route = a.route.clone();
+            }
             p.groupe = a.groupe.clone();
             p.corrige = true;
         }
@@ -698,13 +763,14 @@ pub fn scanner(index: &Index) -> Result<Vec<Page>> {
     Ok(pages)
 }
 
-/// Corrige une page (nom, masque, groupe) ; la correction est marquée pour les scans suivants.
+/// Corrige une page (nom, masque, groupe, route) ; la correction est marquée pour les scans suivants.
 pub fn corriger(
     index: &Index,
     cle: &str,
     nom: Option<&str>,
     masque: Option<bool>,
     groupe: Option<&str>,
+    route: Option<&str>,
 ) -> Result<Page> {
     let mut pages = lire(index);
     let p = pages
@@ -719,6 +785,16 @@ pub fn corriger(
     }
     if let Some(g) = groupe {
         p.groupe = Some(g.trim().to_string()).filter(|g| !g.is_empty());
+    }
+    // Route ajoutée ou corrigée à la main : sert au lien « ouvrir dans l'application » (SPEC-23 R7).
+    if let Some(r) = route {
+        p.route = Some(r.trim()).filter(|r| !r.is_empty()).map(|r| {
+            if r.starts_with('/') {
+                r.to_string()
+            } else {
+                format!("/{r}")
+            }
+        });
     }
     p.corrige = true;
     let copie = p.clone();

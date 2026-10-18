@@ -1,8 +1,9 @@
 <script lang="ts">
   // Carte des pages du cahier de réception (SPEC-23 R5) : les pages trouvées dans le code, groupées, avec
-  // leurs remarques ouvertes ; scanner à nouveau, compléter par le LLM, renommer, masquer, regrouper.
+  // leurs remarques ouvertes et leur lien dans l'application ; adresse de l'application, scanner à
+  // nouveau, compléter par le LLM, renommer, masquer, regrouper, ajouter une route.
   import type { Page } from "../../types/Page";
-  import { reception, ecrireReception, remarquesDe, SOURCES } from "../../lib/reception.svelte";
+  import { reception, ecrireReception, remarquesDe, actuelles, lienApplication, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
 
@@ -24,7 +25,10 @@
     }
     return [...m.entries()];
   });
-  const ouvertes = $derived(etat.remarques.filter((r) => r.statut === "ouverte").length);
+  const ouvertes = $derived(actuelles().filter((r) => r.statut === "ouverte").length);
+  const total = $derived(actuelles().length);
+  // svelte-ignore state_referenced_locally
+  let adresse = $state(reception.etat?.url_application ?? "");
   const masquees = $derived(etat.pages.filter((p) => p.masque).length);
 
   async function action(route: string, corps: unknown = {}, succes = "") {
@@ -41,10 +45,12 @@
     }
   }
 
+  let route = $state("");
   function editer(p: Page) {
     edition = p.cle;
     nom = p.nom;
     groupe = p.groupe ?? "";
+    route = p.route ?? "";
   }
 </script>
 
@@ -57,8 +63,15 @@
 <div class="tuiles">
   <div class="tuile"><span class="valeur">{pages.length}</span><span class="nom">pages</span></div>
   <div class="tuile" class:alerte={ouvertes > 0}><span class="valeur">{ouvertes}</span><span class="nom">remarques ouvertes</span></div>
-  <div class="tuile"><span class="valeur">{etat.remarques.length - ouvertes}</span><span class="nom">traitées, reportées ou rejetées</span></div>
+  <div class="tuile"><span class="valeur">{total - ouvertes}</span><span class="nom">traitées, reportées ou rejetées</span></div>
 </div>
+
+<form class="adresse-application" onsubmit={(e) => { e.preventDefault(); action("application", { url: adresse }, "Adresse enregistrée."); }}>
+  <label for="adresse-app">Adresse de l'application reçue</label>
+  <input id="adresse-app" bind:value={adresse} placeholder="http://10.0.0.21:4200" />
+  <button type="submit">Enregistrer</button>
+  <span class="discret">pour les liens « ouvrir dans l'application » de chaque page</span>
+</form>
 
 <div class="actions">
   <a class="bouton principal" href={url.traitement()}>Traiter les remarques →</a>
@@ -79,8 +92,9 @@
       {@const ouv = rs.filter((r) => r.statut === "ouverte").length}
       <li class="page-reception" class:masquee={p.masque} class:disparue={p.disparue}>
         {#if edition === p.cle}
-          <form class="formulaire" onsubmit={(e) => { e.preventDefault(); action("page", { cle: p.cle, nom, groupe }); }}>
+          <form class="formulaire" onsubmit={(e) => { e.preventDefault(); action("page", { cle: p.cle, nom, groupe, route }); }}>
             <label><span>Nom</span><input bind:value={nom} /></label>
+            <label><span>Route dans l'application</span><input bind:value={route} placeholder="/chemin (pour le lien « ouvrir »)" /></label>
             <label><span>Groupe</span><input bind:value={groupe} placeholder="(aucun)" /></label>
             <div class="actions">
               <button class="principal" type="submit">Enregistrer</button>
@@ -93,6 +107,7 @@
             <strong>{p.nom}</strong>
             {#if p.route}<code>{p.route}</code>{/if}
           </a>
+          {#if lienApplication(p.route)}<a class="ouvrir-app" href={lienApplication(p.route)} target="_blank" rel="noopener" title="Ouvrir cette page dans l'application">↗</a>{/if}
           <div class="meta-page">
             {#if p.symboles[0]}<Code id={p.symboles[0]} />{/if}
             {#each p.exigences as ex}<a class="pastille" href={url.document(ex)}>{ex}</a>{/each}

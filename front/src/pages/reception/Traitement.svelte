@@ -1,7 +1,8 @@
 <script lang="ts">
   // Traitement des remarques (SPEC-23 R5) : filtrer par statut, gravité et page, puis passer chacune à
   // traitée, reportée ou rejetée avec une explication.
-  import { reception, GRAVITES, STATUTS } from "../../lib/reception.svelte";
+  // @relu 2026-10-18 13e4b381
+  import { reception, actuelles, GRAVITES, STATUTS } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import CarteRemarque from "../../composants/reception/CarteRemarque.svelte";
 
@@ -10,12 +11,12 @@
   let page = $state("");
   const rang = (g: string) => ["bloquant", "genant", "detail"].indexOf(g);
   const liste = $derived(
-    (reception.etat?.remarques ?? [])
+    actuelles()
       .filter((r) => (!statut || r.statut === statut) && (!gravite || r.gravite === gravite) && (!page || r.page === page))
       .sort((a, b) => rang(a.gravite) - rang(b.gravite) || a.id.localeCompare(b.id)),
   );
-  const pagesAvecRemarques = $derived([...new Map((reception.etat?.remarques ?? []).map((r) => [r.page, r.nom_page])).entries()]);
-  const compte = (s: string) => (reception.etat?.remarques ?? []).filter((r) => r.statut === s).length;
+  const pagesAvecRemarques = $derived([...new Map(actuelles().map((r) => [r.page, r.nom_page])).entries()]);
+  const compte = (s: string) => actuelles().filter((r) => r.statut === s).length;
 </script>
 
 <p class="fil"><a href={url.reception()}>Réception</a> · traitement</p>

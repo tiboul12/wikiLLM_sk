@@ -3,6 +3,11 @@ import type { Page } from "./Page";
 import type { Remarque } from "./Remarque";
 
 /**
- * État servi à l'écran : la carte et les remarques.
+ * État servi à l'écran : la carte, les remarques (versions remplacées comprises, pour l'historique) et
+ * l'adresse de l'application reçue.
  */
-export type EtatReception = { pages: Array<Page>, remarques: Array<Remarque>, fournisseur: string, };
+export type EtatReception = { pages: Array<Page>, remarques: Array<Remarque>, fournisseur: string, 
+/**
+ * Adresse de l'application reçue, pour les liens « ouvrir dans l'application ».
+ */
+url_application: string | null, };

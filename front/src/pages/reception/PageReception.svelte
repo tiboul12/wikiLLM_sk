@@ -1,7 +1,8 @@
 <script lang="ts">
-  // Une page de l'application : ce que le code en dit (route, composant, exigences), ses remarques, et la
-  // carte pour en ajouter une ; on passe à la page suivante sans revenir à la carte.
-  import { reception, remarquesDe, SOURCES } from "../../lib/reception.svelte";
+  // Une page de l'application : le lien pour l'ouvrir dans l'application, ce que le code en dit (route,
+  // composant, exigences), ses remarques, et la carte pour en ajouter une ; on passe à la page suivante
+  // sans revenir à la carte.
+  import { reception, remarquesDe, lienApplication, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
   import CarteRemarque from "../../composants/reception/CarteRemarque.svelte";
@@ -26,6 +27,22 @@
     {#if SOURCES[p.source]}<span class="discret">{SOURCES[p.source]}</span>{/if}
     {#each p.symboles as s}<Code id={s} />{/each}
     {#each p.exigences as ex}<a class="pastille" href={url.document(ex)}>{ex}</a>{/each}
+  </div>
+
+  {@const lien = lienApplication(p.route)}
+  <div class="lien-application">
+    {#if lien}
+      <a class="bouton" href={lien} target="_blank" rel="noopener">Ouvrir cette page dans l'application ↗</a>
+      <span class="discret">{lien}</span>
+    {:else if p.cle === "general"}
+      <span class="discret">Remarques qui ne visent pas un écran en particulier.</span>
+    {:else if !reception.etat?.url_application}
+      <span class="discret">Pour un lien direct vers cette page : saisis l'adresse de l'application en tête de la <a href={url.reception()}>carte</a>.</span>
+    {:else if p.source === "enum"}
+      <span class="discret">Écran affiché par état (pas d'adresse directe) : ouvre l'application et va sur « {p.nom} ».</span>
+    {:else}
+      <span class="discret">Route inconnue : ajoute-la avec ✎ sur la <a href={url.reception()}>carte</a> pour avoir le lien direct.</span>
+    {/if}
   </div>
 
   <NouvelleRemarque page={cle} />

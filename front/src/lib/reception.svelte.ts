@@ -5,6 +5,7 @@
 import type { EtatReception } from "../types/EtatReception";
 import type { Remarque } from "../types/Remarque";
 import { statique } from "./statique";
+import { adapterHote } from "./atelier.svelte";
 
 /** État partagé : `actif` sous `wikik reception`, `etat` (null sinon), `occupe` pendant un appel au LLM. */
 export const reception = $state({
@@ -52,9 +53,24 @@ export async function ecrireReception<T = unknown>(route: string, corps: unknown
   return v as T;
 }
 
-/** Remarques d'une page. */
+/** Remarques à jour d'une page (sans les versions remplacées). */
 export function remarquesDe(cle: string): Remarque[] {
-  return (reception.etat?.remarques ?? []).filter((r) => r.page === cle);
+  return actuelles().filter((r) => r.page === cle);
+}
+
+/** Remarques à jour : sans les versions remplacées par une modification (elles restent dans l'historique). */
+export function actuelles(): Remarque[] {
+  return (reception.etat?.remarques ?? []).filter((r) => r.statut !== "remplacee");
+}
+
+/**
+ * Lien vers une page de l'application reçue : adresse saisie + route ; null sans l'une ou l'autre.
+ * Une adresse de boucle locale prend l'hôte du navigateur (même règle que les liens wiki ↔ atelier).
+ */
+export function lienApplication(route: string | null | undefined): string | null {
+  const base = reception.etat?.url_application;
+  if (!base || !route) return null;
+  return adapterHote(base) + (route.startsWith("/") ? route : "/" + route);
 }
 
 /** Libellés des genres de remarque. */

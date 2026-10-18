@@ -200,13 +200,66 @@ fn cahier_de_bout_en_bout() {
             .unwrap()
             .contains("## Traitement\n\n**traitee** : Total recalculé au retrait.")
     );
-    // Le wiki la voit (zone réception).
+    // Modifier (nouvelle version), puis supprimer toute la chaîne.
+    let m = serde_json::json!({ "id": "REC-001", "page": "/panier", "texte": "Total faux au retrait", "genre": "bug", "gravite": "genant", "garder": ["docs/reception/images/REC-001-1.png"] }).to_string();
+    assert_eq!(
+        json(p, "POST", "/api/reception/remarque", Some(&m)),
+        (200, Value::String("REC-001.2".into()))
+    );
+    let (_, e) = json(p, "GET", "/api/reception/etat", None);
+    let v2 = e["remarques"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == "REC-001.2")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        (
+            v2["statut"].as_str(),
+            v2["historique"].as_array().unwrap().len()
+        ),
+        (Some("traitee"), 2)
+    );
+    assert_eq!(
+        json(
+            p,
+            "POST",
+            "/api/reception/application",
+            Some(r#"{"url":"http://10.0.0.21:3000"}"#)
+        )
+        .0,
+        200
+    );
+    assert_eq!(
+        json(p, "GET", "/api/reception/etat", None).1["url_application"],
+        "http://10.0.0.21:3000"
+    );
+    let (c, sup) = json(
+        p,
+        "POST",
+        "/api/reception/supprimer",
+        Some(r#"{"id":"REC-001.2"}"#),
+    );
+    assert_eq!((c, sup), (200, serde_json::json!(["REC-001", "REC-001.2"])));
+    assert!(
+        !d.path()
+            .join("docs/reception/images/REC-001-1.png")
+            .exists()
+    );
+    // Le wiki voit les remarques (zone réception).
+    let r2 = serde_json::json!({ "page": "general", "texte": "Remarque générale", "genre": "question", "gravite": "detail" }).to_string();
+    // Un numéro n'est jamais réutilisé, même après suppression.
+    assert_eq!(
+        json(p, "POST", "/api/reception/remarque", Some(&r2)).1,
+        "REC-002"
+    );
     let (_, projet) = json(p, "GET", "/api/projet", None);
     assert!(
         projet["documents"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|x| x["id"] == "REC-001" && x["zone"] == "reception")
+            .any(|x| x["id"] == "REC-002" && x["zone"] == "reception")
     );
 }

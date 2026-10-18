@@ -6,8 +6,10 @@
 
 1. `wikik reception` dans le projet à recevoir (avec `[serveur] reseau = true` pour l'ouvrir depuis un autre poste), puis l'adresse affichée.
 2. La carte s'est construite au premier lancement. La corriger si besoin : ✎ pour renommer, regrouper ou masquer ; « Compléter avec le LLM » cherche les écrans que le scan n'a pas vus (vues par état, étapes, fenêtres). Les corrections survivent aux scans suivants.
-3. Ouvrir une page, écrire la remarque, coller les captures (Ctrl+V) ou les glisser, choisir genre et gravité, « Ajouter la remarque » (Ctrl+Entrée). Une remarque transverse va sur « Général ».
-4. En fin de campagne : « Traiter les remarques », ou laisser l'agent de code le faire.
+3. Saisir une fois, en tête de la carte, l'adresse de l'application reçue (`http://10.0.0.21:4200`) : chaque page a alors son lien « ouvrir dans l'application » (une page sans route : ✎ pour l'ajouter).
+4. Ouvrir une page, écrire la remarque, ajouter les captures (« ＋ Capture » rappelle les raccourcis ; Ctrl+V marche n'importe où sur la page, glisser aussi), choisir genre et gravité, « Ajouter la remarque » (Ctrl+Entrée). Une remarque transverse va sur « Général ».
+5. Corriger une remarque : « Modifier » écrit une nouvelle version (`REC-001.2`), l'ancienne reste dans l'historique. « Supprimer » retire toute la chaîne, après confirmation ; un numéro n'est jamais réutilisé.
+6. En fin de campagne : « Traiter les remarques », ou laisser l'agent de code le faire.
 
 ## Pour l'agent de code
 
