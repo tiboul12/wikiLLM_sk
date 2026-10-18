@@ -4,6 +4,7 @@
 // @req EF-042, ENF-004
 import { Marked, type Tokens, type TokenizerAndRendererExtension } from "marked";
 import DOMPurify from "dompurify";
+import { statique } from "./statique";
 import hljs from "highlight.js/lib/core";
 import rust from "highlight.js/lib/languages/rust";
 import typescript from "highlight.js/lib/languages/typescript";
@@ -52,8 +53,10 @@ type JetonLien = { type: "lienWiki"; raw: string; cible: string; libelle?: strin
 /**
  * Markdown → HTML assaini.
  * `refBase` : préfixe des hooks ⚓ posés sur les titres (`@wiki:projet/doc`), ou rien pour ne pas en poser.
+ * `cheminDoc` : chemin du document ; ses images relatives (captures d'une remarque) sont servies par
+ * `/api/image`, comme GitHub les affiche à partir du même Markdown.
  */
-export function rendre(md: string, resoudre: Resolveur = () => null, refBase?: string): string {
+export function rendre(md: string, resoudre: Resolveur = () => null, refBase?: string, cheminDoc?: string): string {
   const lienWiki: TokenizerAndRendererExtension = {
     name: "lienWiki",
     level: "inline",
@@ -81,6 +84,10 @@ export function rendre(md: string, resoudre: Resolveur = () => null, refBase?: s
         if (l === "mermaid") return `<pre class="mermaid">${echapper(text)}</pre>`;
         return `<pre><code class="hljs">${colorer(text, l || "plaintext")}</code></pre>`;
       },
+      image({ href, text }: Tokens.Image) {
+        const src = cheminDoc && !statique && !/^([a-z]+:|\/)/i.test(href) ? `/api/image?chemin=${encodeURIComponent(resoudreChemin(cheminDoc, href))}` : href;
+        return `<img src="${echapper(src)}" alt="${echapper(text)}" loading="lazy">`;
+      },
       heading({ tokens, depth }: Tokens.Heading) {
         const html = this.parser.parseInline(tokens);
         const id = ancre(html.replace(/<[^>]+>/g, ""));
@@ -91,6 +98,16 @@ export function rendre(md: string, resoudre: Resolveur = () => null, refBase?: s
   });
   const html = m.parse(md, { async: false }) as string;
   return DOMPurify.sanitize(html, { ADD_ATTR: ["data-ref"] });
+}
+
+/** Chemin d'un fichier relatif à un document : `docs/r/remarques/REC-1.md` + `../images/a.png` → `docs/r/images/a.png`. */
+export function resoudreChemin(cheminDoc: string, relatif: string): string {
+  const parties = cheminDoc.split("/").slice(0, -1);
+  for (const p of relatif.split("/")) {
+    if (p === "..") parties.pop();
+    else if (p !== "." && p) parties.push(p);
+  }
+  return parties.join("/");
 }
 
 /** Rend les blocs Mermaid d'un élément ; la bibliothèque n'est chargée que si nécessaire. */

@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Page document (EF-042) : frontmatter, corps Markdown, liens résolus, ce qui le cite ; liens vers
-  // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21).
+  // Page document (EF-042) : frontmatter, corps Markdown (images relatives servies par `/api/image`),
+  // liens résolus, ce qui le cite ; liens vers l'atelier pour un besoin, une exigence ou un artefact (SPEC-21).
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -35,6 +35,7 @@
         return c.fichier ? url.fichier(c.fichier, c.libelle) : url.document(c.id);
       },
       reference(page.id),
+      page.chemin,
     );
   });
 

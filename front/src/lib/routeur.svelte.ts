@@ -6,7 +6,8 @@
 // @req EF-041, EF-042, EF-080
 
 import { statique } from "./statique";
-/** Page à afficher, déduite de l'URL ; les quatre dernières n'existent que dans l'atelier. */
+/** Page à afficher, déduite de l'URL ; `etape` à `clarifier` n'existent que dans l'atelier, les trois
+ * dernières dans le cahier de réception. */
 export type Route =
   | { page: "accueil" }
   | { page: "fichier"; chemin: string; ancre: string }
@@ -16,7 +17,10 @@ export type Route =
   | { page: "atelier" }
   | { page: "etape"; etape: string }
   | { page: "clarification"; id: string }
-  | { page: "clarifier"; sujet: string };
+  | { page: "clarifier"; sujet: string }
+  | { page: "reception" }
+  | { page: "reception-page"; cle: string }
+  | { page: "traitement" };
 
 /** Chemin, paramètres et ancre de l'URL courante, quel que soit le mode. */
 function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
@@ -43,6 +47,9 @@ function analyser(): Route {
   if (chemin.startsWith("/atelier/")) return { page: "etape", etape: chemin.slice("/atelier/".length) };
   if (chemin.startsWith("/clarification/")) return { page: "clarification", id: chemin.slice("/clarification/".length) };
   if (chemin.startsWith("/clarifier/")) return { page: "clarifier", sujet: chemin.slice("/clarifier/".length) };
+  if (chemin === "/reception") return { page: "reception" };
+  if (chemin === "/reception/traitement") return { page: "traitement" };
+  if (chemin.startsWith("/reception/page/")) return { page: "reception-page", cle: params.get("cle") ?? "" };
   return { page: "accueil" };
 }
 
@@ -89,7 +96,7 @@ const prefixe = statique ? "#" : "";
 /**
  * Fabrique des URL stables : `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
  * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>`, `/clarification/<id>`,
- * `/clarifier/<id>`.
+ * `/clarifier/<id>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement`.
  */
 export const url = {
   accueil: () => `${prefixe}/`,
@@ -102,4 +109,8 @@ export const url = {
   etape: (etape: string) => `${prefixe}/atelier/${encodeURIComponent(etape)}`,
   clarification: (id: string) => `${prefixe}/clarification/${encodeURIComponent(id)}`,
   clarifier: (sujet: string) => `${prefixe}/clarifier/${encodeURIComponent(sujet)}`,
+  reception: () => `${prefixe}/reception`,
+  // La clé d'une page est souvent une route (`/configurer`) : elle voyage en paramètre.
+  pageReception: (cle: string) => `${prefixe}/reception/page/?cle=${encodeURIComponent(cle)}`,
+  traitement: () => `${prefixe}/reception/traitement`,
 };

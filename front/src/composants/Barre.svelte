@@ -1,14 +1,15 @@
 <script lang="ts">
-  // Barre latérale : zones Produit (arbre des fichiers), Projet et Atelier (documents par type).
+  // Barre latérale : zones Produit (arbre des fichiers), Projet, Atelier et Réception (documents par type).
   // @relu 2026-10-17 4532aeb1
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
 
   let { projet }: { projet: Projet } = $props();
-  let zone = $state<"produit" | "projet" | "atelier">(routeur.route.page === "document" ? "projet" : "produit");
-  const docsProjet = $derived(projet.documents.filter((d) => d.zone !== "atelier"));
+  let zone = $state<"produit" | "projet" | "atelier" | "reception">(routeur.route.page === "document" ? "projet" : "produit");
+  const docsProjet = $derived(projet.documents.filter((d) => d.zone === "projet"));
   const docsAtelier = $derived(projet.documents.filter((d) => d.zone === "atelier"));
+  const docsReception = $derived(projet.documents.filter((d) => d.zone === "reception"));
 
   const ORDRE: Record<string, [number, string]> = {
     plan: [0, "Plan"],
@@ -34,6 +35,9 @@
     scamper: [30, "SCAMPER"],
     storyboard: [31, "Storyboards"],
     clarification: [32, "Clarifications"],
+    // Cahier de réception (SPEC-23).
+    "carte-reception": [40, "Carte des pages"],
+    remarque: [41, "Remarques"],
   };
 
   const dossiers = $derived.by(() => {
@@ -55,7 +59,7 @@
     }
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
   };
-  const groupes = $derived(grouper(zone === "atelier" ? docsAtelier : docsProjet));
+  const groupes = $derived(grouper(zone === "atelier" ? docsAtelier : zone === "reception" ? docsReception : docsProjet));
 
   const actif = (href: string) => estCourant(href);
 </script>
@@ -65,6 +69,9 @@
   <button class:actif={zone === "projet"} onclick={() => (zone = "projet")}>Projet <small>{docsProjet.length}</small></button>
   {#if docsAtelier.length}
     <button class:actif={zone === "atelier"} onclick={() => (zone = "atelier")}>Atelier <small>{docsAtelier.length}</small></button>
+  {/if}
+  {#if docsReception.length}
+    <button class:actif={zone === "reception"} onclick={() => (zone = "reception")} title="Cahier de réception">Récep. <small>{docsReception.length}</small></button>
   {/if}
 </nav>
 

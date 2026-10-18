@@ -1,6 +1,7 @@
 <script lang="ts">
   // Mise en page : en-tête (projet, recherche), barre latérale (zones Produit, Projet, Atelier), page courante.
-  // Servie par `wikik atelier`, l'application ajoute les écrans de l'atelier (SPEC-20).
+  // Servie par `wikik atelier`, l'application ajoute les écrans de l'atelier (SPEC-20) ; par
+  // `wikik reception`, ceux du cahier de réception (SPEC-23).
   // @relu 2026-10-17 a957d8e5
   import { api } from "./lib/api";
   import { routeur, aller, url } from "./lib/routeur.svelte";
@@ -17,6 +18,10 @@
   import Clarification from "./pages/atelier/Clarification.svelte";
   import Clarifier from "./pages/atelier/Clarifier.svelte";
   import { atelier, detecter } from "./lib/atelier.svelte";
+  import { reception, detecterReception } from "./lib/reception.svelte";
+  import CarteReception from "./pages/reception/Carte.svelte";
+  import PageReception from "./pages/reception/PageReception.svelte";
+  import Traitement from "./pages/reception/Traitement.svelte";
 
   let projet = $state<Projet | null>(null);
   let erreur = $state("");
@@ -34,6 +39,9 @@
     .catch((e) => (erreur = String(e)));
   detecter().then((oui) => {
     if (oui && projet) document.title = `${projet.nom} · atelier wikik`;
+  });
+  detecterReception().then((oui) => {
+    if (oui) document.title = `${projet?.nom ?? "projet"} · réception wikik`;
   });
 
   // Durée de l'appel au LLM en cours, pour le bandeau.
@@ -62,12 +70,15 @@
     <input type="search" placeholder="Rechercher dans la doc…" bind:value={saisie} aria-label="Rechercher" />
   </form>
   {#if atelier.actif}<a class="lien-atelier" href={url.atelier()}>Atelier</a>{/if}
+  {#if reception.actif}<a class="lien-atelier" href={url.reception()}>Réception</a>{/if}
   <a class="lien-graphe" href={url.graphe()}>Graphe</a>
 </header>
 {#if atelier.occupe}
   <div class="bandeau-llm" role="status">
     Le LLM réfléchit ({Math.round((maintenant - atelier.depuis) / 1000)} s) : il lit le projet par MCP et prépare ses propositions.
   </div>
+{:else if reception.occupe}
+  <div class="bandeau-llm" role="status">Le LLM lit le projet par MCP et cherche les écrans que le scan n'a pas trouvés…</div>
 {/if}
 
 <div class="cadre">
@@ -91,6 +102,12 @@
       {#key routeur.route.centre}<PageGraphe centre={routeur.route.centre} />{/key}
     {:else if atelier.actif && atelier.etat && routeur.route.page === "etape"}
       {#key routeur.route.etape}<Etape etape={routeur.route.etape} />{/key}
+    {:else if reception.actif && reception.etat && routeur.route.page === "reception-page"}
+      {#key routeur.route.cle}<PageReception cle={routeur.route.cle} />{/key}
+    {:else if reception.actif && reception.etat && routeur.route.page === "traitement"}
+      <Traitement />
+    {:else if reception.actif && reception.etat && (routeur.route.page === "reception" || routeur.route.page === "accueil")}
+      <CarteReception />
     {:else if atelier.actif && atelier.etat && routeur.route.page === "clarifier"}
       {#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}
     {:else if atelier.actif && atelier.etat && routeur.route.page === "clarification"}
@@ -98,7 +115,7 @@
     {:else if atelier.actif && atelier.etat && (routeur.route.page === "atelier" || routeur.route.page === "accueil")}
       <Tableau />
     {:else if routeur.route.page !== "accueil"}
-      <p class="discret">{atelier.actif ? "Chargement…" : "Cette page n'existe que dans l'atelier (wikik atelier)."}</p>
+      <p class="discret">{atelier.actif || reception.actif ? "Chargement…" : "Cette page n'existe que dans l'atelier (wikik atelier) ou le cahier de réception (wikik reception)."}</p>
     {:else}
       <Accueil {projet} />
     {/if}

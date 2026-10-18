@@ -235,6 +235,7 @@ fn page(
 
 /// Applique les détecteurs (SPEC-22 R2), dans l'ordre ; une route ou un composant déjà vus ne sont
 /// pas repris.
+/// @relu 2026-10-18 501afbd6
 pub fn detecter(index: &Index) -> Result<Vec<Page>> {
     let fichiers = sources(index)?;
     let mut pages: Vec<Page> = vec![];
@@ -404,7 +405,7 @@ pub fn detecter(index: &Index) -> Result<Vec<Page>> {
                     comp.as_deref(),
                     Some(f.chemin.clone()),
                     "enum",
-                    Some(type_enum.clone()),
+                    None,
                 );
                 ajouter(p, comp, &mut pages);
             }

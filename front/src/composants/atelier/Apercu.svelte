@@ -1,5 +1,6 @@
 <script lang="ts">
   // Aperçu d'un document produit par l'atelier (carte mentale, rapport, BDR…), rendu comme dans le wiki.
+  // @relu 2026-10-18 6afdbaff
   import { tick } from "svelte";
   import { api } from "../../lib/api";
   import { rendre, rendreMermaid } from "../../lib/markdown";
@@ -18,7 +19,7 @@
         html = rendre(p.corps, (b) => {
           const l = p.liens.find((x) => x.brute === b)?.cible;
           return l ? (l.fichier ? url.fichier(l.fichier, l.libelle) : url.document(l.id)) : null;
-        });
+        }, undefined, p.chemin);
         tick().then(() => corps && rendreMermaid(corps));
       })
       .catch((e) => (erreur = String(e)));
