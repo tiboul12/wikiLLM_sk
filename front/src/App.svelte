@@ -1,10 +1,11 @@
 <script lang="ts">
   // Mise en page (EF-131, EF-140) : barre d'activité à gauche (sections), panneau de la section active
-  // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le serveur du projet sert les quatre sections
+  // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le
+  // parcours du Design thinking affiché suit l'URL. Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   // @relu 2026-10-19 64b2a015
   import { api } from "./lib/api";
-  import { routeur, aller, url } from "./lib/routeur.svelte";
+  import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
   import { retenir } from "./lib/connus.svelte";
   import type { Projet } from "./types/Projet";
@@ -23,7 +24,8 @@
   import Etape from "./pages/atelier/Etape.svelte";
   import Clarification from "./pages/atelier/Clarification.svelte";
   import Clarifier from "./pages/atelier/Clarifier.svelte";
-  import { atelier, detecter } from "./lib/atelier.svelte";
+  import Clarifications from "./pages/atelier/Clarifications.svelte";
+  import { atelier, detecter, choisirParcours } from "./lib/atelier.svelte";
   import { reception, detecterReception } from "./lib/reception.svelte";
   import CahierReception from "./pages/reception/CahierReception.svelte";
   import CarteReception from "./pages/reception/CarteReception.svelte";
@@ -43,8 +45,14 @@
       document.title = `${p.nom} · wikik`;
     })
     .catch((e) => (erreur = String(e)));
-  detecter();
+  detecter().then((ok) => ok && choisirParcours(parcoursDeUrl()));
   detecterReception();
+
+  // Le parcours affiché suit l'URL des pages du Design thinking (EF-145).
+  $effect(() => {
+    const p = routeur.route.page;
+    if (atelier.actif && (p === "atelier" || p === "etape")) choisirParcours(parcoursDeUrl());
+  });
 
   // Section active : celle de la page, ou la dernière ouverte pour une page commune (recherche, graphe).
   const section = $derived(sectionDe(routeur.route, projet) ?? navigation.section);
@@ -150,6 +158,8 @@
       {#if atelier.etat}{#key routeur.route.etape}<Etape etape={routeur.route.etape} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "clarification"}
       {#if atelier.etat}{#key routeur.route.id}<Clarification id={routeur.route.id} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "clarifications"}
+      {#if atelier.etat}<Clarifications {projet} />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "clarifier"}
       {#if atelier.etat}{#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "atelier"}

@@ -27,7 +27,7 @@ export const NOMS: Record<Section, string> = {
 };
 
 /** Section d'une page ; `null` pour une page commune à toutes (recherche, graphe).
- * @relu 2026-10-19 9ef9eb13
+ * @relu 2026-10-19 3ed32023
  */
 export function sectionDe(route: Route, projet: Projet | null): Section | null {
   switch (route.page) {
@@ -38,15 +38,18 @@ export function sectionDe(route: Route, projet: Projet | null): Section | null {
       return "produit";
     case "projet":
     case "relecture":
+    case "clarification":
+    case "clarifier":
+    case "clarifications":
       return "projet";
     case "document": {
       const zone = projet?.documents.find((d) => d.id === route.id)?.zone;
-      return zone === "atelier" ? "atelier" : zone === "reception" ? "reception" : "projet";
+      const genre = projet?.documents.find((d) => d.id === route.id)?.genre;
+      // Les clarifications vivent dans docs/atelier/ mais se lisent dans Projet (REC-024.2).
+      return zone === "atelier" && genre !== "clarification" ? "atelier" : zone === "reception" ? "reception" : "projet";
     }
     case "atelier":
     case "etape":
-    case "clarification":
-    case "clarifier":
       return "atelier";
     case "reception":
     case "reception-page":

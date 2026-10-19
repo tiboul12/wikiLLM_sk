@@ -556,3 +556,20 @@ a.titre-panneau:hover { color: var(--accent); text-decoration: none; }
 @media (min-width: 821px) {
   .sections-accueil { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 860px; }
 }
+
+/* v7 : parcours et clarifications (EF-144, EF-145) */
+.barre summary .ajouter { margin-left: 6px; border: 0; background: none; color: var(--texte-2); cursor: pointer; font-size: 14px; border-radius: 4px; padding: 0 5px; }
+.barre summary .ajouter:hover { background: var(--fond-3); color: var(--accent); }
+.barre summary .lien-groupe { color: inherit; }
+.barre summary .lien-groupe:hover { color: var(--accent); }
+.ajout-parcours { display: grid; gap: 6px; margin: 4px 6px 10px; }
+.ajout-parcours input { padding: 5px 8px; border: 1px solid var(--bord); border-radius: 6px; background: var(--fond); color: var(--texte); font: inherit; font-size: 13px; }
+.sujet-clarification { margin: 14px 0; padding: 10px 16px; border: 1px solid var(--bord); border-radius: var(--rayon); }
+.sujet-clarification.choisi { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.sujet-clarification h2 { margin: 0 0 6px; font-size: 1.05rem; }
+.sujet-clarification ul { margin: 4px 0 10px; padding-left: 18px; }
+.sujet-clarification li { margin: 3px 0; }
+.sujet-clarification .id { font-family: var(--mono); font-size: 12.5px; color: var(--texte-2); margin-right: 4px; }
+.reponse-clarification { padding-left: 20px; }
+.reponse-clarification li { margin: 4px 0; }
+a.reprendre { margin-left: auto; }

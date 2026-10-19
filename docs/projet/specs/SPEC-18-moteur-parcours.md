@@ -56,6 +56,7 @@ Le corps de la fiche porte, sous des titres fixes : `## Rôle` (pour Tibo), `## 
 
 - Ordre : Pitch, Free writing, Carte mentale, Analogies, 5W1H, Cubing, SCAMPER, Storyboard, Bilan, Exigences, Roadmap.
 - État dans `docs/atelier/parcours.md` (versionné) : mode, état de chaque étape (`a_faire`, `en_cours`, `faite`, `sautee`), sous-étape et boucle courantes. Une étape peut être rouverte à tout moment ; le mode (Express ou Complet) se change par étape.
+- Plusieurs parcours (EF-145) : `PARCOURS` (ci-dessus) et `PARCOURS-2`, `PARCOURS-3`… dans `docs/atelier/parcours-n/` (`parcours.md`, `pitch.md` = `PITCH-n`, `carte.md` = `CARTE-n`), chacun avec son titre et sa version majeure. Un artefact créé dans un parcours ajouté porte `parcours: PARCOURS-n` ; sans ce champ, il appartient au parcours par défaut. Les clarifications ne dépendent d'aucun parcours.
 - Propositions en attente de décision : `.wikik/atelier/propositions/<etape>-<sous_etape>.json` (non versionné, survit au redémarrage).
 - Le contexte d'un appel contient : la consigne de la sous-étape, le titre et le pitch du projet, la liste des identifiants à lire ; le LLM lit leur contenu par MCP.
 

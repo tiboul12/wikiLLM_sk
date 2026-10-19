@@ -1,6 +1,6 @@
 <script lang="ts">
   // Barre d'activité, à la VS Code (EF-131) : une icône par section, toujours visible, avec un badge pour
-  // ce qui attend (remarques ouvertes, clarifications ouvertes) ; le graphe en bas. Sur téléphone, elle
+  // ce qui attend (remarques ouvertes en Réception, clarifications ouvertes en Projet) ; le graphe en bas. Sur téléphone, elle
   // passe en barre du bas.
   import { SECTIONS, NOMS, type Section } from "../lib/sections.svelte";
   import { url } from "../lib/routeur.svelte";
@@ -13,12 +13,12 @@
     accueil: url.accueil,
     produit: url.produit,
     projet: url.projet,
-    atelier: url.atelier,
+    atelier: () => url.atelier(atelier.parcours),
     reception: url.reception,
   };
   const badge = (s: Section): number => {
     if (s === "reception") return reception.etat ? actuelles().filter((r) => r.statut === "ouverte").length : 0;
-    if (s === "atelier") return atelier.etat?.clarifications.filter((c) => c.frontmatter.etat === "ouverte").length ?? 0;
+    if (s === "projet") return atelier.etat?.clarifications.filter((c) => c.frontmatter.etat === "ouverte").length ?? 0;
     return 0;
   };
 </script>

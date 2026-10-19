@@ -1,8 +1,8 @@
 <script lang="ts">
   // Page document (EF-042, EF-143) : frontmatter, corps Markdown (images relatives servies par
   // `/api/image`), liens résolus, identifiants et chemins cités liés d'office, ce qui le cite ; liens vers
-  // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21). Un plan ou le backlog s'ouvre en
-  // tableau à colonnes.
+  // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21), « Reprendre » pour une clarification.
+  // Un plan ou le backlog s'ouvre en tableau à colonnes.
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -82,7 +82,8 @@
       {/each}
     {/each}
     <a class="action" href={url.graphe(page.id)} title="Graphe local">◎ graphe</a>
-    {#if ouvrir}<a class="action atelier" href={ouvrir}>ouvrir dans l'atelier</a>{/if}
+    {#if page.genre === "clarification" && lienAtelier("/")}<a class="bouton principal reprendre" href={url.clarification(page.id)}>Reprendre la clarification →</a>
+    {:else if ouvrir}<a class="action atelier" href={ouvrir}>ouvrir dans le Design thinking</a>{/if}
     {#if clarifier}<a class="action atelier" href={clarifier}>clarifier</a>{/if}
   </div>
   {#if colonnes}

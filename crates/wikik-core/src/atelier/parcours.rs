@@ -1,11 +1,16 @@
 //! Moteur de parcours de l'atelier (SPEC-18) : état des étapes, consignes, propositions en attente,
 //! décisions (garder, corriger, rejeter), saisies, sélections et synthèses.
 //!
+//! Un projet peut mener plusieurs parcours (EF-145) : `PARCOURS` (`docs/atelier/parcours.md`, celui
+//! d'avant la v7) et `PARCOURS-2`, `PARCOURS-3`… (`docs/atelier/parcours-2/`, avec leur pitch et leur
+//! carte). Un artefact créé dans un parcours ajouté porte `parcours: PARCOURS-n` ; sans ce champ, il
+//! appartient au parcours par défaut.
+//!
 //! Chaque élément gardé devient un fichier (SPEC-17) qui cite ses sources réelles : un identifiant que le
 //! LLM aurait inventé est écarté. L'appel au LLM se fait hors de tout verrou : [`preparer`] construit la
 //! demande, [`enregistrer`] range la réponse.
 //!
-//! @req EF-101, EF-103, EF-105, EF-107
+//! @req EF-101, EF-103, EF-105, EF-107, EF-145
 //! @adr 10
 
 use super::artefacts;
@@ -73,9 +78,9 @@ pub struct EtatEtape {
     pub lots: Vec<Lot>,
 }
 
-/// État complet de l'atelier, servi à l'interface : étapes, artefacts, clarifications et leurs
-/// propositions, fournisseur, consommation de l'abonnement.
-/// @relu 2026-10-19 aa54f2c7
+/// État complet de l'atelier pour un parcours, servi à l'interface : étapes, artefacts, clarifications
+/// (communes à tous les parcours) et leurs propositions, fournisseur, consommation de l'abonnement, liste
+/// des parcours.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct EtatAtelier {
@@ -91,11 +96,28 @@ pub struct EtatAtelier {
     pub lots_clarification: Vec<Lot>,
     pub fournisseur: String,
     pub consommation: Option<Consommation>,
+    /// Parcours affiché, et tous les parcours du projet (EF-145).
+    pub parcours: String,
+    pub tous_parcours: Vec<ResumeParcours>,
 }
 
-/// Demande prête à envoyer au LLM, construite sous verrou puis exécutée sans.
+/// Un parcours du projet, pour la liste du volet et de l'accueil.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct ResumeParcours {
+    pub id: String,
+    pub titre: String,
+    pub version: String,
+    /// Étapes faites ou sautées, et nombre d'étapes.
+    pub faites: u32,
+    pub total: u32,
+}
+
+/// Demande prête à envoyer au LLM pour un parcours, construite sous verrou puis exécutée sans.
 #[derive(Debug, Clone)]
 pub struct Preparation {
+    /// Parcours de la demande (`PARCOURS`, `PARCOURS-2`…).
+    pub parcours: String,
     pub etape: String,
     pub sous_etape: String,
     pub cible: Option<String>,
@@ -119,20 +141,68 @@ pub fn travail(racine: &Path) -> PathBuf {
     racine.join(DOSSIER).join("atelier")
 }
 
-fn chemin_parcours(index: &Index) -> String {
-    artefacts::chemin_relatif(
-        &index.config,
-        artefacts::type_de("parcours").unwrap(),
-        "PARCOURS",
-    )
+/// Parcours par défaut : `docs/atelier/parcours.md`.
+pub const DEFAUT: &str = "PARCOURS";
+
+/// Numéro d'un parcours ajouté (`PARCOURS-2` → `2`) ; aucun pour le parcours par défaut. Un identifiant
+/// mal formé est refusé : il sert à construire des chemins.
+fn numero(pid: &str) -> Result<Option<&str>> {
+    if pid == DEFAUT {
+        return Ok(None);
+    }
+    match pid.strip_prefix("PARCOURS-") {
+        Some(n) if !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()) => Ok(Some(n)),
+        _ => bail!("parcours inconnu : {pid}"),
+    }
 }
 
-/// État du parcours (`docs/atelier/parcours.md`), créé vide au besoin.
-fn charger_parcours(index: &Index) -> Map<String, Value> {
-    match artefacts::lire(&index.racine, &chemin_parcours(index)) {
-        Ok((fm, _)) if !fm.is_empty() => fm,
+fn dossier_atelier(index: &Index) -> String {
+    index
+        .config
+        .atelier
+        .dossier
+        .trim_end_matches('/')
+        .to_string()
+}
+
+fn chemin_parcours(index: &Index, pid: &str) -> Result<String> {
+    Ok(match numero(pid)? {
+        None => artefacts::chemin_relatif(
+            &index.config,
+            artefacts::type_de("parcours").unwrap(),
+            DEFAUT,
+        ),
+        Some(n) => format!("{}/parcours-{n}/parcours.md", dossier_atelier(index)),
+    })
+}
+
+/// Identifiant et chemin d'un artefact à fichier unique (pitch, carte) dans un parcours : `PITCH` et
+/// `docs/atelier/pitch.md` pour le parcours par défaut, `PITCH-2` et `docs/atelier/parcours-2/pitch.md`
+/// pour `PARCOURS-2`.
+fn unique_de(index: &Index, pid: &str, genre: &str) -> Result<(String, String)> {
+    let ty = artefacts::type_de(genre)?;
+    let fichier = ty.fichier_unique.context("type sans fichier unique")?;
+    Ok(match numero(pid)? {
+        None => (
+            ty.prefixe.to_string(),
+            artefacts::chemin_relatif(&index.config, ty, ty.prefixe),
+        ),
+        Some(n) => (
+            format!("{}-{n}", ty.prefixe),
+            format!("{}/parcours-{n}/{fichier}", dossier_atelier(index)),
+        ),
+    })
+}
+
+/// État d'un parcours, créé vide au besoin (le parcours par défaut existe toujours).
+fn charger_parcours(index: &Index, pid: &str) -> Map<String, Value> {
+    let lu = chemin_parcours(index, pid)
+        .ok()
+        .and_then(|c| artefacts::lire(&index.racine, &c).ok());
+    match lu {
+        Some((fm, _)) if !fm.is_empty() => fm,
         _ => json!({
-            "id": "PARCOURS", "type": "parcours", "titre": "Parcours de l'atelier", "statut": "brouillon",
+            "id": pid, "type": "parcours", "titre": "Parcours de l'atelier", "statut": "brouillon",
             "mode": "express", "etapes": {}, "selections": {}, "liens_carte": [], "horizons": null,
         })
         .as_object()
@@ -141,11 +211,112 @@ fn charger_parcours(index: &Index) -> Map<String, Value> {
     }
 }
 
-fn sauver_parcours(index: &Index, p: &Map<String, Value>) -> Result<()> {
-    let relatif = chemin_parcours(index);
+/// Un parcours ajouté doit exister (le parcours par défaut se crée au premier geste).
+fn verifier_parcours(index: &Index, pid: &str) -> Result<()> {
+    if numero(pid)?.is_some() && !index.racine.join(chemin_parcours(index, pid)?).exists() {
+        bail!("parcours inconnu : {pid}");
+    }
+    Ok(())
+}
+
+/// Version majeure que documente un parcours : la sienne, sinon `[atelier] version`.
+fn version_de(index: &Index, p: &Map<String, Value>) -> String {
+    p.get("version")
+        .and_then(Value::as_str)
+        .filter(|v| !v.trim().is_empty())
+        .map_or_else(|| index.config.atelier.version.clone(), str::to_string)
+}
+
+/// Les parcours du projet : le parcours par défaut, puis `PARCOURS-2`, `PARCOURS-3`… dans l'ordre.
+pub fn lister_parcours(index: &Index) -> Result<Vec<ResumeParcours>> {
+    let mut ids = vec![DEFAUT.to_string()];
+    let mut numeros: Vec<u32> = std::fs::read_dir(index.racine.join(dossier_atelier(index)))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let nom = e.file_name().to_string_lossy().to_string();
+            nom.strip_prefix("parcours-")?.parse().ok()
+        })
+        .filter(|n| {
+            index
+                .racine
+                .join(format!(
+                    "{}/parcours-{n}/parcours.md",
+                    dossier_atelier(index)
+                ))
+                .exists()
+        })
+        .collect();
+    numeros.sort_unstable();
+    ids.extend(numeros.iter().map(|n| format!("PARCOURS-{n}")));
+    let total = fiches::fiches().iter().filter(|f| !f.hors_parcours).count() as u32;
+    Ok(ids
+        .into_iter()
+        .map(|id| {
+            let p = charger_parcours(index, &id);
+            let faites = p.get("etapes").and_then(Value::as_object).map_or(0, |e| {
+                e.values()
+                    .filter(|x| {
+                        matches!(
+                            x.get("etat").and_then(Value::as_str),
+                            Some("faite" | "sautee")
+                        )
+                    })
+                    .count() as u32
+            });
+            ResumeParcours {
+                titre: p
+                    .get("titre")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Parcours de l'atelier")
+                    .to_string(),
+                version: version_de(index, &p),
+                faites,
+                total,
+                id,
+            }
+        })
+        .collect())
+}
+
+/// Ajoute un parcours (« + » du volet, REC-039) : son titre, la version majeure qu'il documente ; renvoie
+/// son identifiant. Il commence vide, avec son propre pitch.
+pub fn creer_parcours(index: &Index, titre: &str, version: &str) -> Result<String> {
+    if titre.trim().is_empty() {
+        bail!("donne un titre au parcours");
+    }
+    let n = lister_parcours(index)?
+        .iter()
+        .filter_map(|p| {
+            numero(&p.id)
+                .ok()
+                .flatten()
+                .and_then(|n| n.parse::<u32>().ok())
+        })
+        .max()
+        .unwrap_or(1)
+        + 1;
+    let pid = format!("PARCOURS-{n}");
+    let mut p = charger_parcours(index, &pid);
+    p.insert("titre".into(), json!(titre.trim()));
+    p.insert("parcours".into(), json!(pid));
+    if !version.trim().is_empty() {
+        p.insert("version".into(), json!(version.trim()));
+    }
+    sauver_parcours(index, &pid, &p)?;
+    Ok(pid)
+}
+
+fn sauver_parcours(index: &Index, pid: &str, p: &Map<String, Value>) -> Result<()> {
+    let relatif = chemin_parcours(index, pid)?;
     std::fs::create_dir_all(index.racine.join(&relatif).parent().unwrap())?;
-    let mut lignes =
-        String::from("# Parcours de l'atelier\n\n| Étape | État | Mode |\n|---|---|---|\n");
+    let mut lignes = format!(
+        "# {}\n\n| Étape | État | Mode |\n|---|---|---|\n",
+        p.get("titre")
+            .and_then(Value::as_str)
+            .unwrap_or("Parcours de l'atelier")
+    );
     for f in fiches::fiches().iter().filter(|f| !f.hors_parcours) {
         let e = p.get("etapes").and_then(|e| e.get(&f.id));
         let etat = e
@@ -181,11 +352,17 @@ fn marquer(p: &mut Map<String, Value>, etape: &str, etat: &str) {
     e["etat"] = Value::String(etat.into());
 }
 
-fn cle_lot(etape: &str, sous: &str, cible: Option<&str>) -> String {
-    format!(
+/// Nom du fichier d'un lot ; un parcours ajouté préfixe les siens (`PARCOURS-2__pitch__pitch___`).
+fn cle_lot(pid: &str, etape: &str, sous: &str, cible: Option<&str>) -> String {
+    let cle = format!(
         "{etape}__{sous}__{}",
         cible.unwrap_or("_").replace(['/', ':'], "_")
-    )
+    );
+    if pid == DEFAUT {
+        cle
+    } else {
+        format!("{pid}__{cle}")
+    }
 }
 
 fn chemin_lot(index: &Index, cle: &str) -> PathBuf {
@@ -194,8 +371,8 @@ fn chemin_lot(index: &Index, cle: &str) -> PathBuf {
         .join(format!("{cle}.json"))
 }
 
-fn charger_lot(index: &Index, etape: &str, sous: &str, cible: Option<&str>) -> Lot {
-    std::fs::read_to_string(chemin_lot(index, &cle_lot(etape, sous, cible)))
+fn charger_lot(index: &Index, pid: &str, etape: &str, sous: &str, cible: Option<&str>) -> Lot {
+    std::fs::read_to_string(chemin_lot(index, &cle_lot(pid, etape, sous, cible)))
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_else(|| Lot {
@@ -207,10 +384,10 @@ fn charger_lot(index: &Index, etape: &str, sous: &str, cible: Option<&str>) -> L
         })
 }
 
-fn sauver_lot(index: &Index, lot: &Lot) -> Result<()> {
+fn sauver_lot(index: &Index, pid: &str, lot: &Lot) -> Result<()> {
     let chemin = chemin_lot(
         index,
-        &cle_lot(&lot.etape, &lot.sous_etape, lot.cible.as_deref()),
+        &cle_lot(pid, &lot.etape, &lot.sous_etape, lot.cible.as_deref()),
     );
     std::fs::create_dir_all(chemin.parent().unwrap())?;
     std::fs::write(chemin, serde_json::to_string_pretty(lot)?)?;
@@ -244,6 +421,20 @@ fn documents(index: &Index) -> Result<Vec<Doc>> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     Ok(v)
+}
+
+/// Documents d'un parcours : ceux qui portent son identifiant, ou aucun pour le parcours par défaut
+/// (besoins et exigences écrits à la main compris, comme avant la v7).
+fn documents_de(index: &Index, pid: &str) -> Result<Vec<Doc>> {
+    Ok(documents(index)?
+        .into_iter()
+        .filter(|d| {
+            d.fm.get("parcours")
+                .and_then(Value::as_str)
+                .unwrap_or(DEFAUT)
+                == pid
+        })
+        .collect())
 }
 
 fn resume(d: &Doc) -> ArtefactResume {
@@ -305,11 +496,12 @@ fn selection(p: &Map<String, Value>, docs: &[Doc], fiche: &Fiche, se: &SousEtape
 
 // ---------------------------------------------------------------- état servi à l'interface
 
-/// État de l'atelier pour l'interface : chaque étape avec ses artefacts, sélections et lots.
-/// @relu 2026-10-19 46d01390
-pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
-    let p = charger_parcours(index);
-    let docs = documents(index)?;
+/// État d'un parcours pour l'interface : chaque étape avec ses artefacts, sélections et lots ; un
+/// parcours inconnu est refusé.
+pub fn etat(index: &Index, pid: &str, fournisseur: &str) -> Result<EtatAtelier> {
+    verifier_parcours(index, pid)?;
+    let p = charger_parcours(index, pid);
+    let docs = documents_de(index, pid)?;
     let mut etapes = vec![];
     for f in fiches::fiches().iter().filter(|f| !f.hors_parcours) {
         let artefacts = docs
@@ -326,7 +518,7 @@ pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
                 selections.insert(se.id.clone(), selection(&p, &docs, f, se));
             }
         }
-        let lots = lots_de(index, f);
+        let lots = lots_de(index, pid, f);
         let e = p.get("etapes").and_then(|e| e.get(&f.id));
         etapes.push(EtatEtape {
             fiche: f.clone(),
@@ -345,7 +537,8 @@ pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
         .iter()
         .find(|d| d.genre == "pitch")
         .map(|d| d.titre.clone());
-    let clarifications = docs
+    // Les clarifications ne dépendent d'aucun parcours.
+    let clarifications = documents(index)?
         .iter()
         .filter(|d| d.genre == "clarification")
         .map(resume)
@@ -361,14 +554,16 @@ pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
         artefacts: tous,
         clarifications,
         fiche_clarification: fiches::fiche("clarification")?.clone(),
-        lots_clarification: lots_de(index, fiches::fiche("clarification")?),
+        lots_clarification: lots_de(index, DEFAUT, fiches::fiche("clarification")?),
         fournisseur: fournisseur.into(),
         consommation: derniere_consommation(index),
+        parcours: pid.to_string(),
+        tous_parcours: lister_parcours(index)?,
     })
 }
 
-/// Lots de propositions enregistrés pour les sous-étapes d'une fiche, dans l'ordre des noms de fichier.
-fn lots_de(index: &Index, f: &Fiche) -> Vec<Lot> {
+/// Lots de propositions d'un parcours pour les sous-étapes d'une fiche, dans l'ordre des noms de fichier.
+fn lots_de(index: &Index, pid: &str, f: &Fiche) -> Vec<Lot> {
     let dossier = dossier_travail(index).join("propositions");
     let Ok(entrees) = std::fs::read_dir(&dossier) else {
         return vec![];
@@ -382,7 +577,14 @@ fn lots_de(index: &Index, f: &Fiche) -> Vec<Lot> {
         .sous_etapes
         .iter()
         .filter(|se| se.genre == "propositions" || se.brouillon)
-        .map(|se| format!("{}__{}__", f.id, se.id))
+        .map(|se| {
+            let base = format!("{}__{}__", f.id, se.id);
+            if pid == DEFAUT {
+                base
+            } else {
+                format!("{pid}__{base}")
+            }
+        })
         .collect();
     noms.into_iter()
         .filter(|n| prefixes.iter().any(|p| n.starts_with(p)))
@@ -407,10 +609,18 @@ fn derniere_consommation(index: &Index) -> Option<Consommation> {
 
 // ---------------------------------------------------------------- pilotage des étapes
 
-/// `ouvrir`, `terminer`, `sauter` (étape optionnelle) ou `rouvrir` une étape ; changer son mode.
-pub fn piloter(index: &Index, etape: &str, action: &str, mode: Option<&str>) -> Result<()> {
+/// `ouvrir`, `terminer`, `sauter` (étape optionnelle) ou `rouvrir` une étape d'un parcours ; changer son
+/// mode.
+pub fn piloter(
+    index: &Index,
+    pid: &str,
+    etape: &str,
+    action: &str,
+    mode: Option<&str>,
+) -> Result<()> {
+    verifier_parcours(index, pid)?;
     let fiche = fiches::fiche(etape)?;
-    let mut p = charger_parcours(index);
+    let mut p = charger_parcours(index, pid);
     match action {
         "ouvrir" | "rouvrir" => marquer(&mut p, etape, "en_cours"),
         "terminer" => marquer(&mut p, etape, "faite"),
@@ -431,17 +641,24 @@ pub fn piloter(index: &Index, etape: &str, action: &str, mode: Option<&str>) -> 
             .or_insert_with(|| json!({"etat": "en_cours"}));
         e["mode"] = Value::String(m.into());
     }
-    sauver_parcours(index, &p)
+    sauver_parcours(index, pid, &p)
 }
 
-/// Enregistre la sélection d'une sous-étape `selection`.
-pub fn selectionner(index: &Index, etape: &str, sous: &str, ids: &[String]) -> Result<()> {
+/// Enregistre la sélection d'une sous-étape `selection`, parmi les artefacts du parcours.
+pub fn selectionner(
+    index: &Index,
+    pid: &str,
+    etape: &str,
+    sous: &str,
+    ids: &[String],
+) -> Result<()> {
+    verifier_parcours(index, pid)?;
     let fiche = fiches::fiche(etape)?;
     let se = fiche.sous_etape(sous)?;
     if se.genre != "selection" {
         bail!("{etape}/{sous} n'est pas une sélection");
     }
-    let docs = documents(index)?;
+    let docs = documents_de(index, pid)?;
     for id in ids {
         let d = docs
             .iter()
@@ -455,18 +672,20 @@ pub fn selectionner(index: &Index, etape: &str, sous: &str, ids: &[String]) -> R
             );
         }
     }
-    let mut p = charger_parcours(index);
+    let mut p = charger_parcours(index, pid);
     let sel = p.entry("selections").or_insert_with(|| json!({}));
     sel[format!("{etape}/{sous}")] = json!(ids);
     marquer(&mut p, etape, "en_cours");
-    sauver_parcours(index, &p)
+    sauver_parcours(index, pid, &p)
 }
 
 // ---------------------------------------------------------------- propositions
 
-/// Vérifie la cible d'une sous-étape répétée (`pour_chaque`) et renvoie son document.
+/// Vérifie la cible d'une sous-étape répétée (`pour_chaque`) et renvoie son document ; si l'étape
+/// sélectionne ses sujets, la cible doit être dans la sélection du parcours.
 fn verifier_cible<'d>(
     index: &Index,
+    pid: &str,
     docs: &'d [Doc],
     fiche: &Fiche,
     se: &SousEtape,
@@ -501,7 +720,7 @@ fn verifier_cible<'d>(
         .iter()
         .find(|s| s.genre == "selection" && s.parmi.as_deref() == Some(type_cible))
     {
-        let choix = selection(&charger_parcours(index), docs, fiche, sel);
+        let choix = selection(&charger_parcours(index, pid), docs, fiche, sel);
         if !choix.is_empty() && !choix.iter().any(|c| c == id) {
             bail!("{id} ne fait pas partie de la sélection de {}", fiche.titre);
         }
@@ -509,9 +728,11 @@ fn verifier_cible<'d>(
     Ok(Some(d))
 }
 
-/// Construit la demande au LLM pour une sous-étape (sous verrou ; l'appel se fait ensuite sans).
+/// Construit la demande au LLM pour une sous-étape d'un parcours (sous verrou ; l'appel se fait ensuite
+/// sans). Une clarification, hors parcours, peut viser un document de n'importe quel parcours.
 pub fn preparer(
     index: &Index,
+    pid: &str,
     etape: &str,
     sous: &str,
     cible: Option<&str>,
@@ -522,12 +743,18 @@ pub fn preparer(
     if se.genre != "propositions" && !se.brouillon {
         bail!("{etape}/{sous} n'appelle pas le LLM");
     }
-    let docs = documents(index)?;
-    let doc_cible = verifier_cible(index, &docs, fiche, se, cible)?;
-    let p = charger_parcours(index);
+    verifier_parcours(index, pid)?;
+    // Une clarification vise un document de n'importe quel parcours.
+    let docs = if fiche.hors_parcours {
+        documents(index)?
+    } else {
+        documents_de(index, pid)?
+    };
+    let doc_cible = verifier_cible(index, pid, &docs, fiche, se, cible)?;
+    let p = charger_parcours(index, pid);
     let mode = mode_de(&p, etape);
     let n = se.variantes.map_or(1, |v| v.pour(&mode));
-    let lot = charger_lot(index, etape, sous, cible);
+    let lot = charger_lot(index, pid, etape, sous, cible);
     let deja_vus: Vec<String> = lot
         .elements
         .iter()
@@ -589,6 +816,7 @@ pub fn preparer(
         .then(|| doc_cible.and_then(|d| std::fs::read_to_string(index.racine.join(&d.chemin)).ok()))
         .flatten();
     Ok(Preparation {
+        parcours: pid.to_string(),
         etape: etape.into(),
         sous_etape: sous.into(),
         cible: cible.map(str::to_string),
@@ -607,14 +835,22 @@ fn compacter(t: &str) -> String {
         .to_lowercase()
 }
 
-/// Range la réponse du LLM dans le lot de la sous-étape et tient le journal des appels.
+/// Range la réponse du LLM dans le lot de la sous-étape (dans le parcours de la demande) et tient le
+/// journal des appels ; une clarification ne change l'état d'aucune étape.
 pub fn enregistrer(
     index: &Index,
     prep: &Preparation,
     reponse: &Reponse,
     fournisseur: &str,
 ) -> Result<Lot> {
-    let mut lot = charger_lot(index, &prep.etape, &prep.sous_etape, prep.cible.as_deref());
+    let pid = prep.parcours.as_str();
+    let mut lot = charger_lot(
+        index,
+        pid,
+        &prep.etape,
+        &prep.sous_etape,
+        prep.cible.as_deref(),
+    );
     let source = prep.texte_source.as_deref().map(compacter);
     for e in &reponse.elements {
         // Principe de non-altération (P.A.R.S.) : un verbatim doit figurer mot pour mot dans le texte libre.
@@ -637,10 +873,12 @@ pub fn enregistrer(
             artefact: None,
         });
     }
-    sauver_lot(index, &lot)?;
-    let mut p = charger_parcours(index);
-    marquer(&mut p, &prep.etape, "en_cours");
-    sauver_parcours(index, &p)?;
+    sauver_lot(index, pid, &lot)?;
+    if !fiches::fiche(&prep.etape)?.hors_parcours {
+        let mut p = charger_parcours(index, pid);
+        marquer(&mut p, &prep.etape, "en_cours");
+        sauver_parcours(index, pid, &p)?;
+    }
     journaliser(&index.racine, prep, fournisseur, Ok(reponse))?;
     Ok(lot)
 }
@@ -678,9 +916,12 @@ pub fn journaliser(
     Ok(())
 }
 
-/// Garde (éventuellement corrigée) ou rejette la proposition `i` d'un lot ; renvoie l'artefact créé ou complété.
+/// Garde (éventuellement corrigée) ou rejette la proposition `i` d'un lot du parcours ; renvoie l'artefact
+/// créé ou complété.
+#[allow(clippy::too_many_arguments)]
 pub fn decider(
     index: &Index,
+    pid: &str,
     etape: &str,
     sous: &str,
     cible: Option<&str>,
@@ -690,7 +931,7 @@ pub fn decider(
 ) -> Result<Option<String>> {
     let fiche = fiches::fiche(etape)?;
     let se = fiche.sous_etape(sous)?;
-    let mut lot = charger_lot(index, etape, sous, cible);
+    let mut lot = charger_lot(index, pid, etape, sous, cible);
     let element = lot
         .elements
         .get_mut(i)
@@ -712,7 +953,7 @@ pub fn decider(
             {
                 super::fiches::valider(schema_el, &donnees, "proposition")?;
             }
-            let id = materialiser(index, fiche, se, cible, &donnees)?;
+            let id = materialiser(index, pid, fiche, se, cible, &donnees)?;
             let element = lot.elements.get_mut(i).unwrap();
             element.donnees = donnees;
             element.etat = "garde".into();
@@ -721,7 +962,7 @@ pub fn decider(
         }
         autre => bail!("décision inconnue : {autre} (garder ou rejeter)"),
     };
-    sauver_lot(index, &lot)?;
+    sauver_lot(index, pid, &lot)?;
     Ok(resultat)
 }
 
@@ -758,10 +999,12 @@ fn tronquer(t: &str, n: usize) -> String {
     }
 }
 
-/// Crée ou complète l'artefact d'un élément gardé (ou saisi) ; renvoie son identifiant. Un besoin suit
-/// le gabarit `templates/besoin.md` (qui, besoin, pourquoi), une exigence `templates/exigence.md`.
+/// Crée ou complète l'artefact d'un élément gardé (ou saisi) dans un parcours ; renvoie son identifiant.
+/// Un besoin suit le gabarit `templates/besoin.md` (qui, besoin, pourquoi), une exigence
+/// `templates/exigence.md` ; leur version est celle du parcours.
 fn materialiser(
     index: &Index,
+    pid: &str,
     fiche: &Fiche,
     se: &SousEtape,
     cible: Option<&str>,
@@ -779,32 +1022,52 @@ fn materialiser(
     let base = |titre: &str| -> Map<String, Value> {
         objet(json!({ "titre": titre, "statut": "retenu", "technique": fiche.id }))
     };
+    // Tout artefact créé dans un parcours ajouté porte son identifiant ; pitch et carte y ont leur fichier.
+    let creer =
+        |genre: &str, mut fm: Map<String, Value>, corps: &str| -> Result<(String, String)> {
+            if pid == DEFAUT {
+                return artefacts::creer(racine, config, genre, fm, corps);
+            }
+            fm.insert("parcours".into(), json!(pid));
+            if artefacts::type_de(genre)?.fichier_unique.is_some() {
+                let (id, chemin) = unique_de(index, pid, genre)?;
+                fm.insert("id".into(), json!(id));
+                fm.insert("type".into(), json!(genre));
+                std::fs::create_dir_all(racine.join(&chemin).parent().unwrap())?;
+                artefacts::reecrire(racine, &chemin, &fm, corps)?;
+                return Ok((id, chemin));
+            }
+            artefacts::creer(racine, config, genre, fm, corps)
+        };
+    let marquer_parcours = |fm: &mut Map<String, Value>| {
+        if pid != DEFAUT {
+            fm.insert("parcours".into(), json!(pid));
+        }
+    };
     if let Some(complete) = se.complete.as_deref() {
         let id = cible.context("cible attendue")?;
         return completer(index, complete, id, &se.id, d).map(Some);
     }
     if se.ajoute_a.as_deref() == Some("carte") {
-        let mut p = charger_parcours(index);
+        let mut p = charger_parcours(index, pid);
         let liens = p.entry("liens_carte").or_insert_with(|| json!([]));
         if let Some(a) = liens.as_array_mut() {
             a.push(json!({ "de": texte(d, "de"), "vers": texte(d, "vers"), "raison": texte(d, "raison") }));
         }
-        sauver_parcours(index, &p)?;
+        sauver_parcours(index, pid, &p)?;
         return Ok(None);
     }
     if fiche.id == "roadmap" && se.id == "horizons" {
-        let mut p = charger_parcours(index);
+        let mut p = charger_parcours(index, pid);
         p.insert("horizons".into(), d.clone());
-        sauver_parcours(index, &p)?;
+        sauver_parcours(index, pid, &p)?;
         return Ok(None);
     }
     let Some(ty) = se.cree.as_deref() else {
         return Ok(None);
     };
     let (id, _) = match ty {
-        "axe" => artefacts::creer(
-            racine,
-            config,
+        "axe" => creer(
             "axe",
             base(&texte(d, "titre")),
             &format!("# {}\n\n{}", texte(d, "titre"), texte(d, "description")),
@@ -813,14 +1076,19 @@ fn materialiser(
             let mut fm = base(&tronquer(&texte(d, "verbatim"), 60));
             fm.insert("qualification".into(), json!(texte(d, "qualification")));
             let axe = cible
-                .and_then(|c| documents(index).ok()?.into_iter().find(|x| x.id == c))
+                .and_then(|c| {
+                    documents_de(index, pid)
+                        .ok()?
+                        .into_iter()
+                        .find(|x| x.id == c)
+                })
                 .map(|e| texte(&e.fm, "axe"))
                 .unwrap_or_default();
             if connus.contains(&axe) {
                 fm.insert("axe".into(), json!(axe));
             }
             fm.insert("sources".into(), json!(sources(&[])));
-            artefacts::creer(racine, config, "unite", fm, &texte(d, "verbatim"))?
+            creer("unite", fm, &texte(d, "verbatim"))?
         }
         "idee" => {
             let mut fm = base(&texte(d, "titre"));
@@ -833,9 +1101,7 @@ fn materialiser(
                 fm.insert("parent".into(), json!(texte(d, "parent")));
             }
             fm.insert("sources".into(), json!(sources(&["parent"])));
-            artefacts::creer(
-                racine,
-                config,
+            creer(
                 "idee",
                 fm,
                 &format!("# {}\n\n{}", texte(d, "titre"), texte(d, "description")),
@@ -844,9 +1110,7 @@ fn materialiser(
         "probleme" => {
             let mut fm = base(&texte(d, "titre"));
             fm.insert("sources".into(), json!(sources(&[])));
-            artefacts::creer(
-                racine,
-                config,
+            creer(
                 "probleme",
                 fm,
                 &format!("# {}\n\n{}", texte(d, "titre"), texte(d, "description")),
@@ -873,12 +1137,12 @@ fn materialiser(
                 texte(d, "domaine"),
                 principes.join("\n")
             );
-            artefacts::creer(racine, config, "analogie", fm, &corps)?
+            creer("analogie", fm, &corps)?
         }
         "analyse" => {
             let methode = se.methode.clone().unwrap_or_default();
             let sujet = cible.unwrap_or_default();
-            let titre_sujet = documents(index)?
+            let titre_sujet = documents_de(index, pid)?
                 .into_iter()
                 .find(|x| x.id == sujet)
                 .map(|x| x.titre)
@@ -916,7 +1180,7 @@ fn materialiser(
             for (k, t) in cles {
                 corps.push_str(&format!("\n## {t}\n\n{}\n", texte(d, k)));
             }
-            artefacts::creer(racine, config, "analyse", fm, &corps)?
+            creer("analyse", fm, &corps)?
         }
         "storyboard" => {
             let mut fm = base(&texte(d, "titre"));
@@ -925,9 +1189,7 @@ fn materialiser(
             fm.insert("vignettes".into(), json!([]));
             fm.insert("artefacts".into(), json!([]));
             fm.insert("sources".into(), json!(sources(&[])));
-            artefacts::creer(
-                racine,
-                config,
+            creer(
                 "storyboard",
                 fm,
                 &format!(
@@ -939,9 +1201,9 @@ fn materialiser(
         }
         "besoin" => {
             let srcs = sources(&[]);
-            let version = config.atelier.version.clone();
+            let version = version_de(index, &charger_parcours(index, pid));
             let qui = Some(texte(d, "qui")).filter(|q| !q.is_empty()).or_else(|| {
-                documents(index)
+                documents_de(index, pid)
                     .ok()?
                     .into_iter()
                     .find(|x| x.genre == "pitch")
@@ -951,10 +1213,11 @@ fn materialiser(
                 .filter(|p| !p.is_empty())
                 .unwrap_or_else(|| format!("voir les sources : {}.", srcs.join(", ")));
             artefacts::creer_avec(racine, config, "besoin", |id| {
-                let fm = objet(json!({
+                let mut fm = objet(json!({
                     "titre": texte(d, "titre"), "statut": "proposé", "version": version, "technique": fiche.id,
                     "categorie": texte(d, "categorie"), "priorite": texte(d, "priorite"), "sources": srcs,
                 }));
+                marquer_parcours(&mut fm);
                 (
                     fm,
                     format!(
@@ -973,12 +1236,13 @@ fn materialiser(
                 .into_iter()
                 .filter(|c| connus.contains(c))
                 .collect();
-            let version = config.atelier.version.clone();
+            let version = version_de(index, &charger_parcours(index, pid));
             artefacts::creer_avec(racine, config, "exigence", |id| {
-                let fm = objet(json!({
+                let mut fm = objet(json!({
                     "titre": texte(d, "titre"), "statut": "proposé", "priorite": texte(d, "priorite"), "version": version,
                     "technique": fiche.id, "besoins": besoins, "sources": srcs,
                 }));
+                marquer_parcours(&mut fm);
                 (
                     fm,
                     format!(
@@ -1000,7 +1264,7 @@ fn materialiser(
                 "duree_minutes".into(),
                 d.get("duree_minutes").cloned().unwrap_or(json!(10)),
             );
-            artefacts::creer(racine, config, "ecrit", fm, &texte(d, "texte"))?
+            creer("ecrit", fm, &texte(d, "texte"))?
         }
         "pitch" => {
             let mut fm = base(&texte(d, "titre"));
@@ -1027,7 +1291,7 @@ fn materialiser(
             for (t, k) in sections {
                 corps.push_str(&format!("\n## {t}\n\n{}\n", texte(d, k)));
             }
-            artefacts::creer(racine, config, "pitch", fm, &corps)?
+            creer("pitch", fm, &corps)?
         }
         autre => bail!("type d'artefact non géré par l'atelier : {autre}"),
     };
@@ -1132,7 +1396,7 @@ fn corps_storyboard(fm: &Map<String, Value>) -> String {
     c
 }
 
-fn corps_clarification(fm: &Map<String, Value>, ancien: &str) -> String {
+pub(crate) fn corps_clarification(fm: &Map<String, Value>, ancien: &str) -> String {
     let entete = ancien
         .split("\n## Pistes")
         .next()
@@ -1164,9 +1428,10 @@ fn corps_clarification(fm: &Map<String, Value>, ancien: &str) -> String {
 
 // ---------------------------------------------------------------- saisies
 
-/// Enregistre une saisie de Tibo : pitch, texte libre, tri des besoins, conclusion d'une clarification.
+/// Enregistre une saisie de Tibo : pitch, texte libre, tri des besoins.
 pub fn saisir(
     index: &Index,
+    pid: &str,
     etape: &str,
     sous: &str,
     cible: Option<&str>,
@@ -1177,15 +1442,16 @@ pub fn saisir(
     if se.genre != "saisie" {
         bail!("{etape}/{sous} n'est pas une saisie");
     }
-    let docs = documents(index)?;
-    verifier_cible(index, &docs, fiche, se, cible)?;
+    verifier_parcours(index, pid)?;
+    let docs = documents_de(index, pid)?;
+    verifier_cible(index, pid, &docs, fiche, se, cible)?;
     let id = match (etape, sous) {
-        ("pitch", "pitch") => materialiser(index, fiche, se, None, d)?,
+        ("pitch", "pitch") => materialiser(index, pid, fiche, se, None, d)?,
         ("free-writing", "ecriture") => {
             if texte(d, "texte").is_empty() {
                 bail!("le texte libre est vide");
             }
-            materialiser(index, fiche, se, cible, d)?
+            materialiser(index, pid, fiche, se, cible, d)?
         }
         ("bilan", "tri") => {
             for b in d
@@ -1212,28 +1478,11 @@ pub fn saisir(
             }
             None
         }
-        ("clarification", "conclusion") => {
-            let id = cible.context("clarification attendue")?;
-            let doc = docs
-                .iter()
-                .find(|x| x.id == id)
-                .context("clarification introuvable")?;
-            let (mut fm, corps) = artefacts::lire(&index.racine, &doc.chemin)?;
-            fm.insert("conclusion".into(), json!(texte(d, "conclusion")));
-            fm.insert("etat".into(), json!("close"));
-            fm.insert("statut".into(), json!("retenu"));
-            let corps = corps_clarification(&fm, &corps);
-            artefacts::reecrire(&index.racine, &doc.chemin, &fm, &corps)?;
-            Some(id.to_string())
-        }
         _ => bail!("saisie non gérée : {etape}/{sous}"),
     };
-    let mut p = charger_parcours(index);
-    if fiche.hors_parcours {
-        return Ok(id);
-    }
+    let mut p = charger_parcours(index, pid);
     marquer(&mut p, etape, "en_cours");
-    sauver_parcours(index, &p)?;
+    sauver_parcours(index, pid, &p)?;
     Ok(id)
 }
 
@@ -1254,17 +1503,18 @@ fn ecrire_genere(index: &Index, relatif: &str, fm: Map<String, Value>, corps: &s
     Ok(())
 }
 
-/// Assemble l'artefact de synthèse d'une sous-étape ; renvoie les fichiers écrits. BDR et cahier des
-/// charges suivent les rubriques des gabarits de `templates/` ; les irritants du BDR 1 citent les
-/// verbatims du free writing.
-pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>> {
+/// Assemble l'artefact de synthèse d'une sous-étape d'un parcours ; renvoie les fichiers écrits. BDR et
+/// cahier des charges suivent les rubriques des gabarits de `templates/`, dans le dossier de la version
+/// du parcours ; les irritants du BDR 1 citent les verbatims du free writing.
+pub fn synthetiser(index: &Index, pid: &str, etape: &str, sous: &str) -> Result<Vec<String>> {
+    verifier_parcours(index, pid)?;
     let fiche = fiches::fiche(etape)?;
     let se = fiche.sous_etape(sous)?;
     if se.genre != "synthese" {
         bail!("{etape}/{sous} n'est pas une synthèse");
     }
-    let docs = documents(index)?;
-    let p = charger_parcours(index);
+    let docs = documents_de(index, pid)?;
+    let p = charger_parcours(index, pid);
     let de = |genre: &str| {
         docs.iter()
             .filter(move |d| d.genre == genre && d.statut != "ecarte")
@@ -1275,7 +1525,8 @@ pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>
         .find(|d| d.genre == "pitch")
         .map(|d| d.titre.clone())
         .unwrap_or_else(|| "Projet".into());
-    let version = index.config.atelier.version.clone();
+    let version = version_de(index, &p);
+    let id_pitch = unique_de(index, pid, "pitch")?.0;
     let majeure = format!(
         "{}/majeures/{version}",
         index.config.projet.dossier.trim_end_matches('/')
@@ -1321,11 +1572,13 @@ pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>
                     ));
                 }
             }
-            let fm = objet(
-                json!({ "id": "CARTE", "type": "carte", "titre": format!("Carte mentale : {titre_projet}"), "statut": "retenu", "technique": fiche.id, "sources": noeuds }),
+            let (id_carte, relatif) = unique_de(index, pid, "carte")?;
+            let mut fm = objet(
+                json!({ "id": id_carte, "type": "carte", "titre": format!("Carte mentale : {titre_projet}"), "statut": "retenu", "technique": fiche.id, "sources": noeuds }),
             );
-            let relatif =
-                artefacts::chemin_relatif(&index.config, artefacts::type_de("carte")?, "CARTE");
+            if pid != DEFAUT {
+                fm.insert("parcours".into(), json!(pid));
+            }
             std::fs::create_dir_all(index.racine.join(&relatif).parent().unwrap())?;
             artefacts::reecrire(
                 &index.racine,
@@ -1377,9 +1630,12 @@ pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>
                     .into_iter()
                     .find(|s| texte(&s.fm, "sujet") == sujet)
                     .map(|s| s.chemin.clone());
-                let fm = objet(
+                let mut fm = objet(
                     json!({ "titre": format!("SCAMPER : {titre_sujet}"), "statut": "retenu", "technique": fiche.id, "sujet": sujet, "sources": ids }),
                 );
+                if pid != DEFAUT {
+                    fm.insert("parcours".into(), json!(pid));
+                }
                 let relatif = match existant {
                     Some(c) => {
                         let (ancien, _) = artefacts::lire(&index.racine, &c)?;
@@ -1447,14 +1703,14 @@ pub fn synthetiser(index: &Index, etape: &str, sous: &str) -> Result<Vec<String>
                 .collect::<Vec<_>>()
                 .join("\n\n");
             let bdr1 = format!(
-                "# BDR {version}, partie 1 : analyse du besoin\n\n> Produite par l'atelier à partir du pitch ([[PITCH]]) et du free writing. Aucune solution technique.\n\n## Contexte\n\n{}\n\n## Personnes concernées\n\n{}\n\n## Situation actuelle et irritants (avec preuves)\n\n{}\n\n## Contraintes\n\n{}\n\n## Hors sujet\n\n{}\n",
+                "# BDR {version}, partie 1 : analyse du besoin\n\n> Produite par l'atelier à partir du pitch ([[{id_pitch}]]) et du free writing. Aucune solution technique.\n\n## Contexte\n\n{}\n\n## Personnes concernées\n\n{}\n\n## Situation actuelle et irritants (avec preuves)\n\n{}\n\n## Contraintes\n\n{}\n\n## Hors sujet\n\n{}\n",
                 ou(contexte),
                 ou(t("cible")),
                 situation.trim_end(),
                 ou(t("contraintes")),
                 ou(t("hors_sujet"))
             );
-            let mut sources1 = vec!["PITCH".to_string()];
+            let mut sources1 = vec![id_pitch.clone()];
             sources1.extend(preuves.iter().map(|u| u.id.clone()));
             let r1 = format!("{majeure}/bdr-1-analyse.md");
             ecrire_genere(

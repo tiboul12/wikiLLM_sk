@@ -10,7 +10,7 @@
 
 use crate::serve::{Partage, repondre};
 use anyhow::Result;
-use axum::extract::{Request, State};
+use axum::extract::{Query, Request, State};
 use axum::http::{Method, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -22,10 +22,13 @@ use wikik_core::Index;
 use wikik_core::atelier::fournisseur::Demande;
 use wikik_core::atelier::parcours;
 
-/// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel).
+/// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel, parcours,
+/// clarifications). Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/atelier/etat", get(api_etat))
+        .route("/api/atelier/parcours", post(api_parcours))
+        .route("/api/atelier/clarification", post(api_clarification))
         .route("/api/atelier/piloter", post(api_piloter))
         .route("/api/atelier/selection", post(api_selection))
         .route("/api/atelier/proposer", post(api_proposer))
@@ -53,13 +56,59 @@ pub(crate) async fn meme_origine(requete: Request, suite: Next) -> Response {
     suite.run(requete).await
 }
 
-async fn api_etat(State(e): State<Partage>) -> Response {
+fn defaut() -> String {
+    parcours::DEFAUT.to_string()
+}
+
+#[derive(Deserialize)]
+struct ParamEtat {
+    #[serde(default = "defaut")]
+    parcours: String,
+}
+
+async fn api_etat(State(e): State<Partage>, Query(q): Query<ParamEtat>) -> Response {
     let nom = e.fournisseur.nom();
-    repondre(e, move |i| parcours::etat(i, &nom)).await
+    repondre(e, move |i| parcours::etat(i, &q.parcours, &nom)).await
+}
+
+#[derive(Deserialize)]
+struct NouveauParcours {
+    titre: String,
+    #[serde(default)]
+    version: String,
+}
+
+async fn api_parcours(State(e): State<Partage>, Json(p): Json<NouveauParcours>) -> Response {
+    ecrire(e, move |i| {
+        parcours::creer_parcours(i, &p.titre, &p.version)
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct ActionClarification {
+    id: String,
+    /// `clore`, `rouvrir` ou `supprimer`.
+    action: String,
+}
+
+async fn api_clarification(
+    State(e): State<Partage>,
+    Json(p): Json<ActionClarification>,
+) -> Response {
+    ecrire(e, move |i| match p.action.as_str() {
+        "clore" => wikik_core::atelier::clore(i, &p.id),
+        "rouvrir" => wikik_core::atelier::rouvrir(i, &p.id),
+        "supprimer" => wikik_core::atelier::supprimer(i, &p.id),
+        autre => anyhow::bail!("action inconnue : {autre}"),
+    })
+    .await
 }
 
 #[derive(Deserialize)]
 struct Pilotage {
+    #[serde(default = "defaut")]
+    parcours: String,
     etape: String,
     action: String,
     mode: Option<String>,
@@ -67,13 +116,15 @@ struct Pilotage {
 
 async fn api_piloter(State(e): State<Partage>, Json(p): Json<Pilotage>) -> Response {
     ecrire(e, move |i| {
-        parcours::piloter(i, &p.etape, &p.action, p.mode.as_deref())
+        parcours::piloter(i, &p.parcours, &p.etape, &p.action, p.mode.as_deref())
     })
     .await
 }
 
 #[derive(Deserialize)]
 struct Selection {
+    #[serde(default = "defaut")]
+    parcours: String,
     etape: String,
     sous_etape: String,
     ids: Vec<String>,
@@ -81,20 +132,22 @@ struct Selection {
 
 async fn api_selection(State(e): State<Partage>, Json(p): Json<Selection>) -> Response {
     ecrire(e, move |i| {
-        parcours::selectionner(i, &p.etape, &p.sous_etape, &p.ids)
+        parcours::selectionner(i, &p.parcours, &p.etape, &p.sous_etape, &p.ids)
     })
     .await
 }
 
 #[derive(Deserialize)]
 struct Proposer {
+    #[serde(default = "defaut")]
+    parcours: String,
     etape: String,
     sous_etape: String,
     cible: Option<String>,
     entree: Option<String>,
 }
 
-/// Prépare sous verrou, appelle le LLM sans, range la réponse sous verrou.
+/// Prépare sous verrou, appelle le LLM sans, range la réponse sous verrou, dans le parcours demandé.
 /// @relu 2026-10-19 a34aad18
 async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Response {
     let r = tokio::task::spawn_blocking(move || -> Result<parcours::Lot> {
@@ -103,6 +156,7 @@ async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Resp
             i.mettre_a_jour()?;
             parcours::preparer(
                 &i,
+                &p.parcours,
                 &p.etape,
                 &p.sous_etape,
                 p.cible.as_deref(),
@@ -130,6 +184,8 @@ async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Resp
 
 #[derive(Deserialize)]
 struct Decision {
+    #[serde(default = "defaut")]
+    parcours: String,
     etape: String,
     sous_etape: String,
     cible: Option<String>,
@@ -142,6 +198,7 @@ async fn api_decider(State(e): State<Partage>, Json(p): Json<Decision>) -> Respo
     ecrire(e, move |i| {
         parcours::decider(
             i,
+            &p.parcours,
             &p.etape,
             &p.sous_etape,
             p.cible.as_deref(),
@@ -155,6 +212,8 @@ async fn api_decider(State(e): State<Partage>, Json(p): Json<Decision>) -> Respo
 
 #[derive(Deserialize)]
 struct Saisie {
+    #[serde(default = "defaut")]
+    parcours: String,
     etape: String,
     sous_etape: String,
     cible: Option<String>,
@@ -163,20 +222,29 @@ struct Saisie {
 
 async fn api_saisir(State(e): State<Partage>, Json(p): Json<Saisie>) -> Response {
     ecrire(e, move |i| {
-        parcours::saisir(i, &p.etape, &p.sous_etape, p.cible.as_deref(), &p.donnees)
+        parcours::saisir(
+            i,
+            &p.parcours,
+            &p.etape,
+            &p.sous_etape,
+            p.cible.as_deref(),
+            &p.donnees,
+        )
     })
     .await
 }
 
 #[derive(Deserialize)]
 struct Synthese {
+    #[serde(default = "defaut")]
+    parcours: String,
     etape: String,
     sous_etape: String,
 }
 
 async fn api_synthetiser(State(e): State<Partage>, Json(p): Json<Synthese>) -> Response {
     ecrire(e, move |i| {
-        parcours::synthetiser(i, &p.etape, &p.sous_etape)
+        parcours::synthetiser(i, &p.parcours, &p.etape, &p.sous_etape)
     })
     .await
 }
@@ -184,6 +252,7 @@ async fn api_synthetiser(State(e): State<Partage>, Json(p): Json<Synthese>) -> R
 #[derive(Deserialize)]
 struct Rappel {
     sujet: String,
+    #[serde(default)]
     question: String,
 }
 

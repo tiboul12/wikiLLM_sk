@@ -38,7 +38,7 @@ Chaque production de l'atelier doit être un fichier lisible par le wiki et l'ag
 | `scamper` | `SCA-` · `scamper/` | SCAMPER | `sujet`, `idees` par levier |
 | `storyboard` | `SB-` · `storyboards/` | Storyboard (R.E.C.I.T.) | `scenario`, `personnage`, `scene`, `intrigue`, `vignettes` (id, description, prompt), `artefacts` (id `ART-`, nom, vignette) |
 | `clarification` | `CLAR-` · `clarifications/` | Rappel en développement | `sujet` (identifiant visé), `question`, `conclusion`, `etat` (`ouverte`, `close`) |
-| `parcours` | `PARCOURS` · `parcours.md` | Moteur | `mode`, état de chaque étape, sous-étape courante |
+| `parcours` | `PARCOURS` · `parcours.md` (ou `PARCOURS-n` · `parcours-n/parcours.md`) | Moteur | `titre`, `version`, `mode`, état de chaque étape, sous-étape courante |
 
 Vers `docs/projet/` : `besoin` (`B-`, champs `categorie`, `priorite` MoSCoW, `sources`), BDR 1 et 2, `exigence` (`EF-`), `roadmap` (`majeures/v1/roadmap.md`, horizons Maintenant / Ensuite / Plus tard).
 

@@ -57,6 +57,6 @@ En fin de phase : `make check`, contrôle headless, puis chaque remarque du lot 
 | 2 Graphe | ✅ graphe global : documents, code ramené au fichier, pages, remarques ; 7 catégories colorées en puces activables ; disposition à graine fixe ; zoom ×5, espacement ; titre au survol ; appui long : liens colorés (Échap pour effacer) | 2026-10-19 |
 | 3 Produit et fichiers | ✅ tableau fichier par fichier (lignes, symboles, documentés, sans doc, périmés, alertes ; tri, filtre) ; récapitulatif de conformité en tête de fichier ; nom du symbole = lien direct ; ⚓ copie aussi hors HTTPS ; liens d'appels repliés dans le cadre | 2026-10-19 |
 | 4 Projet : gestion, à relire, liens | ✅ groupe Gestion en tête (backlog, plans) ; plans en colonnes à faire / en cours / fait, backlog en colonnes par section ; page « À relire » (92 documents, statut, type, version, filtres) ; identifiants, chemins et `chemin::Symbole` cités liés d'office dans les documents et la doc du code | 2026-10-19 |
-| 5 Clarifications et parcours | à faire | |
+| 5 Clarifications et parcours | ✅ clarifications dans Projet, rangées par sujet avec leur état ; tableau de bord ; « clarifier » ouvre directement les pistes (question par défaut, clarification ouverte reprise) ; pistes gardées = réponse, « Clarifié : terminer », rouvrir, supprimer ; « Reprendre » depuis la page du document ; plusieurs parcours (`PARCOURS-n`, pitch et carte à part, version propre), « + » dans le volet | 2026-10-19 |
 | 6 Complétion de la carte | à faire | |
 | 7 Paramètres, terminal, envoi du traitement | à faire | |
