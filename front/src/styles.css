@@ -165,8 +165,25 @@ table.diagnostics tr.avertissement td:first-child { color: var(--orange); }
 .balise .nom { font-family: var(--mono); font-size: 12px; color: var(--texte-2); }
 .balise.b-pitfall { background: var(--orange-fond); }
 .balise.b-req, .balise.b-adr { background: var(--vert-fond); }
-.voisins { font-size: 13.5px; display: grid; gap: 4px; margin: 8px 0; }
-.voisins .lien { margin-right: 8px; font-family: var(--mono); font-size: 12.5px; }
+.voisins { font-size: 13.5px; display: grid; gap: 4px; margin: 8px 0; min-width: 0; }
+.voisins > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.voisins .lien { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.filtre-tableau input { padding: 6px 10px; border: 1px solid var(--bord); border-radius: 6px; background: var(--fond); color: var(--texte); font: inherit; font-size: 14px; min-width: 240px; }
+.defile-tableau { overflow-x: auto; max-height: 70vh; overflow-y: auto; border: 1px solid var(--bord); border-radius: var(--rayon); }
+.recap-fichiers { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.recap-fichiers th { position: sticky; top: 0; background: var(--fond-2); text-align: left; padding: 0; border-bottom: 1px solid var(--bord); }
+.recap-fichiers th button { width: 100%; padding: 7px 10px; border: 0; background: none; color: var(--texte-2); font: inherit; font-weight: 600; text-align: inherit; cursor: pointer; white-space: nowrap; }
+.recap-fichiers td { padding: 5px 10px; border-bottom: 1px solid var(--bord); }
+.recap-fichiers td a { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.recap-fichiers .nombre { text-align: right; font-variant-numeric: tabular-nums; }
+.recap-fichiers .a-voir { color: var(--orange); font-weight: 600; }
+.recap-fichiers .taux.faible { color: var(--orange); }
+.recap-conformite { margin: 12px 0 20px; padding: 10px 16px; border: 1px solid var(--bord); border-left: 3px solid var(--orange); border-radius: 0 var(--rayon) var(--rayon) 0; background: var(--fond-2); font-size: 14px; }
+.recap-conformite.ok { border-left-color: var(--vert); }
+.recap-conformite ul { margin: 4px 0; padding-left: 18px; }
+.recap-conformite li { margin: 3px 0; }
+.recap-conformite .noms { display: inline-flex; flex-wrap: wrap; gap: 2px 8px; }
+.recap-conformite .noms a { font-family: var(--mono); font-size: 12.5px; }
 .etiquette { color: var(--texte-2); font-size: 12px; margin-right: 6px; }
 .code summary { cursor: pointer; color: var(--texte-2); font-size: 13px; padding: 4px 0; }
 .code pre { margin: 4px 0 6px; padding: 12px; background: var(--fond-2); border-radius: 6px; overflow-x: auto; }
@@ -179,7 +196,10 @@ button.hook, a.action {
 button.hook:hover, a.action:hover { opacity: 1; text-decoration: none; }
 button.hook.copie { color: var(--vert); opacity: 1; }
 button.hook.copie::after { content: " copié"; font-size: 11px; }
-button.hook.echec { color: var(--rouge); }
+button.hook.echec { color: var(--rouge); opacity: 1; }
+button.hook.echec::after { content: " copie refusée"; font-size: 11px; }
+.ancre-symbole { color: inherit; }
+.ancre-symbole:hover { color: var(--accent); }
 button.secondaire { margin-top: 12px; padding: 6px 12px; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--fond-2); color: var(--texte); cursor: pointer; font: inherit; }
 
 /* Documents */

@@ -55,7 +55,7 @@ En fin de phase : `make check`, contrôle headless, puis chaque remarque du lot 
 | 0 BDR, CDC, plan, ADR-0013 | ✅ | 2026-10-19 |
 | 1 Noms et navigation | ✅ barre Accueil, Projet, Design thinking, Produit, Réception ; titre du panneau → accueil de section ; « replier tout » ; panneau à largeur réglable ; élément ouvert déplié et centré ; arborescence des pages ; « Cahier » et « Carte de réception » ; « En bref » des étapes | 2026-10-19 |
 | 2 Graphe | ✅ graphe global : documents, code ramené au fichier, pages, remarques ; 7 catégories colorées en puces activables ; disposition à graine fixe ; zoom ×5, espacement ; titre au survol ; appui long : liens colorés (Échap pour effacer) | 2026-10-19 |
-| 3 Produit et fichiers | à faire | |
+| 3 Produit et fichiers | ✅ tableau fichier par fichier (lignes, symboles, documentés, sans doc, périmés, alertes ; tri, filtre) ; récapitulatif de conformité en tête de fichier ; nom du symbole = lien direct ; ⚓ copie aussi hors HTTPS ; liens d'appels repliés dans le cadre | 2026-10-19 |
 | 4 Projet : gestion, à relire, liens | à faire | |
 | 5 Clarifications et parcours | à faire | |
 | 6 Complétion de la carte | à faire | |

@@ -9,13 +9,29 @@ export function reference(cible: string): string {
   return `@wiki:${projetCourant.nom}/${cible}`;
 }
 
-/** Copie dans le presse-papiers ; `false` si le navigateur refuse (contexte non sécurisé). */
+/**
+ * Copie dans le presse-papiers ; `false` si le navigateur refuse. Hors HTTPS et hors `localhost` (wikik
+ * ouvert depuis un autre poste, REC-020), `navigator.clipboard` n'existe pas : on passe par une zone de
+ * texte et `execCommand("copy")`, encore accepté dans ce cas.
+ */
 export async function copier(texte: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(texte);
     return true;
   } catch {
-    return false;
+    try {
+      const zone = document.createElement("textarea");
+      zone.value = texte;
+      zone.setAttribute("readonly", "");
+      zone.style.cssText = "position: fixed; top: 0; left: 0; opacity: 0";
+      document.body.appendChild(zone);
+      zone.select();
+      const ok = document.execCommand("copy");
+      zone.remove();
+      return ok;
+    } catch {
+      return false;
+    }
   }
 }
 

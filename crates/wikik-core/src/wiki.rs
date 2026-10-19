@@ -28,12 +28,13 @@ pub struct Projet {
     pub documentes: u32,
 }
 
-/// Fichier de code dans l'arbre de la zone Produit.
+/// Fichier de code dans l'arbre de la zone Produit et le tableau fichier par fichier (EF-142).
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct FichierResume {
     pub chemin: String,
     pub role: Option<String>,
+    pub lignes: u32,
     pub symboles: u32,
     pub documentes: u32,
 }
@@ -194,6 +195,7 @@ fn u(v: i64) -> u32 {
 }
 
 /// Accueil : fichiers avec leur rôle, documents avec leur zone (Projet, atelier, réception), statistiques.
+/// @relu 2026-10-19 48f30d62
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -211,6 +213,7 @@ pub fn projet(index: &Index) -> Result<Projet> {
                     chemin: r.get(0)?,
                     role: entete
                         .and_then(|e| resume(&e.lines().map(str::to_string).collect::<Vec<_>>())),
+                    lignes: u(r.get(2)?),
                     symboles: u(r.get(3)?),
                     documentes: u(r.get(4)?),
                 },
