@@ -2,9 +2,10 @@
 id: ADR-0009
 type: adr
 titre: "Atelier : serveur séparé du wiki"
-statut: accepté
+statut: remplacé
 date: 2026-10-17
 remplace: []
+remplace_par: [ADR-0012]
 exigences: []
 ---
 
