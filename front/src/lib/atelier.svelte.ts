@@ -87,6 +87,11 @@ export async function ecrire<T = unknown>(route: string, corps: Record<string, u
   }
 }
 
+/** Arrête les appels au LLM en cours (atelier ou réception, REC-030) ; ils échouent avec « annulé ». */
+export async function annulerLLM() {
+  await fetch("/api/llm/annuler", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+}
+
 /** Lien vers une page de l'atelier ; null dans le site exporté (pas d'atelier). */
 export function lienAtelier(chemin: string): string | null {
   return atelier.actif ? chemin : null;

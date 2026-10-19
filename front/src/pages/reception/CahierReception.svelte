@@ -1,10 +1,13 @@
 <script lang="ts">
   // Cahier de réception (SPEC-23 R5, EF-140) : les pages trouvées dans le code, groupées, chacune avec sa
-  // carte de réception (ses remarques) et son lien dans l'application ; scanner à nouveau, compléter par le
-  // LLM, renommer, masquer, regrouper, ajouter une route. L'adresse de l'application est déduite du projet
+  // carte de réception (ses remarques) et son lien dans l'application ; scanner à nouveau, chercher les
+  // écrans manquants par le LLM (annulable, écrans ajoutés listés avec leur raison, EF-146), renommer,
+  // masquer, regrouper, ajouter une route. L'adresse de l'application est déduite du projet
   // ou réglée dans les paramètres : pas de saisie ici (REC-029).
   // @relu 2026-10-19 619d237e
   import type { Page } from "../../types/Page";
+  import type { Ajout } from "../../types/Ajout";
+  import { annulerLLM } from "../../lib/atelier.svelte";
   import { reception, ecrireReception, remarquesDe, actuelles, lienApplication, visible, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
@@ -16,6 +19,7 @@
   let groupe = $state("");
   let message = $state("");
   let erreur = $state("");
+  let ajouts = $state<Ajout[] | null>(null);
 
   const pages = $derived(etat.pages.filter((p) => voirMasquees || visible(p)));
   const groupes = $derived.by(() => {
@@ -33,13 +37,19 @@
 
   async function action(route: string, corps: unknown = {}, succes = "") {
     erreur = message = "";
-    if (route === "completer") reception.occupe = true;
+    if (route === "completer") {
+      reception.occupe = true;
+      ajouts = null;
+    }
     try {
       const r = await ecrireReception<unknown>(route, corps);
-      message = succes || (Array.isArray(r) ? `${r.length} page(s)` : "");
+      if (route === "completer") ajouts = r as Ajout[];
+      else message = succes;
       edition = null;
     } catch (e) {
-      erreur = String(e instanceof Error ? e.message : e);
+      const m = String(e instanceof Error ? e.message : e);
+      if (m.includes("annulé")) message = "Recherche annulée : la carte n'a pas changé.";
+      else erreur = m;
     } finally {
       reception.occupe = false;
     }
@@ -69,13 +79,30 @@
 <div class="actions">
   <a class="bouton principal" href={url.traitement()}>Traiter les remarques →</a>
   <button onclick={() => action("scanner", {}, "Carte mise à jour.")}>Scanner à nouveau</button>
-  <button onclick={() => action("completer")} disabled={reception.occupe} title="Le LLM lit le projet et propose les écrans manquants ({etat.fournisseur})">
-    {reception.occupe ? "Le LLM cherche…" : "Compléter avec le LLM"}
-  </button>
+  {#if reception.occupe}
+    <button class="danger" onclick={annulerLLM}>Annuler la recherche</button>
+  {:else}
+    <button onclick={() => action("completer")} title="Le LLM ({etat.fournisseur}) lit le projet et ajoute les écrans que le scan n'a pas trouvés">Chercher les écrans manquants (LLM)</button>
+  {/if}
   {#if masquees}<label class="discret"><input type="checkbox" bind:checked={voirMasquees} /> afficher les {masquees} page(s) masquée(s) ou disparue(s) du code</label>{/if}
   {#if message}<span class="succes">{message}</span>{/if}
 </div>
+<p class="discret aide-completer">
+  « Scanner à nouveau » relit le code (routes, composants de pages). « Chercher les écrans manquants » demande au LLM les écrans sans
+  route que le scan ne voit pas (vues par état, onglets, fenêtres) ; il n'ajoute que ceux dont il cite le composant, et dit pourquoi.
+</p>
 {#if erreur}<p class="erreur">{erreur}</p>{/if}
+{#if ajouts}
+  <section class="ajouts-llm">
+    {#if ajouts.length}
+      <strong>{ajouts.length} écran(s) ajouté(s) par le LLM :</strong>
+      <ul>{#each ajouts as a (a.page.cle)}<li><a href={url.pageReception(a.page.cle)}>{a.page.nom}</a> {#if a.page.route}<code>{a.page.route}</code>{/if} : {a.raison}</li>{/each}</ul>
+    {:else}
+      <strong>Rien ne manque : le LLM n'a trouvé aucun écran de plus.</strong>
+    {/if}
+    <button class="discret-bouton" onclick={() => (ajouts = null)}>fermer</button>
+  </section>
+{/if}
 
 {#each groupes as [g, ps] (g)}
   {#if g}<h2>{g.charAt(0).toUpperCase() + g.slice(1)}</h2>{/if}

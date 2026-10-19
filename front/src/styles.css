@@ -573,3 +573,9 @@ a.titre-panneau:hover { color: var(--accent); text-decoration: none; }
 .reponse-clarification { padding-left: 20px; }
 .reponse-clarification li { margin: 4px 0; }
 a.reprendre { margin-left: auto; }
+
+/* v7 : appel au LLM annulable, complément de la carte expliqué (EF-146) */
+.annuler-llm { margin-left: 12px; padding: 2px 10px; border: 1px solid currentColor; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 12.5px; cursor: pointer; }
+.aide-completer { font-size: 13px; margin: 0 0 10px; }
+.ajouts-llm { margin: 8px 0 16px; padding: 10px 14px; border: 1px solid var(--bord); border-left: 3px solid var(--violet); border-radius: 0 var(--rayon) var(--rayon) 0; background: var(--fond-2); font-size: 14px; }
+.ajouts-llm ul { margin: 6px 0; padding-left: 18px; }

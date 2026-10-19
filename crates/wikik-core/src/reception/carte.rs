@@ -904,8 +904,17 @@ pub fn corriger(
     Ok(copie)
 }
 
-/// Ajoute des pages proposées par le LLM (SPEC-22 R5) : seules celles dont le symbole existe sont gardées.
-pub fn ajouter_llm(index: &Index, propositions: &[Value]) -> Result<Vec<Page>> {
+/// Une page ajoutée par le LLM, avec la raison qu'il donne (montrée à Tibo, REC-031).
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct Ajout {
+    pub page: Page,
+    pub raison: String,
+}
+
+/// Ajoute des pages proposées par le LLM (SPEC-22 R5) : seules celles dont le symbole existe sont gardées ;
+/// renvoie chacune avec la raison donnée par le LLM.
+pub fn ajouter_llm(index: &Index, propositions: &[Value]) -> Result<Vec<Ajout>> {
     let mut pages = lire(index);
     let mut ajoutees = vec![];
     for e in propositions {
@@ -949,7 +958,10 @@ pub fn ajouter_llm(index: &Index, propositions: &[Value]) -> Result<Vec<Page>> {
             corrige: false,
             disparue: false,
         };
-        ajoutees.push(p.clone());
+        ajoutees.push(Ajout {
+            page: p.clone(),
+            raison: t("raison"),
+        });
         pages.push(p);
     }
     ecrire(index, &pages)?;

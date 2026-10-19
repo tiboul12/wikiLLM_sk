@@ -23,12 +23,13 @@ use wikik_core::atelier::fournisseur::Demande;
 use wikik_core::atelier::parcours;
 
 /// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel, parcours,
-/// clarifications). Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
+/// clarifications) et l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/atelier/etat", get(api_etat))
         .route("/api/atelier/parcours", post(api_parcours))
         .route("/api/atelier/clarification", post(api_clarification))
+        .route("/api/llm/annuler", post(api_annuler))
         .route("/api/atelier/piloter", post(api_piloter))
         .route("/api/atelier/selection", post(api_selection))
         .route("/api/atelier/proposer", post(api_proposer))
@@ -69,6 +70,13 @@ struct ParamEtat {
 async fn api_etat(State(e): State<Partage>, Query(q): Query<ParamEtat>) -> Response {
     let nom = e.fournisseur.nom();
     repondre(e, move |i| parcours::etat(i, &q.parcours, &nom)).await
+}
+
+/// Arrête les appels au LLM en cours, de l'atelier comme de la réception (REC-030) : ils répondent
+/// « appel au LLM annulé ». Corps JSON exigé comme toute écriture.
+async fn api_annuler(State(e): State<Partage>, Json(_): Json<Value>) -> Response {
+    e.fournisseur.annuler();
+    Json(true).into_response()
 }
 
 #[derive(Deserialize)]
@@ -147,9 +155,11 @@ struct Proposer {
     entree: Option<String>,
 }
 
-/// Prépare sous verrou, appelle le LLM sans, range la réponse sous verrou, dans le parcours demandé.
+/// Prépare sous verrou, appelle le LLM sans, range la réponse sous verrou, dans le parcours demandé ; le
+/// jeton d'annulation est pris dès l'arrivée de la requête.
 /// @relu 2026-10-19 a34aad18
 async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Response {
+    let jeton = e.fournisseur.jeton();
     let r = tokio::task::spawn_blocking(move || -> Result<parcours::Lot> {
         let prep = {
             let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
@@ -168,6 +178,7 @@ async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Resp
             consigne: &prep.consigne,
             schema: &prep.schema,
             exemple: prep.exemple.as_ref(),
+            jeton: Some(jeton),
         });
         let i = e.index.lock().unwrap_or_else(|x| x.into_inner());
         match reponse {

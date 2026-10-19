@@ -18,6 +18,7 @@ fn garder_tout(
 }
 
 /// Comme [`garder_tout`], dans un parcours donné.
+/// @relu 2026-10-19 56e78508
 fn garder_dans(
     i: &mut Index,
     pid: &str,
@@ -32,6 +33,7 @@ fn garder_dans(
             consigne: &prep.consigne,
             schema: &prep.schema,
             exemple: prep.exemple.as_ref(),
+            jeton: None,
         })
         .unwrap();
     let lot = p::enregistrer(i, &prep, &r, "factice").unwrap();
@@ -282,6 +284,7 @@ fn verbatim_invente_ecarte() {
             consigne: &prep.consigne,
             schema: &prep.schema,
             exemple: prep.exemple.as_ref(),
+            jeton: None,
         })
         .unwrap();
     let lot = p::enregistrer(&i, &prep, &r, "factice").unwrap();

@@ -145,10 +145,11 @@ async fn api_traiter(State(e): State<Partage>, Json(p): Json<Traitement>) -> Res
     .await
 }
 
-/// Demande au LLM les pages manquantes (hors verrou), puis les ajoute à la carte.
-/// @relu 2026-10-19 f5140df8
+/// Demande au LLM les pages manquantes (hors verrou), puis les ajoute à la carte ; renvoie chaque page
+/// ajoutée avec la raison donnée par le LLM. L'appel s'arrête par `/api/llm/annuler`.
 async fn api_completer(State(e): State<Partage>) -> Response {
-    let r = tokio::task::spawn_blocking(move || -> Result<Vec<carte::Page>> {
+    let jeton = e.fournisseur.jeton();
+    let r = tokio::task::spawn_blocking(move || -> Result<Vec<carte::Ajout>> {
         let (consigne, schema) = {
             let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
             i.mettre_a_jour()?;
@@ -159,6 +160,7 @@ async fn api_completer(State(e): State<Partage>) -> Response {
             consigne: &consigne,
             schema: &schema,
             exemple: Some(&Value::Array(vec![])),
+            jeton: Some(jeton),
         })?;
         let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
         let ajoutees = carte::ajouter_llm(&i, &reponse.elements)?;

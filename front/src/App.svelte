@@ -1,7 +1,7 @@
 <script lang="ts">
   // Mise en page (EF-131, EF-140) : barre d'activité à gauche (sections), panneau de la section active
   // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le
-  // parcours du Design thinking affiché suit l'URL. Le serveur du projet sert les quatre sections
+  // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler. Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   // @relu 2026-10-19 64b2a015
   import { api } from "./lib/api";
@@ -25,7 +25,7 @@
   import Clarification from "./pages/atelier/Clarification.svelte";
   import Clarifier from "./pages/atelier/Clarifier.svelte";
   import Clarifications from "./pages/atelier/Clarifications.svelte";
-  import { atelier, detecter, choisirParcours } from "./lib/atelier.svelte";
+  import { atelier, detecter, choisirParcours, annulerLLM } from "./lib/atelier.svelte";
   import { reception, detecterReception } from "./lib/reception.svelte";
   import CahierReception from "./pages/reception/CahierReception.svelte";
   import CarteReception from "./pages/reception/CarteReception.svelte";
@@ -115,9 +115,13 @@
 {#if atelier.occupe}
   <div class="bandeau-llm" role="status">
     Le LLM réfléchit ({Math.round((maintenant - atelier.depuis) / 1000)} s) : il lit le projet par MCP et prépare ses propositions.
+    <button class="annuler-llm" onclick={annulerLLM}>Annuler</button>
   </div>
 {:else if reception.occupe}
-  <div class="bandeau-llm" role="status">Le LLM lit le projet par MCP et cherche les écrans que le scan n'a pas trouvés…</div>
+  <div class="bandeau-llm" role="status">
+    Le LLM lit le projet par MCP et cherche les écrans que le scan n'a pas trouvés…
+    <button class="annuler-llm" onclick={annulerLLM}>Annuler</button>
+  </div>
 {/if}
 
 <div class="cadre" class:sans-panneau={!avecPanneau} style="--largeur-panneau: {largeur}px">
