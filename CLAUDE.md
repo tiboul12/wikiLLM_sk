@@ -8,6 +8,7 @@ wikiK est en **refonte** : la v0 Python (wiki Markdown éditable) devient un bin
 - **v4.0-rc1** (18/10/2026) : atelier de définition du besoin (Fast Design Thinking, 12 fiches dans `atelier/techniques/`), LLM `claude -p` branché sur le MCP de wikik, production des besoins, BDR, exigences et roadmap, rappel `atelier_rappel`. Plan : `docs/projet/majeures/v4/plan-v4.md` ; mesure : MESURE-03.
 - **v5.0-rc1** (18/10/2026) : cahier de réception (carte des pages construite à partir du code, remarques avec captures, traitement, outils MCP `pages`, `reception`, `reception_traiter`). Plan : `docs/projet/majeures/v5/plan-v5.md`.
 - **v6.0-rc1** (19/10/2026) : un seul serveur et une seule commande, `wikik` (ADR-0012) : accueil, barre d'activité à gauche (Produit, Projet, Atelier, Réception), accueil par section. `serve`, `atelier`, `reception` n'existent plus.
+- **v7** (19/10/2026, branche `v7-retours`, pas encore fusionnée) : traitement des 40 remarques de la réception de la v6 (PLAN-v7) : noms et navigation, graphe par catégorie, récapitulatifs, gestion en colonnes, clarifications par sujet, parcours multiples, LLM annulable, Paramètres et terminal intégré (ADR-0013). REC-009.2 (front en Rust / WebAssembly) reportée en **v8**.
 - **Prochaine étape avec Tibo** : `docs/projet/backlog.md`, sections « À faire avec Tibo » (v1 et v4 : lancer le projet « météo » dans l'atelier, rappel sur ATS).
 
 - **Plan de référence** : `docs/projet/plan-v1.md` (phases 0 à 9, tableau de suivi en section 7). Le lire avant toute tâche.
