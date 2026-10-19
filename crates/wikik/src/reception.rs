@@ -31,12 +31,11 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/reception/completer", post(api_completer))
 }
 
-/// La carte est enregistrée au premier geste qui en a besoin (remarque, correction, adresse) : ouvrir
-/// le cahier n'écrit rien dans le dépôt (ADR-0012).
+/// La carte est enregistrée, à jour du code, à chaque geste qui en a besoin (remarque, correction,
+/// adresse) : ouvrir le cahier n'écrit rien dans le dépôt (ADR-0012), et l'écran montre toujours ce que
+/// ce geste enregistrera.
 fn assurer_carte(i: &Index) -> Result<()> {
-    if carte::lire(i).is_empty() {
-        carte::scanner(i)?;
-    }
+    carte::scanner(i)?;
     Ok(())
 }
 

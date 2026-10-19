@@ -60,14 +60,22 @@ export function actuelles(): Remarque[] {
   return (reception.etat?.remarques ?? []).filter((r) => r.statut !== "remplacee");
 }
 
+/** Adresse de l'application reçue : celle saisie, sinon celle déduite du projet (`/` : ce serveur). */
+export function baseApplication(): string | null {
+  const b = reception.etat?.url_application ?? reception.etat?.url_detectee ?? null;
+  if (!b) return null;
+  return b === "/" ? location.origin : adapterHote(b);
+}
+
 /**
- * Lien vers une page de l'application reçue : adresse saisie + route ; null sans l'une ou l'autre.
- * Une adresse de boucle locale prend l'hôte du navigateur (même règle que les liens wiki ↔ atelier).
+ * Lien vers une page de l'application reçue : adresse + route ; sans route connue, l'accueil de
+ * l'application ; null si aucune adresse n'est connue. Une adresse de boucle locale prend l'hôte du
+ * navigateur (même règle que les liens wiki ↔ atelier).
  */
 export function lienApplication(route: string | null | undefined): string | null {
-  const base = reception.etat?.url_application;
-  if (!base || !route) return null;
-  return adapterHote(base) + (route.startsWith("/") ? route : "/" + route);
+  const base = baseApplication();
+  if (!base) return null;
+  return route ? base + (route.startsWith("/") ? route : "/" + route) : base + "/";
 }
 
 /** Libellés des genres de remarque. */

@@ -102,6 +102,14 @@ static ENUM: LazyLock<Regex> = LazyLock::new(|| {
 static TITRE_HTML: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)<title>\s*([^<]*?)\s*</title>").unwrap());
 static BALISE_MAJ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<([A-Z]\w*)").unwrap());
+/// Routeur maison à discriminant : `if (chemin === "/produit") return { page: "produit" }`.
+static ROUTE_DISCRIMINANT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?:chemin|path|pathname|url)\s*===?\s*["'`](/[^"'`]*)["'`][^\n;]*?return\s*\{\s*page:\s*["']([\w-]+)["']"#).unwrap()
+});
+/// … et son affichage : `route.page === "produit"}` suivi de `<ProduitAccueil`.
+static AFFICHAGE_DISCRIMINANT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"\.page\s*===?\s*["']([\w-]+)["'][^<]{0,200}<([A-Z]\w*)"#).unwrap()
+});
 
 struct Source {
     chemin: String,
@@ -235,7 +243,7 @@ fn page(
 
 /// Applique les détecteurs (SPEC-22 R2), dans l'ordre ; une route ou un composant déjà vus ne sont
 /// pas repris.
-/// @relu 2026-10-18 501afbd6
+/// @relu 2026-10-19 ce02aeb0
 pub fn detecter(index: &Index) -> Result<Vec<Page>> {
     let fichiers = sources(index)?;
     let mut pages: Vec<Page> = vec![];
@@ -463,22 +471,101 @@ pub fn detecter(index: &Index) -> Result<Vec<Page>> {
         ajouter(p, Some(f.chemin.clone()), &mut pages);
     }
 
+    // 4 bis. Routeur maison à discriminant (le front de wikik) : route → nom de page → composant affiché.
+    let mut routes_page: BTreeMap<String, String> = BTreeMap::new();
+    for f in fichiers
+        .iter()
+        .filter(|f| matches!(f.ext.as_str(), "ts" | "js" | "tsx" | "jsx" | "svelte"))
+    {
+        for m in ROUTE_DISCRIMINANT.captures_iter(&f.texte) {
+            routes_page
+                .entry(m[2].to_string())
+                .or_insert_with(|| m[1].trim_end_matches('/').to_string());
+        }
+    }
+    if !routes_page.is_empty() {
+        for f in fichiers
+            .iter()
+            .filter(|f| matches!(f.ext.as_str(), "svelte" | "tsx" | "jsx" | "vue"))
+        {
+            for m in AFFICHAGE_DISCRIMINANT.captures_iter(&f.texte) {
+                let comp = m[2].to_string();
+                // La page par défaut du routeur (`accueil`, `home`) n'a pas de condition : c'est `/`.
+                let route = match routes_page.get(&m[1]) {
+                    Some(r) => r.clone(),
+                    None if matches!(&m[1], "accueil" | "home" | "index") => "/".into(),
+                    None => continue,
+                };
+                if STRUCTURE.contains(&comp.as_str()) {
+                    continue;
+                }
+                let route = route_normale(&route);
+                // Composant importé sous un autre nom (`import CarteReception from "./Carte.svelte"`) :
+                // la page est le composant du fichier importé.
+                let importe = Regex::new(&format!(
+                    r#"import\s+{}\s+from\s+["']([^"']+\.svelte)["']"#,
+                    regex::escape(&comp)
+                ))
+                .ok()
+                .and_then(|re| re.captures(&f.texte).map(|c| c[1].to_string()))
+                .map(|rel| {
+                    let mut parties: Vec<&str> = f.chemin.split('/').collect();
+                    parties.pop();
+                    for x in rel.split('/') {
+                        match x {
+                            "." => {}
+                            ".." => {
+                                parties.pop();
+                            }
+                            autre => parties.push(autre),
+                        }
+                    }
+                    parties.join("/")
+                });
+                let nom = humaniser(comp.trim_end_matches("Page"));
+                let mut p = page(
+                    index,
+                    route.clone(),
+                    nom,
+                    Some(route),
+                    Some(&comp),
+                    Some(f.chemin.clone()),
+                    "route",
+                    None,
+                );
+                let mut cle_composant = comp.clone();
+                if let Some(c) = &importe
+                    && let Ok((id, nom_symbole)) = index.conn.query_row(
+                        "SELECT id, nom FROM symboles WHERE fichier = ?1 AND genre = 'composant'",
+                        [c],
+                        |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+                    )
+                {
+                    p.symboles = vec![id];
+                    p.exigences = exigences(index, &p.symboles);
+                    p.fichier = Some(c.clone());
+                    cle_composant = nom_symbole;
+                }
+                ajouter(p, Some(cle_composant), &mut pages);
+            }
+        }
+    }
+
     // 5. Composants rangés dans un dossier de pages. Une page déjà trouvée qui a son propre dossier
     //    sous `pages/` (`pages/optim/optim.component.ts`) possède ce dossier : ses étapes et graphiques
     //    sont des morceaux de la page, pas des pages.
+    // Le dossier appartient à la page seulement si son fichier porte le nom du dossier
+    // (`pages/optim/optim.component.ts`) ; `pages/atelier/Tableau.svelte` ne possède pas `atelier/`.
     let dossiers_de_pages: Vec<String> = pages
         .iter()
         .filter_map(|p| {
-            p.fichier
-                .as_deref()?
-                .rsplit_once('/')
-                .map(|(d, _)| d.to_string())
-        })
-        .filter(|d| {
-            d.split('/')
-                .next_back()
-                .is_some_and(|dernier| !DOSSIERS_PAGES.contains(&dernier))
+            let (d, f) = p.fichier.as_deref()?.rsplit_once('/')?;
+            let dernier = d.rsplit('/').next()?;
+            let tige = f.split('.').next()?;
+            let possede = !DOSSIERS_PAGES.contains(&dernier)
                 && d.split('/').any(|x| DOSSIERS_PAGES.contains(&x))
+                && tige.eq_ignore_ascii_case(dernier);
+            possede.then(|| d.to_string())
         })
         .collect();
     let mut st = index.conn.prepare(
@@ -719,12 +806,27 @@ fn ecrire_avec(
 }
 
 /// Fusionne un scan avec la carte existante (SPEC-22 R4) : corrections gardées (nom, masque, groupe,
-/// route ajoutée à la main), nouvelles pages ajoutées, pages disparues marquées.
+/// route ajoutée à la main), page retrouvée sous une autre clé reconnue à son composant (elle garde sa
+/// clé et ses remarques), nouvelles pages ajoutées, pages disparues marquées.
 pub fn fusionner(anciennes: &[Page], trouvees: Vec<Page>) -> Vec<Page> {
     let par_cle: BTreeMap<&str, &Page> = anciennes.iter().map(|p| (p.cle.as_str(), p)).collect();
+    let cles_trouvees: BTreeSet<String> = trouvees.iter().map(|p| p.cle.clone()).collect();
+    // Une page retrouvée sous une autre clé (le scan connaît maintenant sa route) garde sa clé
+    // d'origine : ses remarques y sont rattachées. On la reconnaît à son composant.
+    let par_symbole: BTreeMap<&str, &str> = anciennes
+        .iter()
+        .filter(|a| !cles_trouvees.contains(&a.cle))
+        .filter_map(|a| Some((a.symboles.first()?.as_str(), a.cle.as_str())))
+        .collect();
     let mut sortie: Vec<Page> = vec![];
     let mut vues = BTreeSet::new();
     for mut p in trouvees {
+        if !par_cle.contains_key(p.cle.as_str())
+            && let Some(ancienne) = p.symboles.first().and_then(|s| par_symbole.get(s.as_str()))
+            && !vues.contains(*ancienne)
+        {
+            p.cle = (*ancienne).to_string();
+        }
         if let Some(a) = par_cle.get(p.cle.as_str())
             && a.corrige
         {
@@ -855,6 +957,7 @@ pub fn ajouter_llm(index: &Index, propositions: &[Value]) -> Result<Vec<Page>> {
 }
 
 /// Demande au LLM les pages que les détecteurs n'ont pas trouvées (SPEC-22 R5) : (consigne, schéma).
+/// @relu 2026-10-19 b304927a
 pub fn demande_completion(index: &Index) -> (String, Value) {
     let connues: Vec<String> = lire(index)
         .iter()
@@ -874,7 +977,7 @@ pub fn demande_completion(index: &Index) -> (String, Value) {
          Écrans déjà trouvés par l'analyse du code :\n{}\n\n\
          Trouve les écrans que l'utilisateur peut atteindre et qui manquent (vues affichées par un état, onglets, \
          fenêtres modales importantes, pages servies par le serveur). Pour chacun : un nom court en français, sa route \
-         si elle existe, l'identifiant exact du symbole de l'index qui l'affiche (`chemin::Nom`), et en une phrase la \
+         (l'adresse exacte qui l'ouvre dans l'application, paramètre compris, ex. `/atelier/pitch`) si elle existe, l'identifiant exact du symbole de l'index qui l'affiche (`chemin::Nom`), et en une phrase la \
          raison. N'invente aucun symbole : s'il n'est pas dans l'index, n'ajoute pas l'écran. Réponds `elements: []` \
          si rien ne manque.",
         if connues.is_empty() {
@@ -891,6 +994,70 @@ pub fn demande_completion(index: &Index) -> (String, Value) {
         }}}
     });
     (consigne, schema)
+}
+
+/// Adresse de l'application reçue déduite du projet, quand Tibo n'en a pas saisi (SPEC-23 R7) : `/`
+/// quand le projet est wikik lui-même (l'application est le serveur qui sert le cahier), sinon le serveur
+/// de développement du front (`angular.json` : 4200, Vite : 5173, Trunk : 8080, ou le port déclaré).
+pub fn url_detectee(index: &Index) -> Option<String> {
+    let lire = |rel: &str| std::fs::read_to_string(index.racine.join(rel)).ok();
+    let port_dans = |texte: &str, motif: &str| -> Option<u16> {
+        Regex::new(motif)
+            .ok()?
+            .captures(texte)?
+            .get(1)?
+            .as_str()
+            .parse()
+            .ok()
+    };
+    if lire("crates/wikik/Cargo.toml").is_some_and(|t| t.contains("name = \"wikik\"")) {
+        return Some("/".into());
+    }
+    let mut fichiers = vec![];
+    for e in index.marcheur().ok()?.flatten() {
+        let n = e.file_name().to_string_lossy().to_string();
+        if matches!(
+            n.as_str(),
+            "angular.json"
+                | "vite.config.ts"
+                | "vite.config.js"
+                | "vite.config.mjs"
+                | "Trunk.toml"
+                | "index.html"
+        ) && let Ok(rel) = e.path().strip_prefix(&index.racine)
+        {
+            fichiers.push((n, rel.to_string_lossy().to_string()));
+        }
+    }
+    let local = |p: u16| Some(format!("http://127.0.0.1:{p}"));
+    if let Some((_, r)) = fichiers.iter().find(|(n, _)| n == "angular.json") {
+        return local(
+            lire(r)
+                .and_then(|t| port_dans(&t, r#""port"\s*:\s*(\d+)"#))
+                .unwrap_or(4200),
+        );
+    }
+    if let Some((_, r)) = fichiers.iter().find(|(n, _)| n.starts_with("vite.config")) {
+        return local(
+            lire(r)
+                .and_then(|t| port_dans(&t, r"port\s*:\s*(\d+)"))
+                .unwrap_or(5173),
+        );
+    }
+    if let Some((_, r)) = fichiers.iter().find(|(n, _)| n == "Trunk.toml") {
+        return local(
+            lire(r)
+                .and_then(|t| port_dans(&t, r"port\s*=\s*(\d+)"))
+                .unwrap_or(8080),
+        );
+    }
+    if fichiers
+        .iter()
+        .any(|(n, r)| n == "index.html" && lire(r).is_some_and(|t| t.contains("data-trunk")))
+    {
+        return local(8080);
+    }
+    None
 }
 
 #[cfg(test)]
@@ -929,5 +1096,17 @@ mod tests {
         assert!(a.nom == "Mon nom" && a.masque);
         assert!(r.iter().find(|p| p.cle == "/b").unwrap().disparue);
         assert!(r.iter().any(|p| p.cle == "/c") && r[0].cle == GENERAL);
+        // Retrouvée sous sa route, une page garde sa clé d'origine (ses remarques y sont rattachées).
+        let mut ancienne = mk("traitement", "Traitement");
+        ancienne.symboles = vec!["f.svelte::Traitement".into()];
+        let mut nouvelle = mk("/reception/traitement", "Traitement");
+        nouvelle.symboles = ancienne.symboles.clone();
+        nouvelle.route = Some("/reception/traitement".into());
+        let r = fusionner(&[ancienne], vec![nouvelle]);
+        assert_eq!(r.len(), 2);
+        assert_eq!(
+            (r[1].cle.as_str(), r[1].route.as_deref(), r[1].disparue),
+            ("traitement", Some("/reception/traitement"), false)
+        );
     }
 }

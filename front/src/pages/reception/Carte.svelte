@@ -2,6 +2,7 @@
   // Carte des pages du cahier de réception (SPEC-23 R5) : les pages trouvées dans le code, groupées, avec
   // leurs remarques ouvertes et leur lien dans l'application ; adresse de l'application, scanner à
   // nouveau, compléter par le LLM, renommer, masquer, regrouper, ajouter une route.
+  // @relu 2026-10-19 619d237e
   import type { Page } from "../../types/Page";
   import { reception, ecrireReception, remarquesDe, actuelles, lienApplication, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
@@ -28,7 +29,7 @@
   const ouvertes = $derived(actuelles().filter((r) => r.statut === "ouverte").length);
   const total = $derived(actuelles().length);
   // svelte-ignore state_referenced_locally
-  let adresse = $state(reception.etat?.url_application ?? "");
+  let adresse = $state(reception.etat?.url_application ?? (reception.etat?.url_detectee === "/" ? "" : (reception.etat?.url_detectee ?? "")));
   const masquees = $derived(etat.pages.filter((p) => p.masque).length);
 
   async function action(route: string, corps: unknown = {}, succes = "") {
@@ -70,7 +71,7 @@
   <label for="adresse-app">Adresse de l'application reçue</label>
   <input id="adresse-app" bind:value={adresse} placeholder="http://10.0.0.21:4200" />
   <button type="submit">Enregistrer</button>
-  <span class="discret">pour les liens « ouvrir dans l'application » de chaque page</span>
+  <span class="discret">{reception.etat?.url_application ? "" : reception.etat?.url_detectee ? `déduite du projet : ${reception.etat.url_detectee === "/" ? "ce serveur" : reception.etat.url_detectee}` : "à saisir pour ouvrir les pages"}</span>
 </form>
 
 <div class="actions">

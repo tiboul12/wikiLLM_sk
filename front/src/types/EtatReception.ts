@@ -4,10 +4,14 @@ import type { Remarque } from "./Remarque";
 
 /**
  * État servi à l'écran : la carte, les remarques (versions remplacées comprises, pour l'historique) et
- * l'adresse de l'application reçue.
+ * l'adresse de l'application reçue (saisie, ou déduite du projet).
  */
 export type EtatReception = { pages: Array<Page>, remarques: Array<Remarque>, fournisseur: string, 
 /**
- * Adresse de l'application reçue, pour les liens « ouvrir dans l'application ».
+ * Adresse de l'application reçue, saisie par Tibo, pour les liens « ouvrir dans l'application ».
  */
-url_application: string | null, };
+url_application: string | null, 
+/**
+ * Adresse déduite du projet quand aucune n'est saisie (`/` : le serveur lui-même).
+ */
+url_detectee: string | null, };

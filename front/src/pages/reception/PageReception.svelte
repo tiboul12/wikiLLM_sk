@@ -1,8 +1,9 @@
 <script lang="ts">
-  // Une page de l'application : le lien pour l'ouvrir dans l'application, ce que le code en dit (route,
+  // Une page de l'application : le lien qui l'ouvre dans un nouvel onglet (adresse saisie ou déduite du
+  // projet ; saisie sur place si rien n'est déduit), ce que le code en dit (route,
   // composant, exigences), ses remarques, et la carte pour en ajouter une ; on passe à la page suivante
   // sans revenir à la carte.
-  import { reception, remarquesDe, lienApplication, SOURCES } from "../../lib/reception.svelte";
+  import { reception, remarquesDe, lienApplication, ecrireReception, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
   import CarteRemarque from "../../composants/reception/CarteRemarque.svelte";
@@ -14,6 +15,11 @@
   const p = $derived(reception.etat?.pages.find((x) => x.cle === cle));
   const rs = $derived(remarquesDe(cle));
   const precedente = $derived(i > 0 ? visibles[i - 1] : null);
+  let adresse = $state("");
+  async function enregistrerAdresse(e: SubmitEvent) {
+    e.preventDefault();
+    if (adresse.trim()) await ecrireReception("application", { url: adresse.trim() }).catch(() => {});
+  }
   const suivante = $derived(i >= 0 && i < visibles.length - 1 ? visibles[i + 1] : null);
 </script>
 
@@ -32,16 +38,15 @@
   {@const lien = lienApplication(p.route)}
   <div class="lien-application">
     {#if lien}
-      <a class="bouton" href={lien} target="_blank" rel="noopener">Ouvrir cette page dans l'application ↗</a>
-      <span class="discret">{lien}</span>
-    {:else if p.cle === "general"}
-      <span class="discret">Remarques qui ne visent pas un écran en particulier.</span>
-    {:else if !reception.etat?.url_application}
-      <span class="discret">Pour un lien direct vers cette page : saisis l'adresse de l'application en tête de la <a href={url.reception()}>carte</a>.</span>
-    {:else if p.source === "enum"}
-      <span class="discret">Écran affiché par état (pas d'adresse directe) : ouvre l'application et va sur « {p.nom} ».</span>
+      <a class="bouton principal" href={lien} target="_blank" rel="noopener">{p.route ? "Ouvrir cette page" : "Ouvrir l'application"} ↗</a>
+      <a class="discret" href={lien} target="_blank" rel="noopener">{lien}</a>
+      {#if !p.route && p.cle !== "general"}<span class="discret">(pas d'adresse directe pour cet écran : ✎ sur la carte pour en donner une)</span>{/if}
     {:else}
-      <span class="discret">Route inconnue : ajoute-la avec ✎ sur la <a href={url.reception()}>carte</a> pour avoir le lien direct.</span>
+      <form class="adresse-application" onsubmit={enregistrerAdresse}>
+        <label for="adresse-page">Adresse de l'application</label>
+        <input id="adresse-page" bind:value={adresse} placeholder="http://10.0.0.21:4200" />
+        <button type="submit">Enregistrer</button>
+      </form>
     {/if}
   </div>
 
