@@ -968,7 +968,8 @@ pub fn ajouter_llm(index: &Index, propositions: &[Value]) -> Result<Vec<Ajout>> 
     Ok(ajoutees)
 }
 
-/// Demande au LLM les pages que les détecteurs n'ont pas trouvées (SPEC-22 R5) : (consigne, schéma).
+/// Demande au LLM les pages que les détecteurs n'ont pas trouvées (SPEC-22 R5) : (consigne, schéma). La
+/// consigne reprend la méthode de lecture du wiki des paramètres (`[ia] consigne_lecture`).
 /// @relu 2026-10-19 b304927a
 pub fn demande_completion(index: &Index) -> (String, Value) {
     let connues: Vec<String> = lire(index)
@@ -985,13 +986,15 @@ pub fn demande_completion(index: &Index) -> (String, Value) {
         .collect();
     let consigne = format!(
         "Tu prépares la réception d'une application : la liste de ses écrans, pour que l'utilisateur y dépose ses remarques.\n\
-         Lis le projet avec les outils wikik (carte, fichier, symbole, cherche, pages) ; tu n'écris rien.\n\n\
+         Lis le projet avec les outils wikik (carte, fichier, symbole, cherche, pages) ; tu n'écris rien.\n\
+         Méthode de lecture du wiki : {}\n\n\
          Écrans déjà trouvés par l'analyse du code :\n{}\n\n\
          Trouve les écrans que l'utilisateur peut atteindre et qui manquent (vues affichées par un état, onglets, \
          fenêtres modales importantes, pages servies par le serveur). Pour chacun : un nom court en français, sa route \
          (l'adresse exacte qui l'ouvre dans l'application, paramètre compris, ex. `/atelier/pitch`) si elle existe, l'identifiant exact du symbole de l'index qui l'affiche (`chemin::Nom`), et en une phrase la \
          raison. N'invente aucun symbole : s'il n'est pas dans l'index, n'ajoute pas l'écran. Réponds `elements: []` \
          si rien ne manque.",
+        index.config.ia.consigne_lecture,
         if connues.is_empty() {
             "(aucun)".to_string()
         } else {

@@ -7,8 +7,10 @@ import type { Route } from "./routeur.svelte";
 import type { Projet } from "../types/Projet";
 import { statique } from "./statique";
 
-/** Une section de l'interface (une icône de la barre d'activité). */
-export type Section = "accueil" | "produit" | "projet" | "atelier" | "reception";
+/** Une section de l'interface (une icône de la barre d'activité).
+ * @relu 2026-10-19 bcbfecb4
+ */
+export type Section = "accueil" | "produit" | "projet" | "atelier" | "reception" | "parametres";
 
 /** Sections présentes : le site exporté n'a ni atelier ni réception.
  * @relu 2026-10-19 5f1194ed
@@ -16,7 +18,7 @@ export type Section = "accueil" | "produit" | "projet" | "atelier" | "reception"
 export const SECTIONS: Section[] = statique ? ["accueil", "projet", "produit"] : ["accueil", "projet", "atelier", "produit", "reception"];
 
 /** Nom affiché de chaque section.
- * @relu 2026-10-19 6c2ea740
+ * @relu 2026-10-19 d5f07643
  */
 export const NOMS: Record<Section, string> = {
   accueil: "Accueil",
@@ -24,10 +26,11 @@ export const NOMS: Record<Section, string> = {
   projet: "Projet",
   atelier: "Design thinking",
   reception: "Réception",
+  parametres: "Paramètres",
 };
 
 /** Section d'une page ; `null` pour une page commune à toutes (recherche, graphe).
- * @relu 2026-10-19 3ed32023
+ * @relu 2026-10-19 5f721e41
  */
 export function sectionDe(route: Route, projet: Projet | null): Section | null {
   switch (route.page) {
@@ -55,6 +58,8 @@ export function sectionDe(route: Route, projet: Projet | null): Section | null {
     case "reception-page":
     case "traitement":
       return "reception";
+    case "parametres":
+      return "parametres";
     default:
       return null;
   }

@@ -9,7 +9,7 @@ La section Réception du serveur du projet (`wikik`) est le cahier de réception
 3. L'adresse de l'application reçue est déduite du projet (sinon : section Paramètres) : chaque carte de réception a son lien « Ouvrir cette page ↗ » (une page sans route : ✎ pour l'ajouter).
 4. Ouvrir une page, écrire la remarque, ajouter les captures (« ＋ Capture » rappelle les raccourcis ; Ctrl+V marche n'importe où sur la page, glisser aussi), choisir genre et gravité, « Ajouter la remarque » (Ctrl+Entrée). Une remarque transverse va sur « Général ».
 5. Corriger une remarque : « Modifier » écrit une nouvelle version (`REC-001.2`), l'ancienne reste dans l'historique. « Supprimer » retire toute la chaîne, après confirmation ; un numéro n'est jamais réutilisé.
-6. En fin de campagne : « Traiter les remarques », ou laisser l'agent de code le faire.
+6. En fin de campagne : « Traiter avec l'agent ↗ » envoie la consigne de traitement (section Paramètres ; par défaut, l'agent commence par un plan) dans le terminal intégré : collée dans l'agent s'il tourne, sinon l'agent est lancé avec elle. « Traiter à la main » ouvre la liste des remarques. Le terminal (bouton en haut à droite) est réservé à la machine locale, ou au navigateur ouvert avec l'adresse à clé affichée au lancement.
 
 ## Pour l'agent de code
 

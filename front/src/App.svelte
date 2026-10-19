@@ -1,7 +1,8 @@
 <script lang="ts">
   // Mise en page (EF-131, EF-140) : barre d'activité à gauche (sections), panneau de la section active
   // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le
-  // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler. Le serveur du projet sert les quatre sections
+  // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler ;
+  // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal. Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   // @relu 2026-10-19 64b2a015
   import { api } from "./lib/api";
@@ -30,6 +31,10 @@
   import CahierReception from "./pages/reception/CahierReception.svelte";
   import CarteReception from "./pages/reception/CarteReception.svelte";
   import Traitement from "./pages/reception/Traitement.svelte";
+  import Parametres from "./pages/Parametres.svelte";
+  import PanneauTerminal from "./composants/PanneauTerminal.svelte";
+  import Icone from "./composants/Icone.svelte";
+  import { terminal, chargerParametres } from "./lib/terminal.svelte";
 
   let projet = $state<Projet | null>(null);
   let erreur = $state("");
@@ -47,6 +52,7 @@
     .catch((e) => (erreur = String(e)));
   detecter().then((ok) => ok && choisirParcours(parcoursDeUrl()));
   detecterReception();
+  chargerParametres();
 
   // Le parcours affiché suit l'URL des pages du Design thinking (EF-145).
   $effect(() => {
@@ -59,7 +65,7 @@
   $effect(() => {
     navigation.section = section;
   });
-  const avecPanneau = $derived(section !== "accueil");
+  const avecPanneau = $derived(section !== "accueil" && section !== "parametres");
 
   // Durée de l'appel au LLM en cours, pour le bandeau.
   let maintenant = $state(Date.now());
@@ -88,6 +94,14 @@
     }
   };
   let largeur = $state(lireLargeur());
+  const lireLargeurTerminal = () => {
+    try {
+      return Number(localStorage.getItem("wikik.terminal")) || 560;
+    } catch {
+      return 560;
+    }
+  };
+  let largeurTerminal = $state(lireLargeurTerminal());
   function tirer(e: PointerEvent) {
     const poignee = e.currentTarget as HTMLElement;
     poignee.setPointerCapture(e.pointerId);
@@ -111,6 +125,11 @@
   <form class="recherche" onsubmit={chercher} role="search">
     <input type="search" placeholder="Rechercher dans la doc…" bind:value={saisie} aria-label="Rechercher" />
   </form>
+  {#if terminal.proprietaire}
+    <button class="bouton-terminal" class:actif={terminal.ouvert} onclick={() => (terminal.ouvert = !terminal.ouvert)} title="Terminal du projet (ton agent de développement)" aria-pressed={terminal.ouvert}>
+      <Icone nom="terminal" taille={18} /> <span>Terminal</span>
+    </button>
+  {/if}
 </header>
 {#if atelier.occupe}
   <div class="bandeau-llm" role="status">
@@ -124,7 +143,7 @@
   </div>
 {/if}
 
-<div class="cadre" class:sans-panneau={!avecPanneau} style="--largeur-panneau: {largeur}px">
+<div class="cadre" class:sans-panneau={!avecPanneau} class:avec-terminal={terminal.ouvert} style="--largeur-panneau: {largeur}px; --largeur-terminal: {largeurTerminal}px">
   <BarreActivite active={routeur.route.page === "graphe" ? null : section} graphe={routeur.route.page === "graphe"} />
   {#if avecPanneau}
     <aside class="barre" class:ouverte={barreOuverte}>
@@ -156,6 +175,8 @@
       <Relecture {projet} />
     {:else if routeur.route.page === "accueil"}
       <Accueil {projet} />
+    {:else if routeur.route.page === "parametres"}
+      <Parametres />
     {:else if !atelier.actif && !reception.actif}
       <p class="discret">Cette page n'existe pas dans le site exporté : lance <code>wikik</code> dans le projet.</p>
     {:else if routeur.route.page === "etape"}
@@ -177,3 +198,4 @@
     {/if}
   </main>
 </div>
+{#if terminal.ouvert}<PanneauTerminal bind:largeur={largeurTerminal} />{/if}

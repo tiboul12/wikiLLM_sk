@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Configuration d'un projet.
-/// @relu 2026-10-18 341b2356
+/// @relu 2026-10-19 ca0ea310
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -19,6 +19,31 @@ pub struct Config {
     pub atelier: ConfigAtelier,
     pub serveur: ConfigServeur,
     pub reception: ConfigReception,
+    pub ia: ConfigIa,
+}
+
+/// Section `[ia]` : consignes données aux LLM et agent de développement (EF-147), réglables dans la
+/// section Paramètres.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigIa {
+    /// Méthode de lecture du wiki : instructions du serveur MCP (tout client, Claude Code compris) et
+    /// préambule des demandes de l'atelier et de la réception.
+    pub consigne_lecture: String,
+    /// Consigne tapée dans le terminal par « Traiter les remarques » (EF-148).
+    pub consigne_traitement: String,
+    /// Commande qui lance l'agent de développement dans le terminal intégré.
+    pub agent: String,
+}
+
+impl Default for ConfigIa {
+    fn default() -> Self {
+        Self {
+            consigne_lecture: "Interroger wikik avant d'ouvrir des fichiers source : carte en début de session, symbole puis impact avant de modifier du code ; document pour lire un besoin, une exigence ou une décision par son identifiant.".into(),
+            consigne_traitement: "Traite les remarques ouvertes du cahier de réception de ce projet (outil MCP reception de wikik). Commence par un plan : regroupe les remarques par lot, donne l'ordre et ce que tu vas changer pour chacune, et attends ma validation avant de coder. Ensuite, lot par lot : corrige, vérifie, commite, puis enregistre chaque remarque avec reception_traiter (statut, explication en une phrase, commit).".into(),
+            agent: "claude".into(),
+        }
+    }
 }
 
 /// Section `[reception]` : dossier du cahier de réception (carte des pages, remarques, images ; SPEC-23).

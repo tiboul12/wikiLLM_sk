@@ -8,8 +8,8 @@
 import { statique } from "./statique";
 /** Page à afficher, déduite de l'URL : `produit` et `projet` sont les accueils de section, `relecture` la
  * liste des documents à relire, `clarifications` leur tableau de bord ; `etape` à
- * `clarifier` n'existent que dans l'atelier, les trois dernières dans le cahier de réception (pas dans le
- * site exporté). */
+ * `clarifier` n'existent que dans l'atelier, `reception` à `traitement` dans le cahier de réception, et
+ * `parametres` (pas dans le site exporté). */
 export type Route =
   | { page: "accueil" }
   | { page: "produit" }
@@ -26,7 +26,8 @@ export type Route =
   | { page: "clarifications" }
   | { page: "reception" }
   | { page: "reception-page"; cle: string }
-  | { page: "traitement" };
+  | { page: "traitement" }
+  | { page: "parametres" };
 
 /** Chemin, paramètres et ancre de l'URL courante, quel que soit le mode. */
 function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
@@ -57,6 +58,7 @@ function analyser(): Route {
   if (chemin.startsWith("/clarification/")) return { page: "clarification", id: chemin.slice("/clarification/".length) };
   if (chemin === "/clarifications") return { page: "clarifications" };
   if (chemin.startsWith("/clarifier/")) return { page: "clarifier", sujet: chemin.slice("/clarifier/".length) };
+  if (chemin === "/parametres") return { page: "parametres" };
   if (chemin === "/reception") return { page: "reception" };
   if (chemin === "/reception/traitement") return { page: "traitement" };
   if (chemin.startsWith("/reception/page/")) return { page: "reception-page", cle: params.get("cle") ?? "" };
@@ -117,7 +119,7 @@ export function parcoursDeUrl(): string {
  * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`,
  * `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
  * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>` (avec
- * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarification/<id>`, `/clarifier/<id>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement`.
+ * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarification/<id>`, `/clarifier/<id>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres`.
  */
 export const url = {
   accueil: () => `${prefixe}/`,
@@ -139,4 +141,5 @@ export const url = {
   // La clé d'une page est souvent une route (`/configurer`) : elle voyage en paramètre.
   pageReception: (cle: string) => `${prefixe}/reception/page/?cle=${encodeURIComponent(cle)}`,
   traitement: () => `${prefixe}/reception/traitement`,
+  parametres: () => `${prefixe}/parametres`,
 };

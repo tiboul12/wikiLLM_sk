@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Cahier de réception (SPEC-23 R5, EF-140) : les pages trouvées dans le code, groupées, chacune avec sa
+  // Cahier de réception (SPEC-23 R5, EF-140) : « Traiter avec l'agent » (EF-148) ou à la main ; les pages
+  // trouvées dans le code, groupées, chacune avec sa
   // carte de réception (ses remarques) et son lien dans l'application ; scanner à nouveau, chercher les
   // écrans manquants par le LLM (annulable, écrans ajoutés listés avec leur raison, EF-146), renommer,
   // masquer, regrouper, ajouter une route. L'adresse de l'application est déduite du projet
@@ -11,6 +12,7 @@
   import { reception, ecrireReception, remarquesDe, actuelles, lienApplication, visible, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
+  import EnvoiAgent from "../../composants/reception/EnvoiAgent.svelte";
 
   const etat = $derived(reception.etat!);
   let voirMasquees = $state(false);
@@ -77,7 +79,8 @@
 </div>
 
 <div class="actions">
-  <a class="bouton principal" href={url.traitement()}>Traiter les remarques →</a>
+  <EnvoiAgent />
+  <a class="bouton" href={url.traitement()}>Traiter à la main →</a>
   <button onclick={() => action("scanner", {}, "Carte mise à jour.")}>Scanner à nouveau</button>
   {#if reception.occupe}
     <button class="danger" onclick={annulerLLM}>Annuler la recherche</button>

@@ -3,6 +3,7 @@
   // type, la gestion en tête puis les clarifications par sujet (Projet), parcours avec leurs étapes et
   // « + » pour en ajouter, artefacts (Design thinking), arborescence des pages et remarques (Réception).
   // Le titre mène à l'accueil de la section ; un bouton replie tout ; l'élément ouvert est déplié et centré.
+  // @relu 2026-10-19 eb4d041f
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
@@ -227,7 +228,7 @@
 
     {#if section === "reception" && reception.etat}
       <ul class="liens-section">
-        <li><a href={url.traitement()} class:actif={actif(url.traitement())}>Traiter les remarques</a></li>
+        <li><a href={url.traitement()} class:actif={actif(url.traitement())}>Traitement des remarques</a></li>
       </ul>
       <details open class="arbre">
         <summary>Pages de l'application <small>{reception.etat.pages.filter(visible).length}</small></summary>

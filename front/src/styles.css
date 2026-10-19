@@ -579,3 +579,29 @@ a.reprendre { margin-left: auto; }
 .aide-completer { font-size: 13px; margin: 0 0 10px; }
 .ajouts-llm { margin: 8px 0 16px; padding: 10px 14px; border: 1px solid var(--bord); border-left: 3px solid var(--violet); border-radius: 0 var(--rayon) var(--rayon) 0; background: var(--fond-2); font-size: 14px; }
 .ajouts-llm ul { margin: 6px 0; padding-left: 18px; }
+
+/* v7 : paramètres et terminal intégré (EF-147, EF-148) */
+.barre-activite a.bas { margin-bottom: 4px; }
+.bouton-terminal { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 6px 12px; border: 1px solid var(--bord); border-radius: 8px; background: var(--fond-2); color: var(--texte-2); font: inherit; font-size: 13.5px; cursor: pointer; }
+.bouton-terminal:hover, .bouton-terminal.actif { color: var(--accent); border-color: var(--accent); }
+.cadre.avec-terminal { margin-right: var(--largeur-terminal, 560px); }
+.panneau-terminal { position: fixed; top: 54px; right: 0; bottom: 0; z-index: 10; display: flex; flex-direction: column; background: var(--fond); border-left: 1px solid var(--bord); box-shadow: -4px 0 16px rgb(0 0 0 / 0.08); }
+.panneau-terminal header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--bord); background: var(--fond-2); font-size: 13.5px; }
+.panneau-terminal header .espace { flex: 1; }
+.panneau-terminal header button { padding: 3px 10px; border: 1px solid var(--bord); border-radius: 6px; background: var(--fond); color: var(--texte); font: inherit; font-size: 13px; cursor: pointer; }
+.panneau-terminal header button.fermer { border: 0; background: none; font-size: 18px; color: var(--texte-2); }
+.panneau-terminal .erreur { margin: 6px 10px; font-size: 13px; }
+.hote-terminal { flex: 1; min-height: 0; padding: 6px 0 0 8px; }
+.poignee-terminal { position: absolute; top: 0; bottom: 0; left: -3px; width: 6px; cursor: col-resize; touch-action: none; }
+.poignee-terminal:hover, .poignee-terminal:active { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.parametres h2 { font-size: 1.05rem; margin: 22px 0 4px; }
+.parametres fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
+.parametres label small { display: block; color: var(--texte-2); font-size: 12.5px; margin-top: 3px; }
+.parametres textarea.mono { font-family: var(--mono); font-size: 12.5px; }
+.alerte-acces { padding: 8px 12px; border-left: 3px solid var(--orange); background: var(--orange-fond); border-radius: 0 6px 6px 0; font-size: 14px; }
+@media (max-width: 820px) {
+  .cadre.avec-terminal { margin-right: 0; }
+  .panneau-terminal { left: 0; width: auto !important; bottom: 58px; }
+  .poignee-terminal { display: none; }
+  .bouton-terminal span { display: none; }
+}

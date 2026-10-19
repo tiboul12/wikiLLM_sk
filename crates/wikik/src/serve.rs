@@ -20,7 +20,7 @@ use serde::Deserialize;
 use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use wikik_core::atelier::fournisseur::{self, Fournisseur};
+use wikik_core::atelier::fournisseur;
 use wikik_core::{Index, check, wiki};
 
 /// Front compilé (`front/dist`), embarqué dans le binaire en release.
@@ -30,8 +30,15 @@ pub(crate) struct Front;
 
 pub(crate) struct Etat {
     pub(crate) index: Mutex<Index>,
-    /// Fournisseur LLM de l'atelier et du complément de la carte de réception.
-    pub(crate) fournisseur: Box<dyn Fournisseur>,
+    /// Fournisseur LLM de l'atelier et du complément de la carte de réception, remplacé par les
+    /// paramètres.
+    pub(crate) fournisseur: crate::parametres::Commutable,
+    /// `--factice` : les paramètres ne changent pas le fournisseur.
+    pub(crate) factice: bool,
+    /// Clé du propriétaire (ADR-0013).
+    pub(crate) cle: String,
+    /// Terminal intégré, ouvert à la première connexion (EF-148).
+    pub(crate) terminal: Mutex<Option<Arc<crate::terminal::Terminal>>>,
 }
 
 pub(crate) type Partage = Arc<Etat>;
@@ -55,7 +62,7 @@ impl Port {
 }
 
 /// Démarre le serveur du projet sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C ; `factice`
-/// remplace le LLM par les exemples des fiches.
+/// remplace le LLM par les exemples des fiches. La clé du propriétaire est lue ou créée (`.wikik/cle`).
 pub fn servir(
     racine: &Path,
     adresse: &str,
@@ -74,21 +81,34 @@ pub fn servir(
     let fournisseur = fournisseur::depuis_config(&config, &index.racine, &travail)?;
     eprintln!("wikik : LLM {}", fournisseur.nom());
     let racine = index.racine.clone();
+    let cle = crate::acces::cle(&racine)?;
     let etat: Partage = Arc::new(Etat {
         index: Mutex::new(index),
-        fournisseur,
+        fournisseur: crate::parametres::Commutable::new(fournisseur),
+        factice,
+        cle: cle.clone(),
+        terminal: Mutex::new(None),
     });
-    lancer(routes(etat), ip, port, &racine)
+    lancer(routes(etat), ip, port, &racine, &cle)
 }
 
-/// Toutes les routes : lecture du wiki, atelier, réception ; écritures gardées (corps JSON, même origine,
-/// 25 Mo au plus pour les captures).
+/// Toutes les routes : lecture du wiki, atelier, réception, paramètres, terminal ; écritures gardées
+/// (corps JSON, même origine, 25 Mo au plus pour les captures) ; paramètres et terminal réservés au
+/// propriétaire (ADR-0013).
 pub(crate) fn routes(etat: Partage) -> Router {
     routes_wiki()
         .merge(crate::atelier::routes())
         .merge(crate::reception::routes())
+        .merge(crate::parametres::routes(etat.clone()))
+        .merge(crate::terminal::routes(etat.clone()))
+        // Le front aussi passe par les gardes : `/?cle=…` (adresse du lancement) pose le cookie.
+        .fallback(statique)
         .layer(axum::extract::DefaultBodyLimit::max(25 * 1024 * 1024))
         .layer(axum::middleware::from_fn(crate::atelier::meme_origine))
+        .layer(axum::middleware::from_fn_with_state(
+            etat.clone(),
+            crate::acces::cle_en_cookie,
+        ))
         .with_state(etat)
 }
 
@@ -157,14 +177,14 @@ async fn api_image(State(e): State<Partage>, Query(p): Query<ParamImage>) -> Res
     }
 }
 
-/// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C. Un port automatique déjà pris (autre
+/// Ajoute les en-têtes de sécurité, puis sert jusqu'à Ctrl+C (avec l'adresse du client, pour l'accès
+/// du propriétaire). Un port automatique déjà pris (autre
 /// projet ouvert) fait essayer les 20 suivants ; le port obtenu est noté dans `.wikik/serveur.json`
 /// (adresse renvoyée par `atelier_rappel`) et retiré à l'arrêt. En écoute sur toutes les interfaces,
-/// affiche aussi l'adresse à ouvrir depuis un autre poste (IP du réseau local).
-fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path) -> Result<()> {
-    let app = app
-        .fallback(statique)
-        .layer(axum::middleware::map_response(entetes_securite));
+/// affiche aussi l'adresse à ouvrir depuis un autre poste (IP du réseau local), et celle qui porte la
+/// clé du propriétaire (`cle`, ADR-0013).
+fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, cle: &str) -> Result<()> {
+    let app = app.layer(axum::middleware::map_response(entetes_securite));
     let projet = racine
         .file_name()
         .map_or_else(|| "projet".into(), |n| n.to_string_lossy().into_owned());
@@ -200,13 +220,18 @@ fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path) -> Result<()> {
                 // Écoute sur toutes les interfaces : l'adresse utile est celle du réseau local.
                 eprintln!("{nom} : http://127.0.0.1:{port} sur cette machine (Ctrl+C pour arrêter)");
                 match wikik_core::reseau::ip_locale() {
-                    Some(ip) => eprintln!("  → depuis un autre poste : http://{ip}:{port}"),
+                    Some(ip) => eprintln!(
+                        "  → depuis un autre poste : http://{ip}:{port}\n  → avec le terminal et les paramètres (ton poste, ne la partage pas) : http://{ip}:{port}/?cle={cle}"
+                    ),
                     None => eprintln!("  → adresse réseau introuvable : utiliser l'IP de cette machine, port {port}"),
                 }
             } else {
                 eprintln!("{nom} : http://{adresse_socket} (Ctrl+C pour arrêter)");
             }
-            let r = axum::serve(ecoute, app)
+            let r = axum::serve(
+                ecoute,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;
                 })

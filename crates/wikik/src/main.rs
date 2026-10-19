@@ -6,11 +6,14 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use wikik_core::Index;
 
+mod acces;
 mod atelier;
 mod export;
 mod mcp;
+mod parametres;
 mod reception;
 mod serve;
+mod terminal;
 
 /// Doc dans le code, index requêtable par l'agent, wiki, atelier et cahier de réception.
 ///

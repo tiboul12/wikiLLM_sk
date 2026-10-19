@@ -19,7 +19,7 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::Value;
 use wikik_core::Index;
-use wikik_core::atelier::fournisseur::Demande;
+use wikik_core::atelier::fournisseur::{Demande, Fournisseur};
 use wikik_core::atelier::parcours;
 
 /// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel, parcours,

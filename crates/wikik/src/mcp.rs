@@ -181,6 +181,7 @@ fn erreur(id: Value, code: i64, message: &str) -> Value {
 }
 
 /// Réponse à un message ; `None` pour une notification.
+/// @relu 2026-10-19 2f982a20
 fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
     let id = m.get("id").cloned();
     let methode = m.get("method").and_then(Value::as_str).unwrap_or_default();
@@ -194,7 +195,8 @@ fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
                 "protocolVersion": version,
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "wikik", "version": env!("CARGO_PKG_VERSION") },
-                "instructions": "Interroger wikik avant d'ouvrir des fichiers source : carte en début de session, symbole puis impact avant de modifier du code.",
+                // Méthode de lecture du wiki, réglable dans les paramètres (EF-147).
+                "instructions": index.config.ia.consigne_lecture,
             })
         }
         "ping" => json!({}),
