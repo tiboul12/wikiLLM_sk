@@ -12,9 +12,8 @@ decisions: [ADR-0009]
 
 ## Exigences
 
-1. **R1** Le wiki lit `docs/atelier/` (onglet « Atelier » à côté de Produit et Projet) ; une page de besoin, d'exigence ou d'artefact affiche « ouvrir dans l'atelier » si l'URL de l'atelier est connue (`wikik.toml`, `[atelier] url`, défaut `http://127.0.0.1:8485`).
-2. **R2** L'atelier affiche « voir dans le wiki » (`[atelier] url_wiki`, défaut `http://127.0.0.1:8484`).
-   Mise en œuvre : l'atelier sert aussi l'API du wiki, donc ses liens vers les documents restent dans l'atelier ; le tableau de bord donne en plus l'adresse de `wikik serve`. Côté wiki, « ouvrir dans l'atelier » mène à l'étape qui a produit l'artefact (`technique`) et « clarifier » à `/clarifier/<id>`, où Tibo pose sa question. Le front lit `/api/mode` pour savoir quel serveur le sert ; le site exporté n'a ni ces liens ni cette route. Une adresse de boucle locale (`127.0.0.1`, valeur par défaut) prend dans le navigateur l'hôte par lequel il joint déjà le serveur, en gardant le port ; avec `[serveur] reseau = true`, l'URL renvoyée par `atelier_rappel` porte l'IP de la machine.
+1. **R1** Le wiki lit `docs/atelier/` (section « Atelier ») ; une page de besoin, d'exigence ou d'artefact affiche « ouvrir dans l'atelier » et « clarifier » (liens internes : un seul serveur, ADR-0012).
+2. **R2** L'atelier et le wiki sont deux sections du même serveur : les documents s'ouvrent sur place. L'adresse renvoyée par `atelier_rappel` est celle du serveur du projet (port réellement pris, IP du réseau avec `[serveur] reseau = true`).
 3. **R3** Outils MCP ajoutés : `atelier` (liste des artefacts par type : identifiants et titres), `document` (contenu d'un document de l'atelier ou du projet par identifiant), `atelier_rappel` (crée une clarification `CLAR-xxx` sur un identifiant avec une question, renvoie son URL dans l'atelier). Seul `atelier_rappel` écrit, et seulement un fichier `CLAR-`.
 4. **R4** L'écran de clarification charge le sujet et ses sources ; le LLM répond en lisant le projet par MCP ; Tibo conclut ; la conclusion est écrite dans `CLAR-xxx` (`etat: close`).
 5. **R5** La page du sujet dans le wiki liste ses clarifications (arête `sujet`).

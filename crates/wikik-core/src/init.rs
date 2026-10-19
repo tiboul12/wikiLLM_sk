@@ -48,7 +48,7 @@ seuil_visibilite = "pub"
 # Exemple : perime-corps = "erreur"   (erreur | avertissement | info | ignore)
 
 [serveur]
-# true : `wikik atelier` et `wikik serve` écoutent sur le réseau local (ouvrir l'adresse affichée au
+# true : le serveur (`wikik`) écoute sur le réseau local (ouvrir l'adresse affichée au
 # démarrage depuis un autre poste). L'atelier écrit dans le projet : à réserver à un réseau de confiance.
 reseau = false
 "#;

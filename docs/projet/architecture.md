@@ -31,7 +31,7 @@ flowchart LR
   end
   subgraph Bin["wikik (binaire)"]
     CLI["main.rs : CLI"]
-    SRV["serve.rs : axum"]
+    SRV["serve.rs : axum (wiki, atelier, réception)"]
     FRONT["front/ Svelte (embarqué)"]
   end
   SRC --> LANG --> IDX

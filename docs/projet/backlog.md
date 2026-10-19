@@ -31,14 +31,13 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 
 ## ✋ À faire avec Tibo pour passer de `v4.0-rc1` à `v4.0` (atelier)
 
-- [ ] **Lancer le projet « météo »** dans l'atelier en mode Express : `mkdir meteo && cd meteo && git init && wikik init && wikik atelier`, puis http://127.0.0.1:8485 (procédure `skill/procedures/atelier.md`). Le pitch et le free writing sont à toi. Compléter MESURE-03 (durée de la séance, propositions gardées / rejetées, ressenti).
+- [ ] **Lancer le projet « météo »** dans l'atelier en mode Express : `mkdir meteo && cd meteo && git init && wikik init && wikik`, puis la section Atelier (procédure `skill/procedures/atelier.md`). Le pitch et le free writing sont à toi. Compléter MESURE-03 (durée de la séance, propositions gardées / rejetées, ressenti).
 - [ ] **Rappel sur ATS** : accepter que l'atelier écrive `docs/atelier/clarifications/` dans ATS, rouvrir `AC-019` (question C17 / `add_keyword`, déjà essayée sur un clone : MESURE-03) et conclure.
 - [ ] **Relire** la BDR v4, le cahier des charges v4, SPEC-17 à 21 et les 12 fiches de `atelier/techniques/`.
-- [ ] Réinstaller le binaire (`make install`) pour avoir `wikik atelier`.
 
 ## ✋ À faire avec Tibo pour passer de `v5.0-rc1` à `v5.0` (cahier de réception)
 
-- [ ] **Première campagne : la réception de l'atelier.** Depuis wikiK : `wikik reception`, « Compléter avec le LLM » (il trouve les écrans d'étape : Pitch, Free writing, Planche, Tri…), puis tes remarques page par page.
+- [ ] **Première campagne : la réception de l'atelier.** Depuis wikiK : `wikik`, section Réception, « Compléter avec le LLM » (il trouve les écrans d'étape : Pitch, Free writing, Planche, Tri…), puis tes remarques page par page.
 - [ ] **Relire** la BDR v5, le cahier des charges v5, SPEC-22 et 23.
 
 ## 🧩 Constats de la v1 à traiter

@@ -1,10 +1,14 @@
-//! `wikik serve` : sert le wiki en local, en lecture seule, avec le front embarqué (SPEC-09).
+//! Le serveur du projet, lancé par `wikik` (ADR-0012) : le wiki (Produit, Projet), l'atelier et le
+//! cahier de réception sur un seul port, avec le front embarqué (SPEC-09, SPEC-20, SPEC-23).
 //!
-//! Chaque appel d'API met l'index à jour (incrémental) puis lit `wikik_core::wiki`. Aucune route
-//! n'écrit sur le disque ; une adresse hors boucle locale exige `--autoriser-reseau`.
+//! Chaque appel d'API met l'index à jour (incrémental). Les routes de lecture n'écrivent rien ; celles
+//! de l'atelier et de la réception n'écrivent que dans leurs dossiers, et seulement pour une requête
+//! JSON de même origine. Lancer le serveur n'écrit rien dans le dépôt. Une adresse hors boucle locale
+//! exige `--reseau` (ou `[serveur] reseau = true`).
 //!
-//! @req EF-040, ENF-004, ENF-005
+//! @req EF-040, EF-130, ENF-004, ENF-005
 //! @adr 4
+//! @adr 12
 
 use anyhow::{Result, bail};
 use axum::extract::{Query, State};
@@ -16,6 +20,7 @@ use serde::Deserialize;
 use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use wikik_core::atelier::fournisseur::{self, Fournisseur};
 use wikik_core::{Index, check, wiki};
 
 /// Front compilé (`front/dist`), embarqué dans le binaire en release.
@@ -25,10 +30,8 @@ pub(crate) struct Front;
 
 pub(crate) struct Etat {
     pub(crate) index: Mutex<Index>,
-    /// Présent quand le serveur est l'atelier (`wikik atelier`).
-    pub(crate) atelier: Option<crate::atelier::Atelier>,
-    /// Présent quand le serveur est le cahier de réception (`wikik reception`).
-    pub(crate) reception: Option<crate::reception::Reception>,
+    /// Fournisseur LLM de l'atelier et du complément de la carte de réception.
+    pub(crate) fournisseur: Box<dyn Fournisseur>,
 }
 
 pub(crate) type Partage = Arc<Etat>;
@@ -51,34 +54,56 @@ impl Port {
     }
 }
 
-/// Démarre le serveur du wiki sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C.
-/// @relu 2026-10-18 41e0c2df
-pub fn servir(racine: &Path, adresse: &str, port: Port, autoriser_reseau: bool) -> Result<()> {
+/// Démarre le serveur du projet sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C ; `factice`
+/// remplace le LLM par les exemples des fiches.
+pub fn servir(
+    racine: &Path,
+    adresse: &str,
+    port: Port,
+    autoriser_reseau: bool,
+    factice: bool,
+) -> Result<()> {
     let ip = verifier_adresse(adresse, autoriser_reseau)?;
     let mut index = Index::ouvrir(racine)?;
     index.mettre_a_jour()?;
+    let mut config = index.config.atelier.llm.clone();
+    if factice {
+        config.fournisseur = "factice".into();
+    }
+    let travail = wikik_core::atelier::parcours::travail(&index.racine);
+    let fournisseur = fournisseur::depuis_config(&config, &index.racine, &travail)?;
+    eprintln!("wikik : LLM {}", fournisseur.nom());
     let racine = index.racine.clone();
     let etat: Partage = Arc::new(Etat {
         index: Mutex::new(index),
-        atelier: None,
-        reception: None,
+        fournisseur,
     });
-    lancer(routes_wiki().with_state(etat), ip, port, &racine, "wiki")
+    lancer(routes(etat), ip, port, &racine)
 }
 
-/// Refuse une adresse hors boucle locale sans `--autoriser-reseau`.
+/// Toutes les routes : lecture du wiki, atelier, réception ; écritures gardées (corps JSON, même origine,
+/// 25 Mo au plus pour les captures).
+pub(crate) fn routes(etat: Partage) -> Router {
+    routes_wiki()
+        .merge(crate::atelier::routes())
+        .merge(crate::reception::routes())
+        .layer(axum::extract::DefaultBodyLimit::max(25 * 1024 * 1024))
+        .layer(axum::middleware::from_fn(crate::atelier::meme_origine))
+        .with_state(etat)
+}
+
+/// Refuse une adresse hors boucle locale si le réseau n'est pas autorisé (`--reseau` ou `[serveur] reseau`).
 pub(crate) fn verifier_adresse(adresse: &str, autoriser_reseau: bool) -> Result<IpAddr> {
     let ip: IpAddr = adresse.parse()?;
     if !ip.is_loopback() && !autoriser_reseau {
         bail!(
-            "{adresse} n'est pas une adresse locale : ajouter --autoriser-reseau pour exposer le wiki sur le réseau"
+            "{adresse} n'est pas une adresse locale : ajouter --reseau pour exposer le projet sur le réseau"
         );
     }
     Ok(ip)
 }
 
-/// Routes de lecture du wiki, partagées avec l'atelier (SPEC-20) et le cahier de réception, `/api/mode`
-/// qui dit au front quel serveur le sert, et `/api/image` pour les captures des documents.
+/// Routes de lecture du wiki, et `/api/image` pour les captures des documents.
 pub(crate) fn routes_wiki() -> Router<Partage> {
     Router::new()
         .route("/api/projet", get(api_projet))
@@ -87,7 +112,6 @@ pub(crate) fn routes_wiki() -> Router<Partage> {
         .route("/api/graphe", get(api_graphe))
         .route("/api/cherche", get(api_cherche))
         .route("/api/check", get(api_check))
-        .route("/api/mode", get(api_mode))
         .route("/api/image", get(api_image))
 }
 
@@ -133,30 +157,19 @@ async fn api_image(State(e): State<Partage>, Query(p): Query<ParamImage>) -> Res
     }
 }
 
-/// Le front demande s'il est servi par l'atelier (SPEC-20) ou le cahier de réception (SPEC-23), sans
-/// provoquer d'erreur ailleurs.
-async fn api_mode(State(e): State<Partage>) -> Response {
-    Json(serde_json::json!({ "atelier": e.atelier.is_some(), "reception": e.reception.is_some() }))
-        .into_response()
-}
-
 /// Ajoute le front et les en-têtes, puis sert jusqu'à Ctrl+C. Un port automatique déjà pris (autre
-/// projet ouvert) fait essayer les 20 suivants ; le port obtenu est noté dans `.wikik/serveurs.json`
-/// (liens et `atelier_rappel`) et retiré à l'arrêt. En écoute sur toutes les interfaces, affiche aussi
-/// l'adresse à ouvrir depuis un autre poste (IP du réseau local).
-pub(crate) fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, role: &str) -> Result<()> {
+/// projet ouvert) fait essayer les 20 suivants ; le port obtenu est noté dans `.wikik/serveur.json`
+/// (adresse renvoyée par `atelier_rappel`) et retiré à l'arrêt. En écoute sur toutes les interfaces,
+/// affiche aussi l'adresse à ouvrir depuis un autre poste (IP du réseau local).
+fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path) -> Result<()> {
     let app = app
         .fallback(statique)
         .layer(axum::middleware::map_response(entetes_securite));
     let projet = racine
         .file_name()
         .map_or_else(|| "projet".into(), |n| n.to_string_lossy().into_owned());
-    let nom = format!(
-        "wikik {} ({projet})",
-        if role == "wiki" { "serve" } else { role }
-    );
+    let nom = format!("wikik ({projet})");
     let racine = racine.to_path_buf();
-    let role = role.to_string();
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
@@ -182,7 +195,7 @@ pub(crate) fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, role: &
             };
             let adresse_socket = ecoute.local_addr()?;
             let port = adresse_socket.port();
-            wikik_core::reseau::noter_port(&racine, &role, Some(port));
+            wikik_core::reseau::noter_port(&racine, Some(port));
             if adresse_socket.ip().is_unspecified() {
                 // Écoute sur toutes les interfaces : l'adresse utile est celle du réseau local.
                 eprintln!("{nom} : http://127.0.0.1:{port} sur cette machine (Ctrl+C pour arrêter)");
@@ -198,7 +211,7 @@ pub(crate) fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, role: &
                     let _ = tokio::signal::ctrl_c().await;
                 })
                 .await;
-            wikik_core::reseau::noter_port(&racine, &role, None);
+            wikik_core::reseau::noter_port(&racine, None);
             r?;
             Ok(())
         })
@@ -337,8 +350,14 @@ mod tests {
     #[test]
     fn refuse_le_reseau_sans_option() {
         let d = std::env::temp_dir();
-        let e =
-            super::servir(&d, "0.0.0.0", super::Port::choisir(Some(0), 8484), false).unwrap_err();
-        assert!(e.to_string().contains("--autoriser-reseau"));
+        let e = super::servir(
+            &d,
+            "0.0.0.0",
+            super::Port::choisir(Some(0), 8484),
+            false,
+            true,
+        )
+        .unwrap_err();
+        assert!(e.to_string().contains("--reseau"));
     }
 }

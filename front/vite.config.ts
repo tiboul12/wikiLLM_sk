@@ -1,5 +1,5 @@
 // Front du wiki : compilé dans dist/, embarqué par le binaire wikik (rust-embed).
-// En développement, `npm run dev` relaie /api vers `wikik serve` lancé sur le port 8484.
+// En développement, `npm run dev` relaie /api vers le serveur `wikik` lancé sur le port 8484.
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 

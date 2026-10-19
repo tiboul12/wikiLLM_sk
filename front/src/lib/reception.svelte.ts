@@ -1,5 +1,5 @@
 // État du cahier de réception (SPEC-23) : chargé depuis `/api/reception/etat`, rechargé après chaque
-// écriture. Le mode est donné par `/api/mode` (`reception: true` sous `wikik reception`).
+// écriture. Le serveur du projet le sert toujours (ADR-0012) ; le site exporté ne l'a pas.
 //
 // @req EF-123, EF-124
 import type { EtatReception } from "../types/EtatReception";
@@ -7,7 +7,7 @@ import type { Remarque } from "../types/Remarque";
 import { statique } from "./statique";
 import { adapterHote } from "./atelier.svelte";
 
-/** État partagé : `actif` sous `wikik reception`, `etat` (null sinon), `occupe` pendant un appel au LLM. */
+/** État partagé : `actif` quand le serveur sert le cahier, `etat` (null sinon), `occupe` pendant un appel au LLM. */
 export const reception = $state({
   actif: false,
   etat: null as EtatReception | null,
@@ -21,15 +21,12 @@ async function lireEtat(): Promise<EtatReception> {
   return r.json();
 }
 
-/** Détecte le mode réception et charge l'état ; sans effet ailleurs. */
+/** Charge l'état du cahier ; sans effet dans le site exporté. */
 export async function detecterReception(): Promise<boolean> {
   if (statique) return false;
   try {
-    const mode = await fetch("/api/mode").then((r) => r.json());
-    if (mode.reception) {
-      reception.etat = await lireEtat();
-      reception.actif = true;
-    }
+    reception.etat = await lireEtat();
+    reception.actif = true;
   } catch {
     reception.actif = false;
   }

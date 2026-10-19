@@ -1,6 +1,6 @@
 # Atelier de définition du besoin
 
-L'atelier (`wikik atelier`, http://127.0.0.1:8485) mène le framework Fast Design Thinking en 11 étapes : pitch, free writing, carte mentale, analogies, 5W1H, cubing, SCAMPER, storyboard, bilan des besoins, exigences, roadmap. Le LLM propose (`claude -p`, branché sur le serveur MCP de wikik, en lecture seule) ; Tibo garde, corrige ou rejette. Tout est écrit en fichiers : artefacts dans `docs/atelier/`, besoins, BDR, exigences et roadmap dans `docs/projet/`.
+L'atelier (section Atelier du serveur du projet, lancé par `wikik`) mène le framework Fast Design Thinking en 11 étapes : pitch, free writing, carte mentale, analogies, 5W1H, cubing, SCAMPER, storyboard, bilan des besoins, exigences, roadmap. Le LLM propose (`claude -p`, branché sur le serveur MCP de wikik, en lecture seule) ; Tibo garde, corrige ou rejette. Tout est écrit en fichiers : artefacts dans `docs/atelier/`, besoins, BDR, exigences et roadmap dans `docs/projet/`.
 
 ## Pour l'agent de code
 
@@ -14,15 +14,15 @@ L'atelier (`wikik atelier`, http://127.0.0.1:8485) mène le framework Fast Desig
 ```bash
 mkdir mon-projet && cd mon-projet && git init
 wikik init                 # wikik.toml, docs/projet/, gabarits
-wikik atelier              # puis ouvrir http://127.0.0.1:8485 (le wiki est servi avec)
+wikik                      # puis ouvrir l'adresse affichée, section Atelier
 ```
 
-Depuis un autre poste : `reseau = true` dans la section `[serveur]` de `wikik.toml` (une fois), puis `wikik atelier` affiche l'adresse à ouvrir. Les liens entre wiki et atelier suivent l'adresse du navigateur : aucune IP à configurer. Avec plusieurs projets ouverts, chaque atelier prend le port suivant libre (affiché au démarrage) ; le lien renvoyé par `atelier_rappel` vise le bon.
+Depuis un autre poste : `reseau = true` dans la section `[serveur]` de `wikik.toml` (une fois), puis `wikik` affiche l'adresse à ouvrir. Les liens entre wiki et atelier suivent l'adresse du navigateur : aucune IP à configurer. Avec plusieurs projets ouverts, chacun prend le port suivant libre (affiché au démarrage) ; le lien renvoyé par `atelier_rappel` vise le bon.
 
 - Mode **Express** par défaut (moins de propositions, moins de temps) ; **Complet** par étape, au besoin.
 - Le pitch et le free writing sont à toi : le LLM ne fait que proposer un brouillon (pitch) et extraire les unités de sens mot pour mot (free writing).
 - `[atelier] version` dans `wikik.toml` choisit la majeure documentée (`docs/projet/majeures/<version>/`, défaut `v1`).
-- `wikik atelier --factice` rejoue les exemples des fiches sans LLM : pour découvrir l'interface.
+- `wikik --factice` rejoue les exemples des fiches sans LLM : pour découvrir l'interface.
 - Le bandeau du tableau de bord montre la consommation de l'abonnement (5 h, 7 jours) ; chaque appel est noté dans `.wikik/atelier/journal.jsonl`.
 
 Après l'atelier, la suite est celle de `majeure.md` : faire valider BDR et cahier des charges (`statut: validé`), puis specs, ADR et code avec `@req`.

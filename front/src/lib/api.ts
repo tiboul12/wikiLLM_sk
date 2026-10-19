@@ -1,4 +1,4 @@
-// Client de l'API en lecture seule de `wikik serve` (SPEC-09). Types générés depuis Rust (ts-rs).
+// Client de l'API de lecture du wiki (SPEC-09), servie par `wikik`. Types générés depuis Rust (ts-rs).
 //
 // @req EF-040
 import type { Projet } from "../types/Projet";

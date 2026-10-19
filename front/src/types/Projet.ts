@@ -3,11 +3,6 @@ import type { DocumentResume } from "./DocumentResume";
 import type { FichierResume } from "./FichierResume";
 
 /**
- * Accueil du wiki : arbre des fichiers, liste des documents, adresse de l'atelier s'il existe.
+ * Accueil du wiki : arbre des fichiers, liste des documents (zones Projet, atelier, réception), statistiques.
  */
-export type Projet = { nom: string, fichiers: Array<FichierResume>, documents: Array<DocumentResume>, lignes: number, symboles: number, documentes: number, 
-/**
- * Adresse de l'atelier (`[atelier] url`), si le projet en a un : liens « ouvrir dans l'atelier »
- * et « clarifier » (SPEC-21 R1). Absente du site exporté.
- */
-url_atelier: string | null, };
+export type Projet = { nom: string, fichiers: Array<FichierResume>, documents: Array<DocumentResume>, lignes: number, symboles: number, documentes: number, };

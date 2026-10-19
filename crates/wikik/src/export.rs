@@ -40,8 +40,8 @@ fn ecrire<T: Serialize>(racine: &Path, relatif: &str, valeur: &T) -> Result<()> 
         .with_context(|| format!("écriture de {}", chemin.display()))
 }
 
-/// Écrit le site dans `sortie` (créé au besoin, vidé de ses anciens `donnees/` et `assets/`), sans lien
-/// vers l'atelier (adresse locale). Renvoie le nombre de fichiers écrits.
+/// Écrit le site dans `sortie` (créé au besoin, vidé de ses anciens `donnees/` et `assets/`) : accueil,
+/// Produit et Projet, en lecture seule (ni atelier ni réception). Renvoie le nombre de fichiers écrits.
 pub fn exporter(racine: &Path, sortie: &Path) -> Result<usize> {
     let mut index = Index::ouvrir(racine)?;
     index.mettre_a_jour()?;
@@ -74,9 +74,7 @@ pub fn exporter(racine: &Path, sortie: &Path) -> Result<usize> {
         n += 1;
     }
 
-    let mut projet = wiki::projet(&index)?;
-    // Le site publié n'a pas d'atelier : pas de lien vers une adresse locale.
-    projet.url_atelier = None;
+    let projet = wiki::projet(&index)?;
     ecrire(sortie, "donnees/projet.json", &projet)?;
     ecrire(sortie, "donnees/check.json", &check::verifier(&index)?)?;
     ecrire(

@@ -47,25 +47,20 @@ impl Config {
     }
 }
 
-/// Section `[serveur]` : `reseau = true` fait écouter `wikik serve` et `wikik atelier` sur le réseau
-/// local sans option à retaper (équivaut à `--reseau`). Choix explicite : l'atelier écrit dans le projet.
+/// Section `[serveur]` : `reseau = true` fait écouter le serveur (`wikik`) sur le réseau local sans
+/// option à retaper (équivaut à `--reseau`). Choix explicite : le serveur écrit dans le projet.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigServeur {
     pub reseau: bool,
 }
 
-/// Section `[atelier]` : dossier des artefacts, adresses des deux serveurs, version majeure documentée,
-/// LLM (SPEC-17 à 21).
+/// Section `[atelier]` : dossier des artefacts, version majeure documentée, LLM (SPEC-17 à 21).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigAtelier {
     /// Dossier des artefacts de l'atelier, relatif à la racine.
     pub dossier: String,
-    /// Adresse de l'atelier, pour les liens « ouvrir dans l'atelier » du wiki.
-    pub url: String,
-    /// Adresse du wiki, pour les liens « voir dans le wiki » de l'atelier.
-    pub url_wiki: String,
     /// Version majeure que l'atelier documente (dossier `docs/projet/majeures/<version>/`).
     pub version: String,
     pub llm: ConfigLlm,
@@ -75,8 +70,6 @@ impl Default for ConfigAtelier {
     fn default() -> Self {
         Self {
             dossier: "docs/atelier".into(),
-            url: "http://127.0.0.1:8485".into(),
-            url_wiki: "http://127.0.0.1:8484".into(),
             version: "v1".into(),
             llm: ConfigLlm::default(),
         }

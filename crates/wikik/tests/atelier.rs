@@ -1,4 +1,5 @@
-//! `wikik atelier --factice` : routes de l'atelier, garde d'origine, lecture du wiki (SPEC-18, SPEC-20).
+//! `wikik --factice` : routes de l'atelier, garde d'origine, lecture du wiki sur le même serveur
+//! (SPEC-18, SPEC-20, ADR-0012).
 
 use serde_json::Value;
 use std::io::{Read, Write};
@@ -24,7 +25,6 @@ fn demarrer(racine: &std::path::Path) -> Serveur {
         .args([
             "--racine",
             racine.to_str().unwrap(),
-            "atelier",
             "--factice",
             "--port",
             &port.to_string(),
@@ -155,16 +155,13 @@ fn atelier_factice_de_bout_en_bout() {
     );
     assert!(d.path().join(".wikik/atelier/journal.jsonl").exists());
 
-    // Le front sait qu'il est dans l'atelier ; le wiki connaît l'adresse de l'atelier (SPEC-21 R1).
-    assert_eq!(
-        http(p, "GET", "/api/mode", None, &[]),
-        (200, r#"{"atelier":true,"reception":false}"#.into())
-    );
-    // Port réellement pris, noté dans .wikik/serveurs.json (plusieurs projets ouverts à la fois).
+    // Le même serveur sert aussi la réception ; le port réellement pris est noté (adresse d'`atelier_rappel`).
+    assert_eq!(http(p, "GET", "/api/reception/etat", None, &[]).0, 200);
+    let serveur = std::fs::read_to_string(d.path().join(".wikik/serveur.json")).unwrap();
+    assert_eq!(serveur, format!(r#"{{"port":{p}}}"#));
+    let (_, rappel) = post(p, "rappel", r#"{"sujet":"PITCH","question":"Pourquoi ?"}"#);
     assert!(
-        projet.contains(&format!(r#""url_atelier":"http://127.0.0.1:{p}""#)),
-        "{projet}"
+        rappel.contains(&format!("http://127.0.0.1:{p}/clarification/CLAR-001")),
+        "{rappel}"
     );
-    let serveurs = std::fs::read_to_string(d.path().join(".wikik/serveurs.json")).unwrap();
-    assert_eq!(serveurs, format!(r#"{{"atelier":{p}}}"#));
 }

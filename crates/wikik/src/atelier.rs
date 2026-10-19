@@ -1,5 +1,4 @@
-//! `wikik atelier` : l'atelier de définition du besoin (SPEC-18 à SPEC-20), servi avec l'API de lecture du
-//! wiki et le même front.
+//! Routes de l'atelier de définition du besoin (SPEC-18 à SPEC-20), section du serveur du projet.
 //!
 //! Les routes d'écriture passent par le moteur de parcours, qui n'écrit que dans `docs/atelier/`,
 //! `docs/projet/` et `.wikik/atelier/`. Elles exigent un corps JSON et, si le navigateur l'envoie, une
@@ -9,58 +8,23 @@
 //! @req EF-100, EF-104, ENF-007, ENF-008
 //! @adr 10
 
-use crate::serve::{Etat, Partage, lancer, repondre, routes_wiki, verifier_adresse};
+use crate::serve::{Partage, repondre};
 use anyhow::Result;
-use axum::Json;
 use axum::extract::{Request, State};
 use axum::http::{Method, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::Value;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
 use wikik_core::Index;
-use wikik_core::atelier::fournisseur::{self, Demande, Fournisseur};
+use wikik_core::atelier::fournisseur::Demande;
 use wikik_core::atelier::parcours;
 
-/// Fournisseur LLM de l'atelier.
-pub(crate) struct Atelier {
-    pub(crate) fournisseur: Box<dyn Fournisseur>,
-}
-
-/// Démarre l'atelier sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C.
-/// @relu 2026-10-18 9f88592f
-pub fn servir(
-    racine: &Path,
-    adresse: &str,
-    port: crate::serve::Port,
-    autoriser_reseau: bool,
-    factice: bool,
-) -> Result<()> {
-    let ip = verifier_adresse(adresse, autoriser_reseau)?;
-    let mut index = Index::ouvrir(racine)?;
-    index.mettre_a_jour()?;
-    let mut config = index.config.atelier.llm.clone();
-    if factice {
-        config.fournisseur = "factice".into();
-    }
-    let fournisseur =
-        fournisseur::depuis_config(&config, &index.racine, &parcours::travail(&index.racine))?;
-    eprintln!("wikik atelier : fournisseur {}", fournisseur.nom());
-    let racine = index.racine.clone();
-    let etat: Partage = Arc::new(Etat {
-        index: Mutex::new(index),
-        atelier: Some(Atelier { fournisseur }),
-        reception: None,
-    });
-    lancer(routes(etat), ip, port, &racine, "atelier")
-}
-
-/// Routes du wiki et de l'atelier.
-pub(crate) fn routes(etat: Partage) -> axum::Router {
-    routes_wiki()
+/// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel).
+pub(crate) fn routes() -> Router<Partage> {
+    Router::new()
         .route("/api/atelier/etat", get(api_etat))
         .route("/api/atelier/piloter", post(api_piloter))
         .route("/api/atelier/selection", post(api_selection))
@@ -69,8 +33,6 @@ pub(crate) fn routes(etat: Partage) -> axum::Router {
         .route("/api/atelier/saisir", post(api_saisir))
         .route("/api/atelier/synthetiser", post(api_synthetiser))
         .route("/api/atelier/rappel", post(api_rappel))
-        .layer(axum::middleware::from_fn(meme_origine))
-        .with_state(etat)
 }
 
 /// Une écriture venue d'une autre origine (page tierce ouverte dans le navigateur) est refusée.
@@ -91,14 +53,8 @@ pub(crate) async fn meme_origine(requete: Request, suite: Next) -> Response {
     suite.run(requete).await
 }
 
-fn nom_fournisseur(e: &Etat) -> String {
-    e.atelier
-        .as_ref()
-        .map_or_else(|| "aucun".into(), |a| a.fournisseur.nom())
-}
-
 async fn api_etat(State(e): State<Partage>) -> Response {
-    let nom = nom_fournisseur(&e);
+    let nom = e.fournisseur.nom();
     repondre(e, move |i| parcours::etat(i, &nom)).await
 }
 
@@ -139,6 +95,7 @@ struct Proposer {
 }
 
 /// Prépare sous verrou, appelle le LLM sans, range la réponse sous verrou.
+/// @relu 2026-10-19 a34aad18
 async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Response {
     let r = tokio::task::spawn_blocking(move || -> Result<parcours::Lot> {
         let prep = {
@@ -152,12 +109,8 @@ async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Resp
                 p.entree.as_deref(),
             )?
         };
-        let atelier = e
-            .atelier
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("pas de fournisseur"))?;
-        let nom = atelier.fournisseur.nom();
-        let reponse = atelier.fournisseur.proposer(&Demande {
+        let nom = e.fournisseur.nom();
+        let reponse = e.fournisseur.proposer(&Demande {
             consigne: &prep.consigne,
             schema: &prep.schema,
             exemple: prep.exemple.as_ref(),

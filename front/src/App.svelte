@@ -1,14 +1,17 @@
 <script lang="ts">
-  // Mise en page : en-tête (projet, recherche), barre latérale (zones Produit, Projet, Atelier), page courante.
-  // Servie par `wikik atelier`, l'application ajoute les écrans de l'atelier (SPEC-20) ; par
-  // `wikik reception`, ceux du cahier de réception (SPEC-23).
-  // @relu 2026-10-17 a957d8e5
+  // Mise en page (EF-131) : barre d'activité à gauche (sections), panneau de la section active, page
+  // courante ; en-tête avec le projet et la recherche. Le serveur du projet sert les quatre sections
+  // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   import { api } from "./lib/api";
   import { routeur, aller, url } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
   import type { Projet } from "./types/Projet";
+  import { sectionDe, navigation } from "./lib/sections.svelte";
+  import BarreActivite from "./composants/BarreActivite.svelte";
   import Barre from "./composants/Barre.svelte";
   import Accueil from "./pages/Accueil.svelte";
+  import ProduitAccueil from "./pages/ProduitAccueil.svelte";
+  import ProjetAccueil from "./pages/ProjetAccueil.svelte";
   import PageFichier from "./pages/PageFichier.svelte";
   import PageDocument from "./pages/PageDocument.svelte";
   import Recherche from "./pages/Recherche.svelte";
@@ -33,16 +36,18 @@
     .then((p) => {
       projet = p;
       projetCourant.nom = p.nom;
-      atelier.url = p.url_atelier;
       document.title = `${p.nom} · wikik`;
     })
     .catch((e) => (erreur = String(e)));
-  detecter().then((oui) => {
-    if (oui && projet) document.title = `${projet.nom} · atelier wikik`;
+  detecter();
+  detecterReception();
+
+  // Section active : celle de la page, ou la dernière ouverte pour une page commune (recherche, graphe).
+  const section = $derived(sectionDe(routeur.route, projet) ?? navigation.section);
+  $effect(() => {
+    navigation.section = section;
   });
-  detecterReception().then((oui) => {
-    if (oui) document.title = `${projet?.nom ?? "projet"} · réception wikik`;
-  });
+  const avecPanneau = $derived(section !== "accueil");
 
   // Durée de l'appel au LLM en cours, pour le bandeau.
   let maintenant = $state(Date.now());
@@ -64,14 +69,11 @@
 </script>
 
 <header class="entete">
-  <button class="menu" aria-label="Afficher la navigation" onclick={() => (barreOuverte = !barreOuverte)}>☰</button>
+  {#if avecPanneau}<button class="menu" aria-label="Afficher la navigation" onclick={() => (barreOuverte = !barreOuverte)}>☰</button>{/if}
   <a class="marque" href={url.accueil()}><span class="logo">w</span>{projet?.nom ?? "wikik"}</a>
   <form class="recherche" onsubmit={chercher} role="search">
     <input type="search" placeholder="Rechercher dans la doc…" bind:value={saisie} aria-label="Rechercher" />
   </form>
-  {#if atelier.actif}<a class="lien-atelier" href={url.atelier()}>Atelier</a>{/if}
-  {#if reception.actif}<a class="lien-atelier" href={url.reception()}>Réception</a>{/if}
-  <a class="lien-graphe" href={url.graphe()}>Graphe</a>
 </header>
 {#if atelier.occupe}
   <div class="bandeau-llm" role="status">
@@ -81,16 +83,19 @@
   <div class="bandeau-llm" role="status">Le LLM lit le projet par MCP et cherche les écrans que le scan n'a pas trouvés…</div>
 {/if}
 
-<div class="cadre">
-  <aside class="barre" class:ouverte={barreOuverte}>
-    {#if projet}
-      <Barre {projet} />
-    {:else if erreur}
-      <p class="erreur">{erreur}</p>
-    {:else}
-      <p class="discret">Chargement…</p>
-    {/if}
-  </aside>
+<div class="cadre" class:sans-panneau={!avecPanneau}>
+  <BarreActivite active={routeur.route.page === "graphe" ? null : section} graphe={routeur.route.page === "graphe"} />
+  {#if avecPanneau}
+    <aside class="barre" class:ouverte={barreOuverte}>
+      {#if projet}
+        <Barre {projet} {section} />
+      {:else if erreur}
+        <p class="erreur">{erreur}</p>
+      {:else}
+        <p class="discret">Chargement…</p>
+      {/if}
+    </aside>
+  {/if}
   <main class="contenu">
     {#if routeur.route.page === "fichier"}
       {#key routeur.route.chemin}<PageFichier chemin={routeur.route.chemin} ancre={routeur.route.ancre} />{/key}
@@ -100,24 +105,28 @@
       {#key routeur.route.q}<Recherche q={routeur.route.q} />{/key}
     {:else if routeur.route.page === "graphe"}
       {#key routeur.route.centre}<PageGraphe centre={routeur.route.centre} />{/key}
-    {:else if atelier.actif && atelier.etat && routeur.route.page === "etape"}
-      {#key routeur.route.etape}<Etape etape={routeur.route.etape} />{/key}
-    {:else if reception.actif && reception.etat && routeur.route.page === "reception-page"}
-      {#key routeur.route.cle}<PageReception cle={routeur.route.cle} />{/key}
-    {:else if reception.actif && reception.etat && routeur.route.page === "traitement"}
-      <Traitement />
-    {:else if reception.actif && reception.etat && (routeur.route.page === "reception" || routeur.route.page === "accueil")}
-      <CarteReception />
-    {:else if atelier.actif && atelier.etat && routeur.route.page === "clarifier"}
-      {#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}
-    {:else if atelier.actif && atelier.etat && routeur.route.page === "clarification"}
-      {#key routeur.route.id}<Clarification id={routeur.route.id} />{/key}
-    {:else if atelier.actif && atelier.etat && (routeur.route.page === "atelier" || routeur.route.page === "accueil")}
-      <Tableau />
-    {:else if routeur.route.page !== "accueil"}
-      <p class="discret">{atelier.actif || reception.actif ? "Chargement…" : "Cette page n'existe que dans l'atelier (wikik atelier) ou le cahier de réception (wikik reception)."}</p>
-    {:else}
+    {:else if routeur.route.page === "produit"}
+      <ProduitAccueil {projet} />
+    {:else if routeur.route.page === "projet"}
+      <ProjetAccueil {projet} />
+    {:else if routeur.route.page === "accueil"}
       <Accueil {projet} />
+    {:else if !atelier.actif && !reception.actif}
+      <p class="discret">Cette page n'existe pas dans le site exporté : lance <code>wikik</code> dans le projet.</p>
+    {:else if routeur.route.page === "etape"}
+      {#if atelier.etat}{#key routeur.route.etape}<Etape etape={routeur.route.etape} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "clarification"}
+      {#if atelier.etat}{#key routeur.route.id}<Clarification id={routeur.route.id} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "clarifier"}
+      {#if atelier.etat}{#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "atelier"}
+      {#if atelier.etat}<Tableau />{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "reception-page"}
+      {#if reception.etat}{#key routeur.route.cle}<PageReception cle={routeur.route.cle} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "traitement"}
+      {#if reception.etat}<Traitement />{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "reception"}
+      {#if reception.etat}<CarteReception />{:else}<p class="discret">Chargement…</p>{/if}
     {/if}
   </main>
 </div>

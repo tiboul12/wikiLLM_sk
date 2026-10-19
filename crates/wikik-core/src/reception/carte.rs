@@ -698,7 +698,7 @@ fn ecrire_avec(
     }
     fm.insert("pages".into(), serde_json::to_value(pages)?);
     let mut corps = String::from(
-        "# Carte des pages\n\n> Construite par `wikik reception` à partir du code ; noms, masques et groupes corrigés à l'écran sont gardés par les scans suivants.\n\n| Page | Route | Code | Source |\n|---|---|---|---|\n",
+        "# Carte des pages\n\n> Construite par le cahier de réception (`wikik`) à partir du code ; noms, masques et groupes corrigés à l'écran sont gardés par les scans suivants.\n\n| Page | Route | Code | Source |\n|---|---|---|---|\n",
     );
     for p in pages.iter().filter(|p| !p.masque) {
         corps.push_str(&format!(

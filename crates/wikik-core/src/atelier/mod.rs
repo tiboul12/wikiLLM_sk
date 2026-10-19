@@ -21,6 +21,7 @@ use serde_json::json;
 /// le port réellement pris par l'atelier du projet (plusieurs projets ouverts).
 ///
 /// @req EF-110
+/// @relu 2026-10-19 76342eae
 pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, String)> {
     let c = &index.conn;
     let existe: bool = c
@@ -58,7 +59,7 @@ pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, Str
         ),
     )?;
     let atelier =
-        crate::reseau::pour_le_reseau(&crate::reseau::adresse_atelier(index), &index.config);
+        crate::reseau::pour_le_reseau(&crate::reseau::adresse_serveur(index), &index.config);
     let url = format!("{}/clarification/{id}", atelier.trim_end_matches('/'));
     Ok((id, url))
 }

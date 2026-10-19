@@ -12,7 +12,7 @@ decisions: [ADR-0009, ADR-0004]
 
 ## Choix
 
-Même front que le wiki (Svelte 5 + TypeScript, embarqué), servi par `wikik atelier` (port 8485) qui expose aussi l'API de lecture du wiki ; l'application détecte le mode atelier par l'API `/api/atelier/etat`. Français. Navigateur (pas d'application de bureau en v4).
+Même front que le wiki (Svelte 5 + TypeScript, embarqué) ; l'atelier est la section « Atelier » du serveur du projet (`wikik`, ADR-0012). Français. Navigateur (pas d'application de bureau en v4).
 
 ## Écrans
 
@@ -34,7 +34,7 @@ Les écrans non listés (Analogies, 5W1H, Cubing) utilisent l'écran générique
 
 ## API de l'atelier
 
-Servie par `wikik atelier` en plus de l'API de lecture du wiki. Les écritures sont en `POST` JSON ; une requête dont l'en-tête `Origin` ne correspond pas à l'hôte est refusée (403), un corps non JSON aussi (415).
+Servie par le serveur du projet (`wikik`), avec l'API de lecture du wiki et celle de la réception. Les écritures sont en `POST` JSON ; une requête dont l'en-tête `Origin` ne correspond pas à l'hôte est refusée (403), un corps non JSON aussi (415).
 
 | Route | Corps | Effet |
 |---|---|---|

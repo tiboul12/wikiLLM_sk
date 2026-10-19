@@ -1,5 +1,6 @@
-//! `wikik reception` : carte scannée au lancement, remarques avec images, images servies sans risque,
-//! traitement, outil de requête (SPEC-22, SPEC-23).
+//! Cahier de réception du serveur `wikik` : carte proposée sans rien écrire, enregistrée à la première
+//! remarque, remarques avec images, images servies sans risque, traitement, outil de requête (SPEC-22,
+//! SPEC-23, ADR-0012).
 
 use serde_json::Value;
 use std::io::{Read, Write};
@@ -38,7 +39,6 @@ fn demarrer(racine: &Path) -> Serveur {
         .args([
             "--racine",
             racine.to_str().unwrap(),
-            "reception",
             "--factice",
             "--port",
             &port.to_string(),
@@ -101,7 +101,7 @@ fn cahier_de_bout_en_bout() {
     let s = demarrer(d.path());
     let p = s.1;
 
-    // La carte est construite au premier lancement.
+    // La carte est proposée sans rien écrire dans le dépôt (ADR-0012).
     let (c, e) = json(p, "GET", "/api/reception/etat", None);
     assert_eq!(c, 200);
     let cles: Vec<&str> = e["pages"]
@@ -114,7 +114,10 @@ fn cahier_de_bout_en_bout() {
         cles.contains(&"general") && cles.contains(&"/panier") && cles.contains(&"bibliotheque"),
         "{cles:?}"
     );
-    assert_eq!(json(p, "GET", "/api/mode", None).1["reception"], true);
+    assert!(
+        !d.path().join("docs/reception").exists(),
+        "lancer le serveur n'écrit rien"
+    );
 
     // Une remarque avec deux captures.
     let corps = serde_json::json!({ "page": "/panier", "texte": "Le total ne se met pas à jour\nquand on retire un article.", "genre": "bug", "gravite": "bloquant", "images": [PNG, PNG] }).to_string();

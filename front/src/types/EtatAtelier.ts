@@ -8,6 +8,7 @@ import type { Lot } from "./Lot";
 /**
  * État complet de l'atelier, servi à l'interface : étapes, artefacts, clarifications et leurs
  * propositions, fournisseur, consommation de l'abonnement.
+ * @relu 2026-10-19 aa54f2c7
  */
 export type EtatAtelier = { 
 /**
@@ -25,4 +26,4 @@ fiche_clarification: Fiche,
 /**
  * Propositions des clarifications (une par clarification).
  */
-lots_clarification: Array<Lot>, fournisseur: string, consommation: Consommation | null, url_wiki: string, };
+lots_clarification: Array<Lot>, fournisseur: string, consommation: Consommation | null, };

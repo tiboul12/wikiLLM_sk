@@ -1,7 +1,6 @@
 // État de l'atelier (SPEC-20) : chargé depuis `/api/atelier/etat`, rechargé après chaque écriture.
 //
-// Le mode atelier est donné par `/api/mode` (servie par `wikik serve` et `wikik atelier`, absente du
-// site exporté).
+// Le serveur du projet sert toujours l'atelier (ADR-0012) ; le site exporté ne l'a pas.
 //
 // @req EF-100, EF-101
 import type { EtatAtelier } from "../types/EtatAtelier";
@@ -9,13 +8,11 @@ import type { ArtefactResume } from "../types/ArtefactResume";
 import { statique } from "./statique";
 
 /**
- * État partagé : `actif` dans l'atelier, `url` de l'atelier vue du wiki, `etat` (null hors atelier),
+ * État partagé : `actif` quand le serveur sert l'atelier, `etat` (null sinon),
  * `occupe` : appels au LLM en cours.
  */
 export const atelier = $state({
   actif: false,
-  /** Adresse de l'atelier vue depuis `wikik serve` (null sans atelier, ou dans le site exporté). */
-  url: null as string | null,
   etat: null as EtatAtelier | null,
   occupe: 0,
   depuis: 0,
@@ -28,17 +25,12 @@ async function lireEtat(): Promise<EtatAtelier> {
   return r.json();
 }
 
-/** Détecte le mode atelier et charge l'état ; sans effet en mode statique ou sur `wikik serve`.
- * @relu 2026-10-17 c5c12988
- */
+/** Charge l'état de l'atelier ; sans effet dans le site exporté. */
 export async function detecter(): Promise<boolean> {
   if (statique) return false;
   try {
-    const mode = await fetch("/api/mode").then((r) => r.json());
-    if (mode.atelier) {
-      atelier.etat = await lireEtat();
-      atelier.actif = true;
-    }
+    atelier.etat = await lireEtat();
+    atelier.actif = true;
   } catch {
     atelier.actif = false;
   }
@@ -75,13 +67,9 @@ export async function ecrire<T = unknown>(route: string, corps: unknown, llm = f
   }
 }
 
-/**
- * Lien vers une page de l'atelier : relatif quand l'atelier sert lui-même le wiki, absolu depuis
- * `wikik serve` (hôte adapté par [`adapterHote`]) ; null sans atelier.
- */
+/** Lien vers une page de l'atelier ; null dans le site exporté (pas d'atelier). */
 export function lienAtelier(chemin: string): string | null {
-  if (atelier.actif) return chemin;
-  return atelier.url ? adapterHote(atelier.url) + chemin : null;
+  return atelier.actif ? chemin : null;
 }
 
 /**

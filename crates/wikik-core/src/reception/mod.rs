@@ -20,11 +20,19 @@ pub struct EtatReception {
     pub url_application: Option<String>,
 }
 
-/// État du cahier de réception pour l'écran.
-/// @relu 2026-10-18 e001f71e
+/// État du cahier de réception pour l'écran ; tant que la carte n'est pas enregistrée, celle que le scan
+/// trouve maintenant (rien n'est écrit).
 pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatReception> {
     Ok(EtatReception {
-        pages: carte::lire(index),
+        pages: {
+            // Carte pas encore enregistrée : celle que le scan trouve maintenant, sans rien écrire.
+            let enregistree = carte::lire(index);
+            if enregistree.is_empty() {
+                carte::fusionner(&[], carte::detecter(index)?)
+            } else {
+                enregistree
+            }
+        },
         remarques: remarques::lister(index)?,
         fournisseur: fournisseur.into(),
         url_application: carte::url_application(index),

@@ -75,6 +75,7 @@ pub struct EtatEtape {
 
 /// État complet de l'atelier, servi à l'interface : étapes, artefacts, clarifications et leurs
 /// propositions, fournisseur, consommation de l'abonnement.
+/// @relu 2026-10-19 aa54f2c7
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct EtatAtelier {
@@ -90,7 +91,6 @@ pub struct EtatAtelier {
     pub lots_clarification: Vec<Lot>,
     pub fournisseur: String,
     pub consommation: Option<Consommation>,
-    pub url_wiki: String,
 }
 
 /// Demande prête à envoyer au LLM, construite sous verrou puis exécutée sans.
@@ -306,7 +306,7 @@ fn selection(p: &Map<String, Value>, docs: &[Doc], fiche: &Fiche, se: &SousEtape
 // ---------------------------------------------------------------- état servi à l'interface
 
 /// État de l'atelier pour l'interface : chaque étape avec ses artefacts, sélections et lots.
-/// @relu 2026-10-18 698058ee
+/// @relu 2026-10-19 46d01390
 pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
     let p = charger_parcours(index);
     let docs = documents(index)?;
@@ -364,7 +364,6 @@ pub fn etat(index: &Index, fournisseur: &str) -> Result<EtatAtelier> {
         lots_clarification: lots_de(index, fiches::fiche("clarification")?),
         fournisseur: fournisseur.into(),
         consommation: derniere_consommation(index),
-        url_wiki: crate::reseau::adresse_wiki(index),
     })
 }
 

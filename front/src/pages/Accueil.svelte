@@ -1,65 +1,51 @@
 <script lang="ts">
-  // Accueil : chiffres du projet et doc à reprendre (même rapport que `wikik check`).
+  // Accueil du projet (EF-131) : une tuile par section avec son état, pour aller où il faut d'un clic.
   import type { Projet } from "../types/Projet";
-  import { api, type RapportCheck } from "../lib/api";
   import { url } from "../lib/routeur.svelte";
+  import { SECTIONS } from "../lib/sections.svelte";
+  import { atelier } from "../lib/atelier.svelte";
+  import { reception, actuelles } from "../lib/reception.svelte";
+  import Icone from "../composants/Icone.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
-  let rapport = $state<RapportCheck | null>(null);
-  api.check().then((r) => (rapport = r)).catch(() => {});
-
   const taux = $derived(projet && projet.symboles ? Math.round((100 * projet.documentes) / projet.symboles) : 0);
-  const aReprendre = $derived(
-    rapport?.diagnostics.filter((d) => d.severite !== "info").slice(0, 40) ?? [],
-  );
-  const lienDiag = (d: { fichier: string; symbole: string | null }) =>
-    d.fichier.endsWith(".md")
-      ? url.document(projet?.documents.find((x) => x.chemin === d.fichier)?.id ?? "")
-      : url.fichier(d.fichier, d.symbole?.slice(d.fichier.length + 2));
+  const docs = (zone: string, genre?: string) => (projet?.documents ?? []).filter((d) => d.zone === zone && (!genre || d.genre === genre)).length;
+  const etapesFaites = $derived(atelier.etat?.etapes.filter((e) => e.etat === "faite" || e.etat === "sautee").length ?? 0);
+  const enCours = $derived(atelier.etat?.etapes.find((e) => e.etat === "en_cours")?.fiche.titre);
+  const ouvertes = $derived(reception.etat ? actuelles().filter((r) => r.statut === "ouverte").length : 0);
+  const pages = $derived(reception.etat?.pages.filter((p) => !p.masque && p.cle !== "general").length ?? 0);
 </script>
 
 {#if projet}
   <h1>{projet.nom}</h1>
-  <section class="tuiles">
-    <div class="tuile"><span class="valeur">{projet.fichiers.length}</span><span class="nom">fichiers de code</span></div>
-    <div class="tuile"><span class="valeur">{projet.lignes.toLocaleString("fr")}</span><span class="nom">lignes</span></div>
-    <div class="tuile"><span class="valeur">{projet.symboles}</span><span class="nom">symboles</span></div>
-    <div class="tuile">
-      <span class="valeur">{taux} %</span><span class="nom">documentés</span>
+  <p class="discret">Le code, ses documents, la définition du besoin et la réception de l'application, au même endroit.</p>
+  <div class="sections-accueil">
+    <a class="section-tuile" href={url.produit()}>
+      <span class="entete-tuile"><Icone nom="produit" taille={26} /> <strong>Produit</strong></span>
+      <span class="chiffre">{projet.fichiers.length} <small>fichiers</small></span>
+      <span class="discret">{projet.symboles} symboles · {taux} % documentés</span>
       <span class="jauge"><span style="width: {taux}%"></span></span>
-    </div>
-    <div class="tuile"><span class="valeur">{projet.documents.length}</span><span class="nom">documents Projet</span></div>
-    {#if rapport}
-      <div class="tuile" class:alerte={rapport.resume.erreurs > 0}>
-        <span class="valeur">{rapport.resume.erreurs} · {rapport.resume.avertissements}</span><span class="nom">erreurs · avertissements</span>
-      </div>
+    </a>
+    <a class="section-tuile" href={url.projet()}>
+      <span class="entete-tuile"><Icone nom="projet" taille={26} /> <strong>Projet</strong></span>
+      <span class="chiffre">{docs("projet")} <small>documents</small></span>
+      <span class="discret">{docs("projet", "besoin")} besoins · {docs("projet", "exigence")} exigences · {docs("projet", "adr")} décisions</span>
+    </a>
+    {#if SECTIONS.includes("atelier")}
+      <a class="section-tuile" href={url.atelier()}>
+        <span class="entete-tuile"><Icone nom="atelier" taille={26} /> <strong>Atelier</strong></span>
+        <span class="chiffre">{etapesFaites} / {atelier.etat?.etapes.length ?? 11} <small>étapes</small></span>
+        <span class="discret">{atelier.etat?.projet ? `« ${atelier.etat.projet} »` : "Définir le besoin : commencer par le pitch"}{enCours ? ` · en cours : ${enCours}` : ""}</span>
+      </a>
     {/if}
-  </section>
-
-  {#if rapport}
-    <h2>À reprendre</h2>
-    {#if aReprendre.length === 0}
-      <p>Rien à signaler : la doc suit le code.</p>
-    {:else}
-      <table class="diagnostics">
-        <thead><tr><th>Sévérité</th><th>Code</th><th>Où</th><th>Message</th></tr></thead>
-        <tbody>
-          {#each aReprendre as d}
-            <tr class={d.severite}>
-              <td>{d.severite}</td>
-              <td><code>{d.code}</code></td>
-              <td><a href={lienDiag(d)}>{d.fichier}:{d.ligne}</a></td>
-              <td>{d.message}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-      {#if rapport.diagnostics.length > aReprendre.length}
-        <p class="discret">Liste complète : <code>wikik check</code>.</p>
-      {/if}
+    {#if SECTIONS.includes("reception")}
+      <a class="section-tuile" class:attention={ouvertes > 0} href={url.reception()}>
+        <span class="entete-tuile"><Icone nom="reception" taille={26} /> <strong>Réception</strong></span>
+        <span class="chiffre">{ouvertes} <small>remarque{ouvertes > 1 ? "s" : ""} ouverte{ouvertes > 1 ? "s" : ""}</small></span>
+        <span class="discret">{pages} pages trouvées dans le code</span>
+      </a>
     {/if}
-    {#if rapport.mode_reference === "local"}
-      <p class="discret">Hors dépôt git : la doc périmée est détectée par une référence locale.</p>
-    {/if}
-  {/if}
+  </div>
+{:else}
+  <p class="discret">Chargement…</p>
 {/if}

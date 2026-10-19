@@ -12,7 +12,7 @@ decisions: [ADR-0010]
 
 ## Exigences
 
-1. **R1 Serveur.** `wikik reception` (port 8487, ou le suivant libre ; `[serveur] reseau` comme les autres) sert l'API du wiki et celle de la réception, avec le même front ; `/api/mode` répond `reception: true`. Écritures limitées à `docs/reception/` ; même garde d'origine que l'atelier ; corps jusqu'à 25 Mo (images).
+1. **R1 Serveur.** Le cahier est la section « Réception » du serveur du projet (`wikik`, ADR-0012) ; écritures limitées à `docs/reception/`, mêmes gardes que l'atelier (corps JSON, même origine), corps jusqu'à 25 Mo (images). Ouvrir le cahier n'écrit rien : la carte proposée par le scan est enregistrée à la première remarque, correction ou adresse.
 2. **R2 Remarque** : `docs/reception/remarques/REC-xxx.md`. Frontmatter : `id`, `type: remarque`, `titre` (début du texte), `statut` (`ouverte`, `traitee`, `reportee`, `rejetee`), `page` (clé de la carte), `nom_page`, `genre` (`bug`, `ergonomie`, `evolution`, `question`), `gravite` (`bloquant`, `genant`, `detail`), `symboles`, `exigences`, `images`, `date` ; après traitement `resolution`, `commit`. Corps : le texte, puis les images en Markdown relatif (`![capture 1](../images/REC-001-1.png)`), lisible aussi sur GitHub.
 3. **R3 Images** : collées (presse-papiers) ou déposées, envoyées en `data:` URL ; PNG, JPEG, GIF, WebP seulement, 10 Mo chacune au plus ; écrites dans `docs/reception/images/`. Le serveur les sert par `/api/image?chemin=…` (même liste de types, chemin sous la racine du projet, jamais hors de `docs/`) ; le front réécrit les images relatives d'un document vers cette route.
 4. **R4 Index** : `docs/reception/` est une zone de documents (onglet « Réception » du wiki) ; la carte et les remarques sont cherchables.

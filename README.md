@@ -7,9 +7,11 @@
 - **indexe** la doc écrite dans le code (Rust `///` `//!` ; TypeScript, JavaScript et Svelte en JSDoc `/** */`) et la zone Projet (`docs/projet/` : besoins, exigences, ADR, specs) avec tree-sitter et SQLite ;
 - **répond à l'agent de code** à faible coût en tokens (`wikik query …`) : sur ATS (Rust) le contexte d'une modification coûte 20 à 80 fois moins que la lecture des fichiers ([MESURE-01](./docs/projet/mesures/mesure-01-v1-agent.md)), sur shelley (Angular) un composant de 3 400 lignes se résume en 1 500 tokens ([MESURE-02](./docs/projet/mesures/mesure-02-v2-typescript.md)) ;
 - **détecte la doc périmée** : le code d'une fonction a changé depuis le dernier commit qui a touché son bloc (`wikik check`) ;
-- **sert un wiki local** en lecture seule : code et doc en cellules, documents du projet, liens entre les deux, graphe (`wikik serve`) ;
-- **tient le cahier de réception** : la carte des pages de l'application, construite à partir du code, et les remarques de l'utilisateur page par page, captures comprises, que l'agent traite ensuite (`wikik reception`) ;
-- **anime l'atelier de définition du besoin** (Fast Design Thinking) avec un LLM branché sur le wiki par MCP, et en tire besoins, BDR, exigences et roadmap dans `docs/projet/` (`wikik atelier`).
+- **ouvre tout le projet d'une seule commande, `wikik`**, avec une page d'accueil et une barre de sections à gauche :
+  - **Produit** : le code et sa doc en cellules, liens, graphe ;
+  - **Projet** : besoins, exigences, décisions, specs, versions majeures ;
+  - **Atelier** : la définition du besoin (Fast Design Thinking) avec un LLM branché sur le wiki par MCP, qui produit besoins, BDR, exigences et roadmap ;
+  - **Réception** : la carte des pages de l'application, construite à partir du code, et les remarques de l'utilisateur page par page, captures comprises, que l'agent traite ensuite.
 
 ---
 
@@ -22,12 +24,10 @@ cd mon-projet
 wikik init              # wikik.toml, docs/projet/, gabarits dans docs/modeles/, .wikik/ dans .gitignore
 wikik query carte       # vue d'ensemble pour l'agent
 wikik check             # doc périmée, manquante, références cassées
-wikik serve             # wiki sur http://127.0.0.1:8484
-wikik atelier           # atelier + wiki sur http://127.0.0.1:8485 (LLM : `claude -p`, abonnement Claude Code)
-wikik reception         # cahier de réception + wiki sur http://127.0.0.1:8487
+wikik                   # tout le projet sur http://127.0.0.1:8484 : Produit, Projet, Atelier, Réception
 ```
 
-Pour ouvrir le wiki ou l'atelier depuis un autre poste, mettre une fois `reseau = true` dans la section `[serveur]` de `wikik.toml` (ou lancer avec `--reseau`) : au démarrage, le serveur affiche l'adresse à ouvrir (`→ depuis un autre poste : http://10.0.0.21:8485`). L'atelier sert aussi le wiki : une seule commande suffit. Plusieurs projets ouverts en même temps prennent chacun le port suivant libre (8485, 8486…), affiché au démarrage avec le nom du projet.
+Pour l'ouvrir depuis un autre poste, mettre une fois `reseau = true` dans la section `[serveur]` de `wikik.toml` (ou lancer `wikik --reseau`) : au démarrage, le serveur affiche l'adresse à ouvrir (`→ depuis un autre poste : http://10.0.0.21:8484`). Plusieurs projets ouverts en même temps prennent chacun le port suivant libre (8484, 8485…), affiché avec le nom du projet. `wikik --factice` remplace le LLM de l'atelier par les exemples des fiches (pour découvrir l'interface). Le serveur n'écrit que dans `docs/atelier/`, `docs/projet/` et `docs/reception/`, et rien au lancement.
 
 | Commande | Rôle |
 |---|---|
@@ -40,8 +40,7 @@ Pour ouvrir le wiki ou l'atelier depuis un autre poste, mettre une fois `reseau 
 | `wikik init --ci` · `--hook` | Workflow GitHub (check annoté, wiki publié), `CODEOWNERS`, hook pre-commit |
 | `wikik nouveau <exigence\|besoin\|adr\|spec> "titre"` | Crée le prochain identifiant libre |
 | `wikik stats` | Couverture de la doc |
-| `wikik reception` | Cahier de réception : pages de l'application trouvées dans le code, remarques avec captures, traitement |
-| `wikik atelier [--factice]` | Atelier de définition du besoin ; `--factice` rejoue les exemples des fiches, sans LLM |
+| `wikik [--reseau] [--port N] [--factice]` | Serveur du projet : accueil, Produit, Projet, Atelier, Réception |
 | `wikik mcp` | Serveur MCP (stdio) : les requêtes comme outils pour l'agent. Claude Code : `claude mcp add wikik -- wikik mcp` |
 
 Pour lancer un projet avec l'atelier, ou y rappeler un point flou pendant le développement : [`skill/procedures/atelier.md`](./skill/procedures/atelier.md). Pour recevoir une application et traiter les remarques : [`skill/procedures/reception.md`](./skill/procedures/reception.md).
@@ -58,7 +57,7 @@ Pour l'agent de code : le skill [`skill/SKILL.md`](./skill/SKILL.md) (règles d'
 - 🔭 [Suite du projet (backlog)](./docs/projet/backlog.md)
 - 🤖 [Consignes pour Claude Code](./CLAUDE.md)
 
-Le mieux reste de lancer `wikik serve` à la racine de ce dépôt : wikik se documente avec lui-même.
+Le mieux reste de lancer `wikik` à la racine de ce dépôt : wikik se documente avec lui-même.
 
 ---
 

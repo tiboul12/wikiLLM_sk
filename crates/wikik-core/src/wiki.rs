@@ -1,4 +1,4 @@
-//! Données des pages du wiki : structures de l'API de `wikik serve`, construites depuis l'index.
+//! Données des pages du wiki : structures de l'API du serveur (`wikik`), construites depuis l'index.
 //!
 //! Les structures sont exportées en TypeScript (`ts-rs`, dossier `front/src/types/`) pour que le
 //! front et le cœur ne se désynchronisent pas (ADR-0004). Aucune entrée/sortie réseau ici.
@@ -16,7 +16,7 @@ use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use ts_rs::TS;
 
-/// Accueil du wiki : arbre des fichiers, liste des documents, adresse de l'atelier s'il existe.
+/// Accueil du wiki : arbre des fichiers, liste des documents (zones Projet, atelier, réception), statistiques.
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct Projet {
@@ -26,9 +26,6 @@ pub struct Projet {
     pub lignes: u32,
     pub symboles: u32,
     pub documentes: u32,
-    /// Adresse de l'atelier (`[atelier] url`), si le projet en a un : liens « ouvrir dans l'atelier »
-    /// et « clarifier » (SPEC-21 R1). Absente du site exporté.
-    pub url_atelier: Option<String>,
 }
 
 /// Fichier de code dans l'arbre de la zone Produit.
@@ -191,9 +188,7 @@ fn u(v: i64) -> u32 {
     u32::try_from(v).unwrap_or(0)
 }
 
-/// Accueil : fichiers avec leur rôle, documents (zone Projet ou atelier), statistiques, adresse de
-/// l'atelier quand le projet a un dossier d'atelier.
-/// @relu 2026-10-18 fd0fd887
+/// Accueil : fichiers avec leur rôle, documents avec leur zone (Projet, atelier, réception), statistiques.
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -254,15 +249,6 @@ pub fn projet(index: &Index) -> Result<Projet> {
         .racine
         .file_name()
         .map_or_else(|| "projet".into(), |n| n.to_string_lossy().into_owned());
-    let url_atelier = index
-        .racine
-        .join(&index.config.atelier.dossier)
-        .is_dir()
-        .then(|| {
-            crate::reseau::adresse_atelier(index)
-                .trim_end_matches('/')
-                .to_string()
-        });
     Ok(Projet {
         nom,
         fichiers,
@@ -270,7 +256,6 @@ pub fn projet(index: &Index) -> Result<Projet> {
         lignes: u(lignes),
         symboles,
         documentes,
-        url_atelier,
     })
 }
 

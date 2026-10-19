@@ -1,73 +1,26 @@
-//! `wikik reception` : le cahier de réception (SPEC-22, SPEC-23), servi avec l'API de lecture du wiki et
-//! le même front.
+//! Routes du cahier de réception (SPEC-22, SPEC-23), section du serveur du projet.
 //!
 //! Les écritures ne touchent que `docs/reception/` ; mêmes gardes que l'atelier (corps JSON, origine
 //! identique). Le corps d'une requête peut atteindre 25 Mo : les captures collées voyagent en base64.
 //!
 //! @req EF-120, EF-121, EF-122, EF-123, EF-124
 
-use crate::atelier::{ecrire, meme_origine, resultat};
-use crate::serve::{Etat, Partage, Port, lancer, repondre, routes_wiki, verifier_adresse};
+use crate::atelier::{ecrire, resultat};
+use crate::serve::{Partage, repondre};
 use anyhow::Result;
-use axum::Json;
 use axum::extract::State;
 use axum::response::Response;
 use axum::routing::{get, post};
+use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::Value;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
 use wikik_core::Index;
-use wikik_core::atelier::fournisseur::{self, Demande, Fournisseur};
+use wikik_core::atelier::fournisseur::Demande;
 use wikik_core::reception::{carte, remarques};
 
-/// Fournisseur LLM du cahier (complément de la carte).
-pub(crate) struct Reception {
-    pub(crate) fournisseur: Box<dyn Fournisseur>,
-}
-
-/// Démarre le cahier de réception sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C. La carte
-/// est scannée au premier lancement.
-pub fn servir(
-    racine: &Path,
-    adresse: &str,
-    port: Port,
-    autoriser_reseau: bool,
-    factice: bool,
-) -> Result<()> {
-    let ip = verifier_adresse(adresse, autoriser_reseau)?;
-    let mut index = Index::ouvrir(racine)?;
-    index.mettre_a_jour()?;
-    if carte::lire(&index).is_empty() {
-        let pages = carte::scanner(&index)?;
-        index.mettre_a_jour()?;
-        eprintln!(
-            "wikik reception : carte construite, {} page(s)",
-            pages.len()
-        );
-    }
-    let mut config = index.config.atelier.llm.clone();
-    if factice {
-        config.fournisseur = "factice".into();
-    }
-    let travail = index
-        .racine
-        .join(wikik_core::index::DOSSIER)
-        .join("reception");
-    let fournisseur = fournisseur::depuis_config(&config, &index.racine, &travail)?;
-    let racine = index.racine.clone();
-    let etat: Partage = Arc::new(Etat {
-        index: Mutex::new(index),
-        atelier: None,
-        reception: Some(Reception { fournisseur }),
-    });
-    lancer(routes(etat), ip, port, &racine, "reception")
-}
-
-/// Routes du wiki et du cahier de réception.
-/// @relu 2026-10-18 b19a58bd
-pub(crate) fn routes(etat: Partage) -> axum::Router {
-    routes_wiki()
+/// Routes du cahier de réception.
+pub(crate) fn routes() -> Router<Partage> {
+    Router::new()
         .route("/api/reception/etat", get(api_etat))
         .route("/api/reception/scanner", post(api_scanner))
         .route("/api/reception/page", post(api_page))
@@ -76,16 +29,19 @@ pub(crate) fn routes(etat: Partage) -> axum::Router {
         .route("/api/reception/supprimer", post(api_supprimer))
         .route("/api/reception/application", post(api_application))
         .route("/api/reception/completer", post(api_completer))
-        .layer(axum::extract::DefaultBodyLimit::max(25 * 1024 * 1024))
-        .layer(axum::middleware::from_fn(meme_origine))
-        .with_state(etat)
+}
+
+/// La carte est enregistrée au premier geste qui en a besoin (remarque, correction, adresse) : ouvrir
+/// le cahier n'écrit rien dans le dépôt (ADR-0012).
+fn assurer_carte(i: &Index) -> Result<()> {
+    if carte::lire(i).is_empty() {
+        carte::scanner(i)?;
+    }
+    Ok(())
 }
 
 async fn api_etat(State(e): State<Partage>) -> Response {
-    let nom = e
-        .reception
-        .as_ref()
-        .map_or_else(|| "aucun".into(), |r| r.fournisseur.nom());
+    let nom = e.fournisseur.nom();
     repondre(e, move |i| wikik_core::reception::etat(i, &nom)).await
 }
 
@@ -104,6 +60,7 @@ struct Correction {
 
 async fn api_page(State(e): State<Partage>, Json(p): Json<Correction>) -> Response {
     ecrire(e, move |i| {
+        assurer_carte(i)?;
         carte::corriger(
             i,
             &p.cle,
@@ -122,7 +79,11 @@ struct Application {
 }
 
 async fn api_application(State(e): State<Partage>, Json(p): Json<Application>) -> Response {
-    ecrire(e, move |i| carte::definir_url_application(i, &p.url)).await
+    ecrire(e, move |i| {
+        assurer_carte(i)?;
+        carte::definir_url_application(i, &p.url)
+    })
+    .await
 }
 
 /// Saisie d'une remarque : création (`id` absent) ou nouvelle version d'une remarque (`id`).
@@ -141,6 +102,7 @@ struct SaisieRemarque {
 
 async fn api_remarque(State(e): State<Partage>, Json(p): Json<SaisieRemarque>) -> Response {
     ecrire(e, move |i| {
+        assurer_carte(i)?;
         let date = wikik_core::relu::aujourdhui();
         let s = remarques::Saisie {
             page: &p.page,
@@ -185,18 +147,16 @@ async fn api_traiter(State(e): State<Partage>, Json(p): Json<Traitement>) -> Res
 }
 
 /// Demande au LLM les pages manquantes (hors verrou), puis les ajoute à la carte.
+/// @relu 2026-10-19 f5140df8
 async fn api_completer(State(e): State<Partage>) -> Response {
     let r = tokio::task::spawn_blocking(move || -> Result<Vec<carte::Page>> {
         let (consigne, schema) = {
             let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
             i.mettre_a_jour()?;
+            assurer_carte(&i)?;
             carte::demande_completion(&i)
         };
-        let r = e
-            .reception
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("pas de fournisseur"))?;
-        let reponse = r.fournisseur.proposer(&Demande {
+        let reponse = e.fournisseur.proposer(&Demande {
             consigne: &consigne,
             schema: &schema,
             exemple: Some(&Value::Array(vec![])),

@@ -12,15 +12,37 @@ mod mcp;
 mod reception;
 mod serve;
 
-/// Doc dans le code, index requêtable par l'agent, wiki local.
+/// Doc dans le code, index requêtable par l'agent, wiki, atelier et cahier de réception.
+///
+/// Sans sous-commande, lance le serveur du projet (ADR-0012) : wiki, atelier et réception sur un port.
 #[derive(Parser)]
 #[command(name = "wikik", version, about)]
 struct Cli {
     /// Racine du projet (par défaut : dossier courant).
     #[arg(long, global = true, default_value = ".")]
     racine: PathBuf,
+    #[command(flatten)]
+    serveur: OptionsServeur,
     #[command(subcommand)]
-    commande: Commande,
+    commande: Option<Commande>,
+}
+
+/// Options du serveur (`wikik` sans sous-commande).
+#[derive(clap::Args)]
+struct OptionsServeur {
+    /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
+    #[arg(long)]
+    adresse: Option<String>,
+    /// Port (défaut : 8484, ou le suivant libre si un autre projet l'occupe).
+    #[arg(long)]
+    port: Option<u16>,
+    /// Écoute sur le réseau local (comme `[serveur] reseau = true`) : le projet, qui s'écrit depuis
+    /// l'atelier et la réception, devient visible des autres postes.
+    #[arg(long)]
+    reseau: bool,
+    /// LLM factice : l'atelier rejoue les exemples des fiches, sans appel.
+    #[arg(long)]
+    factice: bool,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -74,60 +96,8 @@ enum Commande {
     },
     /// Serveur MCP sur stdio : les requêtes de l'agent comme outils (Claude Code : `claude mcp add wikik -- wikik mcp`).
     Mcp,
-    /// Atelier de définition du besoin (Fast Design Thinking), avec le wiki en lecture.
-    Atelier {
-        /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
-        #[arg(long)]
-        adresse: Option<String>,
-        /// Port (défaut : 8485, ou le suivant libre si un autre projet l'occupe).
-        #[arg(long)]
-        port: Option<u16>,
-        /// Écoute sur le réseau local (comme `[serveur] reseau = true`) : l'atelier, qui écrit, devient
-        /// visible des autres postes.
-        #[arg(long)]
-        reseau: bool,
-        /// Autorise une `--adresse` hors boucle locale.
-        #[arg(long)]
-        autoriser_reseau: bool,
-        /// Fournisseur factice : renvoie les exemples des fiches, sans LLM.
-        #[arg(long)]
-        factice: bool,
-    },
-    /// Cahier de réception : carte des pages construite à partir du code, remarques page par page.
-    Reception {
-        /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
-        #[arg(long)]
-        adresse: Option<String>,
-        /// Port (défaut : 8487, ou le suivant libre si un autre projet l'occupe).
-        #[arg(long)]
-        port: Option<u16>,
-        /// Écoute sur le réseau local (comme `[serveur] reseau = true`).
-        #[arg(long)]
-        reseau: bool,
-        /// Autorise une `--adresse` hors boucle locale.
-        #[arg(long)]
-        autoriser_reseau: bool,
-        /// Fournisseur factice pour le complément de la carte (sans LLM).
-        #[arg(long)]
-        factice: bool,
-    },
     /// Marque le bloc d'un symbole comme relu (`@relu AAAA-MM-JJ <jeton du code>`).
     Relu { symbole: String },
-    /// Sert le wiki en local, en lecture seule.
-    Serve {
-        /// Adresse d'écoute (défaut : 127.0.0.1, ou le réseau si `[serveur] reseau = true`).
-        #[arg(long)]
-        adresse: Option<String>,
-        /// Port (défaut : 8484, ou le suivant libre si un autre projet l'occupe).
-        #[arg(long)]
-        port: Option<u16>,
-        /// Écoute sur le réseau local (comme `[serveur] reseau = true`).
-        #[arg(long)]
-        reseau: bool,
-        /// Autorise une `--adresse` hors boucle locale.
-        #[arg(long)]
-        autoriser_reseau: bool,
-    },
 }
 
 #[derive(Subcommand)]
@@ -186,9 +156,22 @@ fn main() {
 }
 
 /// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-18 c97e0a29
+/// @relu 2026-10-19 31f8fd6b
 fn executer(cli: Cli) -> anyhow::Result<i32> {
-    match cli.commande {
+    let Some(commande) = cli.commande else {
+        let o = cli.serveur;
+        let (adresse, autoriser) = ecoute(&cli.racine, o.adresse, o.reseau)?;
+        let port = serve::Port::choisir(o.port, wikik_core::reseau::PORT_DEFAUT);
+        serve::servir(&cli.racine, &adresse, port, autoriser, o.factice)?;
+        return Ok(0);
+    };
+    let o = &cli.serveur;
+    if o.adresse.is_some() || o.port.is_some() || o.reseau || o.factice {
+        anyhow::bail!(
+            "--adresse, --port, --reseau et --factice vont avec `wikik` seul (le serveur)"
+        );
+    }
+    match commande {
         Commande::Index { dump_json } => {
             let mut index = Index::ouvrir(&cli.racine)?;
             let r = index.mettre_a_jour()?;
@@ -287,55 +270,6 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
             mcp::servir(&cli.racine)?;
             Ok(0)
         }
-        Commande::Serve {
-            adresse,
-            port,
-            reseau,
-            autoriser_reseau,
-        } => {
-            let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
-            serve::servir(
-                &cli.racine,
-                &adresse,
-                serve::Port::choisir(port, 8484),
-                autoriser,
-            )?;
-            Ok(0)
-        }
-        Commande::Atelier {
-            adresse,
-            port,
-            reseau,
-            autoriser_reseau,
-            factice,
-        } => {
-            let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
-            atelier::servir(
-                &cli.racine,
-                &adresse,
-                serve::Port::choisir(port, 8485),
-                autoriser,
-                factice,
-            )?;
-            Ok(0)
-        }
-        Commande::Reception {
-            adresse,
-            port,
-            reseau,
-            autoriser_reseau,
-            factice,
-        } => {
-            let (adresse, autoriser) = ecoute(&cli.racine, adresse, reseau, autoriser_reseau)?;
-            reception::servir(
-                &cli.racine,
-                &adresse,
-                serve::Port::choisir(port, 8487),
-                autoriser,
-                factice,
-            )?;
-            Ok(0)
-        }
         Commande::Relu { symbole } => {
             let mut index = Index::ouvrir(&cli.racine)?;
             index.mettre_a_jour()?;
@@ -348,20 +282,19 @@ fn executer(cli: Cli) -> anyhow::Result<i32> {
     }
 }
 
-/// Adresse d'écoute d'un serveur : `--adresse` si donnée ; sinon le réseau local avec `--reseau` ou
+/// Adresse d'écoute du serveur : `--adresse` si donnée, sinon toutes les interfaces avec `--reseau` ou
 /// `[serveur] reseau = true` dans `wikik.toml`, la boucle locale par défaut. Renvoie (adresse, réseau
-/// autorisé).
+/// autorisé) : une adresse hors boucle locale n'est acceptée qu'avec le réseau autorisé.
 fn ecoute(
     racine: &std::path::Path,
     adresse: Option<String>,
     reseau: bool,
-    autoriser: bool,
 ) -> anyhow::Result<(String, bool)> {
-    let config_reseau = wikik_core::config::Config::charger(racine)?.serveur.reseau;
+    let reseau = reseau || wikik_core::config::Config::charger(racine)?.serveur.reseau;
     Ok(match adresse {
-        Some(a) => (a, autoriser || reseau),
-        None if reseau || config_reseau => ("0.0.0.0".into(), true),
-        None => ("127.0.0.1".into(), autoriser),
+        Some(a) => (a, reseau),
+        None if reseau => ("0.0.0.0".into(), true),
+        None => ("127.0.0.1".into(), false),
     })
 }
 
@@ -374,21 +307,21 @@ mod tests {
     fn adresse_d_ecoute() {
         let d = tempfile::tempdir().unwrap();
         assert_eq!(
-            ecoute(d.path(), None, false, false).unwrap(),
+            ecoute(d.path(), None, false).unwrap(),
             ("127.0.0.1".into(), false)
         );
         assert_eq!(
-            ecoute(d.path(), None, true, false).unwrap(),
+            ecoute(d.path(), None, true).unwrap(),
             ("0.0.0.0".into(), true)
         );
         std::fs::write(d.path().join("wikik.toml"), "[serveur]\nreseau = true\n").unwrap();
         assert_eq!(
-            ecoute(d.path(), None, false, false).unwrap(),
+            ecoute(d.path(), None, false).unwrap(),
             ("0.0.0.0".into(), true)
         );
         assert_eq!(
-            ecoute(d.path(), Some("127.0.0.1".into()), false, false).unwrap(),
-            ("127.0.0.1".into(), false)
+            ecoute(d.path(), Some("127.0.0.1".into()), false).unwrap(),
+            ("127.0.0.1".into(), true)
         );
     }
 }

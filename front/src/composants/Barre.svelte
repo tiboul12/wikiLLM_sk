@@ -1,15 +1,15 @@
 <script lang="ts">
-  // Barre latérale : zones Produit (arbre des fichiers), Projet, Atelier et Réception (documents par type).
-  // @relu 2026-10-17 4532aeb1
+  // Panneau latéral de la section active (EF-131) : arbre des fichiers (Produit), documents par type
+  // (Projet), étapes et artefacts (Atelier), pages et remarques (Réception).
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
+  import type { Section } from "../lib/sections.svelte";
+  import { atelier, ETATS } from "../lib/atelier.svelte";
+  import { reception, remarquesDe } from "../lib/reception.svelte";
 
-  let { projet }: { projet: Projet } = $props();
-  let zone = $state<"produit" | "projet" | "atelier" | "reception">(routeur.route.page === "document" ? "projet" : "produit");
-  const docsProjet = $derived(projet.documents.filter((d) => d.zone === "projet"));
-  const docsAtelier = $derived(projet.documents.filter((d) => d.zone === "atelier"));
-  const docsReception = $derived(projet.documents.filter((d) => d.zone === "reception"));
+  let { projet, section }: { projet: Projet; section: Section } = $props();
+  const docsDe = (zone: string) => projet.documents.filter((d) => d.zone === zone);
 
   const ORDRE: Record<string, [number, string]> = {
     plan: [0, "Plan"],
@@ -59,24 +59,16 @@
     }
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
   };
-  const groupes = $derived(grouper(zone === "atelier" ? docsAtelier : zone === "reception" ? docsReception : docsProjet));
+  const groupes = $derived(grouper(docsDe(section === "atelier" ? "atelier" : section === "reception" ? "reception" : "projet")));
+  const TITRES: Record<string, string> = { produit: "Produit", projet: "Projet", atelier: "Atelier", reception: "Réception" };
 
   const actif = (href: string) => estCourant(href);
 </script>
 
-<nav class="onglets" aria-label="Zones">
-  <button class:actif={zone === "produit"} onclick={() => (zone = "produit")}>Produit <small>{projet.fichiers.length}</small></button>
-  <button class:actif={zone === "projet"} onclick={() => (zone = "projet")}>Projet <small>{docsProjet.length}</small></button>
-  {#if docsAtelier.length}
-    <button class:actif={zone === "atelier"} onclick={() => (zone = "atelier")}>Atelier <small>{docsAtelier.length}</small></button>
-  {/if}
-  {#if docsReception.length}
-    <button class:actif={zone === "reception"} onclick={() => (zone = "reception")} title="Cahier de réception">Récep. <small>{docsReception.length}</small></button>
-  {/if}
-</nav>
+<p class="titre-panneau">{TITRES[section] ?? ""}</p>
 
 {#key routeur.route}
-  {#if zone === "produit"}
+  {#if section === "produit"}
     {#each dossiers as [dossier, fichiers]}
       <details open>
         <summary>{dossier}/</summary>
@@ -94,6 +86,41 @@
       </details>
     {/each}
   {:else}
+    {#if section === "atelier" && atelier.etat}
+      <details open>
+        <summary>Parcours</summary>
+        <ul>
+          {#each atelier.etat.etapes as e, i (e.fiche.id)}
+            {@const href = url.etape(e.fiche.id)}
+            <li>
+              <a {href} class:actif={actif(href)} title={ETATS[e.etat] ?? e.etat}>
+                <span class="puce etat-{e.etat}">{e.etat === "faite" ? "✓" : i + 1}</span> {e.fiche.titre}
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </details>
+    {/if}
+    {#if section === "reception" && reception.etat}
+      <ul class="liens-section">
+        <li><a href={url.traitement()} class:actif={actif(url.traitement())}>Traiter les remarques</a></li>
+      </ul>
+      <details open>
+        <summary>Pages <small>{reception.etat.pages.filter((p) => !p.masque).length}</small></summary>
+        <ul>
+          {#each reception.etat.pages.filter((p) => !p.masque) as p (p.cle)}
+            {@const href = url.pageReception(p.cle)}
+            {@const n = remarquesDe(p.cle).filter((r) => r.statut === "ouverte").length}
+            <li>
+              <a {href} class:actif={actif(href) && new URLSearchParams(location.search).get("cle") === p.cle} title={p.route ?? p.nom}>
+                {p.nom}
+                {#if n}<span class="compteur faible">{n}</span>{/if}
+              </a>
+            </li>
+          {/each}
+        </ul>
+      </details>
+    {/if}
     {#each groupes as [nom, g]}
       <details open={g.docs.length <= 12}>
         <summary>{nom} <small>{g.docs.length}</small></summary>
@@ -108,6 +135,8 @@
           {/each}
         </ul>
       </details>
+    {:else}
+      {#if section === "projet"}<p class="discret">Aucun document : <code>wikik nouveau besoin "…"</code>, ou l'atelier.</p>{/if}
     {/each}
   {/if}
 {/key}
