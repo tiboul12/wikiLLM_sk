@@ -27,7 +27,7 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 - [ ] **Activer la CI et Pages sur wikiK** : `wikik init --ci`, puis activer GitHub Pages (source : GitHub Actions) ; non fait automatiquement car cela publie le wiki.
 - [ ] **Installer** : `make install`, puis le skill pour tous les projets (`ln -s "$PWD/skill" ~/.claude/skills/wikik`) en remplacement de `doc-as-code` et `wiki-dev-sync`.
 - [ ] **Amorcer ATS** (procédure `skill/procedures/amorcer.md`) : `wikik init`, puis les blocs manquants module par module ; migrer `ATS/wiki/` et le cahier des charges d'ATS vers `docs/projet/` (convertir `AC-009`, `F1`… en `EF-xxx`).
-- [ ] **Trancher Leptos ou Svelte** pour le front (SPEC-05) : Svelte a été choisi par défaut.
+- [ ] **Trancher Leptos ou Svelte** pour le front (SPEC-05) : Svelte a été choisi par défaut. Tibo a tranché le 19/10 (REC-009.2) : front en Rust / WebAssembly avec `leptos-shadcn-ui`, en **v8**, après la v7 (PLAN-v7, section « Décision »).
 
 ## ✋ À faire avec Tibo pour passer de `v4.0-rc1` à `v4.0` (atelier)
 
@@ -39,6 +39,11 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 
 - [ ] **Première campagne : la réception de l'atelier.** Depuis wikiK : `wikik`, section Réception, « Compléter avec le LLM » (il trouve les écrans d'étape : Pitch, Free writing, Planche, Tri…), puis tes remarques page par page.
 - [ ] **Relire** la BDR v5, le cahier des charges v5, SPEC-22 et 23.
+
+## 🔁 v7 : retours de la réception du 19/10
+
+- [ ] Traiter les 39 remarques du périmètre : PLAN-v7 (branche temporaire `v7-retours`).
+- [ ] **v8** : front en Rust / WebAssembly (REC-009.2) : BDR, ADR qui remplace ADR-0004, puis portage écran par écran.
 
 ## 🧩 Constats de la v1 à traiter
 
