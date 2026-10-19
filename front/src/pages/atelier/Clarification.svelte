@@ -1,6 +1,7 @@
 <script lang="ts">
   // Clarification rappelée depuis le développement (SPEC-21 R4) : la question, le sujet, les pistes du LLM
   // qui lit le projet par MCP, puis la conclusion de Tibo.
+  // @relu 2026-10-19 aaccaa21
   import { atelier, artefact, champ, ecrire } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Propositions from "../../composants/atelier/Propositions.svelte";
@@ -28,7 +29,7 @@
 {#if !c}
   <p class="discret">{atelier.etat ? `Clarification inconnue : ${id}` : "Chargement…"}</p>
 {:else}
-  <p class="fil"><a href={url.atelier()}>Atelier</a> · clarification</p>
+  <p class="fil"><a href={url.atelier()}>Design thinking</a> · clarification</p>
   <h1>{c.titre}</h1>
   <div class="meta">
     <span class="pastille">{champ(c, "etat")}</span>

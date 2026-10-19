@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Mise en page (EF-131) : barre d'activité à gauche (sections), panneau de la section active, page
-  // courante ; en-tête avec le projet et la recherche. Le serveur du projet sert les quatre sections
+  // Mise en page (EF-131, EF-140) : barre d'activité à gauche (sections), panneau de la section active
+  // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   import { api } from "./lib/api";
   import { routeur, aller, url } from "./lib/routeur.svelte";
@@ -16,14 +16,14 @@
   import PageDocument from "./pages/PageDocument.svelte";
   import Recherche from "./pages/Recherche.svelte";
   import PageGraphe from "./pages/PageGraphe.svelte";
-  import Tableau from "./pages/atelier/Tableau.svelte";
+  import DesignThinking from "./pages/atelier/DesignThinking.svelte";
   import Etape from "./pages/atelier/Etape.svelte";
   import Clarification from "./pages/atelier/Clarification.svelte";
   import Clarifier from "./pages/atelier/Clarifier.svelte";
   import { atelier, detecter } from "./lib/atelier.svelte";
   import { reception, detecterReception } from "./lib/reception.svelte";
-  import CarteReception from "./pages/reception/Carte.svelte";
-  import PageReception from "./pages/reception/PageReception.svelte";
+  import CahierReception from "./pages/reception/CahierReception.svelte";
+  import CarteReception from "./pages/reception/CarteReception.svelte";
   import Traitement from "./pages/reception/Traitement.svelte";
 
   let projet = $state<Projet | null>(null);
@@ -66,6 +66,31 @@
     routeur.route;
     barreOuverte = false;
   });
+
+  // Largeur du panneau, réglée en tirant son bord (REC-011) et gardée par ce navigateur.
+  const lireLargeur = () => {
+    try {
+      return Number(localStorage.getItem("wikik.panneau")) || 280;
+    } catch {
+      return 280;
+    }
+  };
+  let largeur = $state(lireLargeur());
+  function tirer(e: PointerEvent) {
+    const poignee = e.currentTarget as HTMLElement;
+    poignee.setPointerCapture(e.pointerId);
+    const bouger = (m: PointerEvent) => (largeur = Math.min(700, Math.max(180, m.clientX - 56)));
+    const lacher = () => {
+      poignee.removeEventListener("pointermove", bouger);
+      try {
+        localStorage.setItem("wikik.panneau", String(largeur));
+      } catch {
+        /* sans stockage, la largeur vaut pour la session */
+      }
+    };
+    poignee.addEventListener("pointermove", bouger);
+    poignee.addEventListener("pointerup", lacher, { once: true });
+  }
 </script>
 
 <header class="entete">
@@ -83,7 +108,7 @@
   <div class="bandeau-llm" role="status">Le LLM lit le projet par MCP et cherche les écrans que le scan n'a pas trouvés…</div>
 {/if}
 
-<div class="cadre" class:sans-panneau={!avecPanneau}>
+<div class="cadre" class:sans-panneau={!avecPanneau} style="--largeur-panneau: {largeur}px">
   <BarreActivite active={routeur.route.page === "graphe" ? null : section} graphe={routeur.route.page === "graphe"} />
   {#if avecPanneau}
     <aside class="barre" class:ouverte={barreOuverte}>
@@ -95,6 +120,8 @@
         <p class="discret">Chargement…</p>
       {/if}
     </aside>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="poignee" onpointerdown={tirer} ondblclick={() => (largeur = 280)} title="Tirer pour élargir le panneau (double-clic : largeur d'origine)"></div>
   {/if}
   <main class="contenu">
     {#if routeur.route.page === "fichier"}
@@ -120,13 +147,13 @@
     {:else if routeur.route.page === "clarifier"}
       {#if atelier.etat}{#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "atelier"}
-      {#if atelier.etat}<Tableau />{:else}<p class="discret">Chargement…</p>{/if}
+      {#if atelier.etat}<DesignThinking />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "reception-page"}
-      {#if reception.etat}{#key routeur.route.cle}<PageReception cle={routeur.route.cle} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+      {#if reception.etat}{#key routeur.route.cle}<CarteReception cle={routeur.route.cle} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "traitement"}
       {#if reception.etat}<Traitement />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "reception"}
-      {#if reception.etat}<CarteReception />{:else}<p class="discret">Chargement…</p>{/if}
+      {#if reception.etat}<CahierReception />{:else}<p class="discret">Chargement…</p>{/if}
     {/if}
   </main>
 </div>

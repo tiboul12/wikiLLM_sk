@@ -1,10 +1,11 @@
 <script lang="ts">
-  // Carte des pages du cahier de réception (SPEC-23 R5) : les pages trouvées dans le code, groupées, avec
-  // leurs remarques ouvertes et leur lien dans l'application ; adresse de l'application, scanner à
-  // nouveau, compléter par le LLM, renommer, masquer, regrouper, ajouter une route.
+  // Cahier de réception (SPEC-23 R5, EF-140) : les pages trouvées dans le code, groupées, chacune avec sa
+  // carte de réception (ses remarques) et son lien dans l'application ; scanner à nouveau, compléter par le
+  // LLM, renommer, masquer, regrouper, ajouter une route. L'adresse de l'application est déduite du projet
+  // ou réglée dans les paramètres : pas de saisie ici (REC-029).
   // @relu 2026-10-19 619d237e
   import type { Page } from "../../types/Page";
-  import { reception, ecrireReception, remarquesDe, actuelles, lienApplication, SOURCES } from "../../lib/reception.svelte";
+  import { reception, ecrireReception, remarquesDe, actuelles, lienApplication, visible, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
 
@@ -16,7 +17,7 @@
   let message = $state("");
   let erreur = $state("");
 
-  const pages = $derived(etat.pages.filter((p) => voirMasquees || !p.masque));
+  const pages = $derived(etat.pages.filter((p) => voirMasquees || visible(p)));
   const groupes = $derived.by(() => {
     const m = new Map<string, Page[]>();
     for (const p of pages) {
@@ -28,9 +29,7 @@
   });
   const ouvertes = $derived(actuelles().filter((r) => r.statut === "ouverte").length);
   const total = $derived(actuelles().length);
-  // svelte-ignore state_referenced_locally
-  let adresse = $state(reception.etat?.url_application ?? (reception.etat?.url_detectee === "/" ? "" : (reception.etat?.url_detectee ?? "")));
-  const masquees = $derived(etat.pages.filter((p) => p.masque).length);
+  const masquees = $derived(etat.pages.filter((p) => !visible(p)).length);
 
   async function action(route: string, corps: unknown = {}, succes = "") {
     erreur = message = "";
@@ -57,7 +56,7 @@
 
 <h1>Cahier de réception</h1>
 <p class="discret">
-  Les pages de l'application, trouvées dans son code. Ouvre une page pour y déposer tes remarques : une carte par remarque, captures comprises.
+  Les pages de l'application, trouvées dans son code. Chaque page a sa carte de réception : ouvre-la pour y déposer tes remarques, captures comprises.
   Tout est écrit dans <code>docs/reception/</code>.
 </p>
 
@@ -67,20 +66,13 @@
   <div class="tuile"><span class="valeur">{total - ouvertes}</span><span class="nom">traitées, reportées ou rejetées</span></div>
 </div>
 
-<form class="adresse-application" onsubmit={(e) => { e.preventDefault(); action("application", { url: adresse }, "Adresse enregistrée."); }}>
-  <label for="adresse-app">Adresse de l'application reçue</label>
-  <input id="adresse-app" bind:value={adresse} placeholder="http://10.0.0.21:4200" />
-  <button type="submit">Enregistrer</button>
-  <span class="discret">{reception.etat?.url_application ? "" : reception.etat?.url_detectee ? `déduite du projet : ${reception.etat.url_detectee === "/" ? "ce serveur" : reception.etat.url_detectee}` : "à saisir pour ouvrir les pages"}</span>
-</form>
-
 <div class="actions">
   <a class="bouton principal" href={url.traitement()}>Traiter les remarques →</a>
   <button onclick={() => action("scanner", {}, "Carte mise à jour.")}>Scanner à nouveau</button>
   <button onclick={() => action("completer")} disabled={reception.occupe} title="Le LLM lit le projet et propose les écrans manquants ({etat.fournisseur})">
     {reception.occupe ? "Le LLM cherche…" : "Compléter avec le LLM"}
   </button>
-  {#if masquees}<label class="discret"><input type="checkbox" bind:checked={voirMasquees} /> afficher les {masquees} page(s) masquée(s)</label>{/if}
+  {#if masquees}<label class="discret"><input type="checkbox" bind:checked={voirMasquees} /> afficher les {masquees} page(s) masquée(s) ou disparue(s) du code</label>{/if}
   {#if message}<span class="succes">{message}</span>{/if}
 </div>
 {#if erreur}<p class="erreur">{erreur}</p>{/if}

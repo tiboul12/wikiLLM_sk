@@ -90,7 +90,9 @@ h2 { font-size: 1.2rem; margin: 2rem 0 0.6rem; }
 .menu { display: none; border: 0; background: none; color: var(--texte); font-size: 20px; cursor: pointer; }
 
 /* Cadre */
-.cadre { display: grid; grid-template-columns: 56px 280px minmax(0, 1fr); min-height: calc(100vh - 54px); }
+.cadre { position: relative; display: grid; grid-template-columns: 56px var(--largeur-panneau, 280px) minmax(0, 1fr); min-height: calc(100vh - 54px); }
+.poignee { position: absolute; top: 0; bottom: 0; left: calc(56px + var(--largeur-panneau, 280px) - 3px); width: 6px; cursor: col-resize; z-index: 8; touch-action: none; }
+.poignee:hover, .poignee:active { background: color-mix(in srgb, var(--accent) 45%, transparent); }
 .cadre.sans-panneau { grid-template-columns: 56px minmax(0, 1fr); }
 .barre {
   position: sticky; top: 54px; height: calc(100vh - 54px); overflow-y: auto;
@@ -230,6 +232,7 @@ a.pastille { color: var(--accent); }
     box-shadow: 4px 0 16px rgb(0 0 0 / 0.15);
   }
   .barre.ouverte { transform: none; }
+  .poignee { display: none; }
   .contenu { padding: 18px 16px 60px; }
   .lignes { margin-left: 0; }
 }
@@ -270,6 +273,10 @@ button.discret-bouton { border-color: transparent; background: none; color: var(
 .bascule { display: inline-flex; padding: 2px; gap: 2px; background: var(--fond-3); border-radius: var(--rayon); }
 .bascule button { border: 0; padding: 3px 10px; font-size: 13px; background: transparent; color: var(--texte-2); }
 .bascule button.actif { background: var(--fond); color: var(--texte); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.en-bref { margin: 12px 0; padding: 10px 16px 6px; background: var(--fond-2); border-left: 3px solid var(--violet); border-radius: 0 var(--rayon) var(--rayon) 0; }
+.en-bref h2 { margin: 2px 0 6px; font-size: 1rem; }
+.en-bref ol { margin: 6px 0; padding-left: 20px; }
+.en-bref li { margin: 3px 0; }
 .role { margin: 12px 0; padding: 10px 16px; background: var(--fond-2); border-left: 3px solid var(--violet); border-radius: 0 var(--rayon) var(--rayon) 0; }
 .regles summary, .ecartees summary { cursor: pointer; color: var(--texte-2); font-size: 14px; }
 .sous-etape { margin: 18px 0; padding: 4px 18px 12px; border: 1px solid var(--bord); border-radius: var(--rayon); }
@@ -447,7 +454,12 @@ kbd { padding: 1px 6px; border: 1px solid var(--bord-fort); border-bottom-width:
   border-radius: 9px; background: var(--orange); color: white; font-size: 10.5px; font-weight: 700;
   display: grid; place-items: center; line-height: 1;
 }
-.titre-panneau { margin: 2px 6px 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texte-2); }
+.entete-panneau { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 8px; }
+.entete-panneau .replier { border: 0; background: none; color: var(--texte-2); cursor: pointer; font-size: 15px; padding: 0 6px; border-radius: 4px; }
+.entete-panneau .replier:hover { background: var(--fond-3); color: var(--texte); }
+a.titre-panneau:hover { color: var(--accent); text-decoration: none; }
+.barre ul ul { margin-left: 10px; padding-left: 6px; border-left: 1px solid var(--bord); }
+.titre-panneau { margin: 0 6px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texte-2); }
 .barre .puce { display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 50%; background: var(--fond-3); font-size: 10.5px; font-weight: 650; color: var(--texte-2); }
 .barre .puce.etat-faite { background: var(--vert-fond); color: var(--vert); }
 .barre .puce.etat-en_cours { background: var(--accent-fond); color: var(--accent); }

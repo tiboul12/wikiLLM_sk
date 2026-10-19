@@ -1,5 +1,6 @@
 <script lang="ts">
   // Ouvrir une clarification sur un document (SPEC-21) : depuis le wiki, ou quand un point du besoin est flou.
+  // @relu 2026-10-19 724eee5c
   import { api } from "../../lib/api";
   import { ecrire } from "../../lib/atelier.svelte";
   import { aller, url } from "../../lib/routeur.svelte";
@@ -24,7 +25,7 @@
   }
 </script>
 
-<p class="fil"><a href={url.atelier()}>Atelier</a> · nouvelle clarification</p>
+<p class="fil"><a href={url.atelier()}>Design thinking</a> · nouvelle clarification</p>
 <h1>Clarifier <a href={url.document(sujet)}>{sujet}</a></h1>
 {#if doc}<p class="discret">{doc.genre} · {doc.titre}</p>{/if}
 <form class="formulaire" onsubmit={ouvrir}>

@@ -123,3 +123,25 @@ export const ETATS: Record<string, string> = {
   faite: "faite",
   sautee: "sautée",
 };
+
+/** Nom lisible d'un type d'artefact de l'atelier (SPEC-17), au singulier et au pluriel. */
+export const ARTEFACTS: Record<string, [string, string]> = {
+  pitch: ["pitch", "pitchs"],
+  axe: ["axe", "axes"],
+  ecrit: ["écrit libre", "écrits libres"],
+  unite: ["unité de sens", "unités de sens"],
+  carte: ["carte mentale", "cartes mentales"],
+  probleme: ["problème", "problèmes"],
+  analogie: ["analogie", "analogies"],
+  idee: ["idée", "idées"],
+  analyse: ["analyse", "analyses"],
+  scamper: ["piste SCAMPER", "pistes SCAMPER"],
+  storyboard: ["storyboard", "storyboards"],
+  besoin: ["besoin", "besoins"],
+  exigence: ["exigence", "exigences"],
+  roadmap: ["roadmap", "roadmaps"],
+  clarification: ["clarification", "clarifications"],
+};
+/** Nom lisible d'un type d'artefact (le type brut s'il est inconnu, vide sans type). */
+export const nomArtefact = (genre: string | null | undefined, pluriel = true) =>
+  genre ? (ARTEFACTS[genre]?.[pluriel ? 1 : 0] ?? genre) : "";

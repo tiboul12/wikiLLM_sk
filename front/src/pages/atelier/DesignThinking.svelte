@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Tableau de bord de l'atelier : étapes du parcours (état, mode), consommation, clarifications ouvertes.
+  // Accueil du Design thinking (l'atelier, EF-140) : étapes du parcours (état, mode), consommation,
+  // clarifications ouvertes.
   // @relu 2026-10-19 4bfd1579
   import { atelier, PHASES, ETATS } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
@@ -10,7 +11,7 @@
   const pct = (x: number) => `${Math.round(x * 100)} %`;
 </script>
 
-<h1>Atelier{etat.projet ? ` : ${etat.projet}` : ""}</h1>
+<h1>Design thinking{etat.projet ? ` : ${etat.projet}` : ""}</h1>
 <p class="discret">
   Définition du besoin selon le framework Fast Design Thinking. Le LLM ({etat.fournisseur}) lit le projet par MCP et propose ; tu gardes, corriges ou rejettes. Tout est écrit dans <code>docs/atelier/</code> et <code>docs/projet/</code>.
 </p>

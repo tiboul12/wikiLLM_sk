@@ -1,7 +1,8 @@
-// Sections de l'interface (ADR-0012, EF-131) : Accueil, Produit, Projet, Atelier, Réception. La section
-// active se déduit de la page affichée ; une page commune (recherche, graphe) garde la section d'où l'on vient.
+// Sections de l'interface (ADR-0012, EF-131) : Accueil, Projet, Design thinking (l'atelier), Produit,
+// Réception, dans l'ordre où l'on s'en sert (EF-140). La section active se déduit de la page affichée ; une
+// page commune (recherche, graphe) garde la section d'où l'on vient.
 //
-// @req EF-131
+// @req EF-131, EF-140
 import type { Route } from "./routeur.svelte";
 import type { Projet } from "../types/Projet";
 import { statique } from "./statique";
@@ -9,15 +10,19 @@ import { statique } from "./statique";
 /** Une section de l'interface (une icône de la barre d'activité). */
 export type Section = "accueil" | "produit" | "projet" | "atelier" | "reception";
 
-/** Sections présentes : le site exporté n'a ni atelier ni réception. */
-export const SECTIONS: Section[] = statique ? ["accueil", "produit", "projet"] : ["accueil", "produit", "projet", "atelier", "reception"];
+/** Sections présentes : le site exporté n'a ni atelier ni réception.
+ * @relu 2026-10-19 5f1194ed
+ */
+export const SECTIONS: Section[] = statique ? ["accueil", "projet", "produit"] : ["accueil", "projet", "atelier", "produit", "reception"];
 
-/** Nom affiché de chaque section. */
+/** Nom affiché de chaque section.
+ * @relu 2026-10-19 6c2ea740
+ */
 export const NOMS: Record<Section, string> = {
   accueil: "Accueil",
   produit: "Produit",
   projet: "Projet",
-  atelier: "Atelier",
+  atelier: "Design thinking",
   reception: "Réception",
 };
 
