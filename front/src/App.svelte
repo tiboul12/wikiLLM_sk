@@ -2,9 +2,11 @@
   // Mise en page (EF-131, EF-140) : barre d'activité à gauche (sections), panneau de la section active
   // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
+  // @relu 2026-10-19 64b2a015
   import { api } from "./lib/api";
   import { routeur, aller, url } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
+  import { retenir } from "./lib/connus.svelte";
   import type { Projet } from "./types/Projet";
   import { sectionDe, navigation } from "./lib/sections.svelte";
   import BarreActivite from "./composants/BarreActivite.svelte";
@@ -12,6 +14,7 @@
   import Accueil from "./pages/Accueil.svelte";
   import ProduitAccueil from "./pages/ProduitAccueil.svelte";
   import ProjetAccueil from "./pages/ProjetAccueil.svelte";
+  import Relecture from "./pages/Relecture.svelte";
   import PageFichier from "./pages/PageFichier.svelte";
   import PageDocument from "./pages/PageDocument.svelte";
   import Recherche from "./pages/Recherche.svelte";
@@ -36,6 +39,7 @@
     .then((p) => {
       projet = p;
       projetCourant.nom = p.nom;
+      retenir(p);
       document.title = `${p.nom} · wikik`;
     })
     .catch((e) => (erreur = String(e)));
@@ -136,6 +140,8 @@
       <ProduitAccueil {projet} />
     {:else if routeur.route.page === "projet"}
       <ProjetAccueil {projet} />
+    {:else if routeur.route.page === "relecture"}
+      <Relecture {projet} />
     {:else if routeur.route.page === "accueil"}
       <Accueil {projet} />
     {:else if !atelier.actif && !reception.actif}

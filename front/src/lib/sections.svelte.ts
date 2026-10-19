@@ -26,7 +26,9 @@ export const NOMS: Record<Section, string> = {
   reception: "Réception",
 };
 
-/** Section d'une page ; `null` pour une page commune à toutes (recherche, graphe). */
+/** Section d'une page ; `null` pour une page commune à toutes (recherche, graphe).
+ * @relu 2026-10-19 9ef9eb13
+ */
 export function sectionDe(route: Route, projet: Projet | null): Section | null {
   switch (route.page) {
     case "accueil":
@@ -35,6 +37,7 @@ export function sectionDe(route: Route, projet: Projet | null): Section | null {
     case "fichier":
       return "produit";
     case "projet":
+    case "relecture":
       return "projet";
     case "document": {
       const zone = projet?.documents.find((d) => d.id === route.id)?.zone;

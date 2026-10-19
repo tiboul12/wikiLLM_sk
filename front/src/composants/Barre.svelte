@@ -1,6 +1,7 @@
 <script lang="ts">
   // Panneau latéral de la section active (EF-131, EF-140) : arbre des fichiers (Produit), documents par
-  // type (Projet), étapes et artefacts (Design thinking), arborescence des pages et remarques (Réception).
+  // type, la gestion en tête (Projet), étapes et artefacts (Design thinking), arborescence des pages et
+  // remarques (Réception).
   // Le titre mène à l'accueil de la section ; un bouton replie tout ; l'élément ouvert est déplié et centré.
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
@@ -13,8 +14,10 @@
   let { projet, section }: { projet: Projet; section: Section } = $props();
   const docsDe = (zone: string) => projet.documents.filter((d) => d.zone === zone);
 
+  // La gestion (backlog, plans) vient en tête du volet Projet (REC-017.2).
   const ORDRE: Record<string, [number, string]> = {
-    plan: [0, "Plan"],
+    backlog: [-1, "Gestion"],
+    plan: [-1, "Gestion"],
     "bdr-analyse": [1, "BDR"],
     "bdr-definition": [1, "BDR"],
     "cahier-des-charges": [2, "Cahier des charges"],

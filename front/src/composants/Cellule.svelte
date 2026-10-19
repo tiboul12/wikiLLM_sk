@@ -1,17 +1,18 @@
 <script lang="ts">
-  // Cellule de symbole (EF-041) : en-tête (nom = lien direct, ⚓ = référence à copier), doc rendue,
-  // balises, voisins, code replié.
+  // Cellule de symbole (EF-041) : en-tête (nom = lien direct, ⚓ = référence à copier), doc rendue (les
+  // identifiants cités y sont liés), balises, voisins, code replié.
   // @relu 2026-10-17 c9c4bd41
   import type { Cellule } from "../types/Cellule";
   import { rendre, colorer } from "../lib/markdown";
   import { reference, copier } from "../lib/hook";
   import { url } from "../lib/routeur.svelte";
+  import { autoLien } from "../lib/connus.svelte";
   import Lien from "./Lien.svelte";
   import Balises from "./Balises.svelte";
 
   let { cellule, ouverte = false, langage = "rust" }: { cellule: Cellule; ouverte?: boolean; langage?: string } = $props();
   let copie = $state<"" | "copie" | "echec">("");
-  const doc = $derived(cellule.doc ? rendre(cellule.doc) : "");
+  const doc = $derived(cellule.doc ? rendre(cellule.doc, undefined, undefined, undefined, autoLien) : "");
   // Pas de grammaire Svelte dans highlight.js : le script est du TypeScript.
   const langageCode = $derived(langage === "svelte" ? "typescript" : langage);
   const code = $derived(colorer(cellule.code, langageCode));

@@ -130,6 +130,24 @@ h2 { font-size: 1.2rem; margin: 2rem 0 0.6rem; }
 .tuile .valeur { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
 .tuile .nom { color: var(--texte-2); font-size: 13px; }
 .tuile.alerte .valeur { color: var(--rouge); }
+a.lien-tuile { color: var(--texte); }
+a.lien-tuile:hover { text-decoration: none; border-color: var(--accent); }
+.lien-auto { border-bottom: 1px dotted color-mix(in srgb, var(--accent) 55%, transparent); }
+.lien-auto code { color: inherit; }
+.cache { display: none; }
+.vue-gestion { margin: 12px 0; }
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 20px; }
+.colonne-kanban { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--rayon); background: var(--fond-3); min-width: 0; }
+.colonne-kanban h3 { margin: 0 2px 2px; font-size: 13.5px; }
+.colonne-kanban h3 small { color: var(--texte-2); font-weight: 400; }
+.carte-kanban { padding: 8px 10px; border: 1px solid var(--bord); border-radius: 6px; background: var(--fond); font-size: 13.5px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.05); overflow-wrap: anywhere; }
+.carte-kanban .prose { font-size: 13px; color: var(--texte-2); }
+.carte-kanban .prose p { margin: 4px 0; }
+.carte-kanban.fait strong { color: var(--vert); }
+.relecture { width: 100%; border-collapse: collapse; font-size: 14px; }
+.relecture th { text-align: left; color: var(--texte-2); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--bord); }
+.relecture td { padding: 5px 8px; border-bottom: 1px solid var(--bord); }
+.relecture .id { font-family: var(--mono); font-size: 12.5px; color: var(--texte-2); margin-right: 4px; }
 .jauge { height: 4px; margin-top: 6px; background: var(--fond-3); border-radius: 2px; overflow: hidden; }
 .jauge span { display: block; height: 100%; background: var(--vert); }
 

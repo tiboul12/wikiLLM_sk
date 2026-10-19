@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Accueil de la section Projet (EF-131) : les documents par type, ceux qui attendent une relecture, et
-  // les versions majeures (BDR, cahier des charges, plan).
+  // Accueil de la section Projet (EF-131, EF-142) : les documents par type, ceux qui attendent une
+  // relecture (la tuile mène à la liste complète), et les versions majeures (BDR, cahier des charges, plan).
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { url } from "../lib/routeur.svelte";
@@ -37,7 +37,7 @@
   {#each TYPES as [g, nom]}
     <div class="tuile"><span class="valeur">{deType(g).length}</span><span class="nom">{nom}</span></div>
   {/each}
-  <div class="tuile" class:alerte={aRelire.length > 0}><span class="valeur">{aRelire.length}</span><span class="nom">à relire (proposé)</span></div>
+  <a class="tuile lien-tuile" class:alerte={aRelire.length > 0} href={url.relecture()}><span class="valeur">{aRelire.length}</span><span class="nom">à relire (proposé) →</span></a>
 </div>
 
 {#if majeures.length}
@@ -57,6 +57,6 @@
   <ul class="a-relire">
     {#each aRelire.slice(0, 30) as d (d.id)}<li><a class="id" href={url.document(d.id)}>{d.id}</a> {d.titre}</li>{/each}
   </ul>
-  {#if aRelire.length > 30}<p class="discret">… et {aRelire.length - 30} autres (barre de gauche).</p>{/if}
+  {#if aRelire.length > 30}<p><a href={url.relecture()}>Les {aRelire.length} documents à relire, avec leur statut →</a></p>{/if}
 {/if}
 {/if}

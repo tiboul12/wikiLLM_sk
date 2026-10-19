@@ -6,13 +6,15 @@
 // @req EF-041, EF-042, EF-080
 
 import { statique } from "./statique";
-/** Page à afficher, déduite de l'URL : `produit` et `projet` sont les accueils de section ; `etape` à
+/** Page à afficher, déduite de l'URL : `produit` et `projet` sont les accueils de section, `relecture` la
+ * liste des documents à relire ; `etape` à
  * `clarifier` n'existent que dans l'atelier, les trois dernières dans le cahier de réception (pas dans le
  * site exporté). */
 export type Route =
   | { page: "accueil" }
   | { page: "produit" }
   | { page: "projet" }
+  | { page: "relecture" }
   | { page: "fichier"; chemin: string; ancre: string }
   | { page: "document"; id: string; ancre: string }
   | { page: "recherche"; q: string }
@@ -44,6 +46,7 @@ function analyser(): Route {
   const { chemin, params, ancre } = lireUrl();
   if (chemin === "/produit" || chemin === "/produit/") return { page: "produit" };
   if (chemin === "/projet" || chemin === "/projet/") return { page: "projet" };
+  if (chemin === "/projet/relecture") return { page: "relecture" };
   if (chemin.startsWith("/produit/")) return { page: "fichier", chemin: chemin.slice("/produit/".length), ancre };
   if (chemin.startsWith("/projet/")) return { page: "document", id: chemin.slice("/projet/".length), ancre };
   if (chemin === "/recherche") return { page: "recherche", q: params.get("q") ?? "" };
@@ -99,7 +102,7 @@ addEventListener("click", (e) => {
 const prefixe = statique ? "#" : "";
 
 /**
- * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section),
+ * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`,
  * `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
  * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>`, `/clarification/<id>`,
  * `/clarifier/<id>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement`.
@@ -108,6 +111,7 @@ export const url = {
   accueil: () => `${prefixe}/`,
   produit: () => `${prefixe}/produit`,
   projet: () => `${prefixe}/projet`,
+  relecture: () => `${prefixe}/projet/relecture`,
   fichier: (chemin: string, ancre?: string) =>
     `${prefixe}/produit/${chemin.split("/").map(encodeURIComponent).join("/")}${ancre ? "#" + encodeURIComponent(ancre) : ""}`,
   document: (id: string) => `${prefixe}/projet/${encodeURIComponent(id)}`,
