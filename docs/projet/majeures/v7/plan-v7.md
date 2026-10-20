@@ -24,7 +24,7 @@ REC-009.2 demande de refaire tout le front avec `leptos-shadcn-ui`. **Recommanda
 | Phase | Lot | Remarques | Exigence |
 |---|---|---|---|
 | 1 | Noms et navigation | REC-014, 015, 016, 027, 028, 029, 036, 037, 008, 010, 011, 026 | EF-140 |
-| 2 | Graphe | REC-001 (supprimée), 002, 003, 004, 005, 006 | EF-141 |
+| 2 | Graphe | REC-001.2, 002, 003, 004, 005, 006 | EF-141 |
 | 3 | Produit et fichiers | REC-007, 020, 021, 023 | EF-142 |
 | 4 | Projet : gestion, à relire, liens | REC-012, 013, 017.2, 018.2 | EF-142, EF-143 |
 | 5 | Clarifications et parcours | REC-024.2, 025, 032, 033, 034, 035, 040.2, 039 | EF-144, EF-145 |
@@ -40,7 +40,7 @@ En fin de phase : `make check`, contrôle headless, puis chaque remarque du lot 
 - **REC-027, REC-028** : `/reception` s'appelle « Cahier de réception » ; l'écran d'une page s'appelle « Carte de réception » (une carte par page, qui porte ses remarques).
 - **REC-026** : arborescence tirée des routes (préfixe le plus long), les écrans sans route rangés sous l'écran de leur dossier ; on la corrige avec ✎ (route, groupe). Un écran disparu du code dont les remarques sont traitées ne s'affiche plus (case « afficher les masquées »).
 - **REC-029** : le champ d'adresse disparaît du cahier ; l'adresse est déduite, ou réglée dans les paramètres.
-- **REC-001** : catégories : code, exigences et besoins, décisions, documents de projet, atelier (avant-projet), pages de l'application, remarques ; une couleur et une puce activable chacune.
+- **REC-001.2** : catégories : code, exigences et besoins, décisions, documents de projet, atelier (avant-projet), pages de l'application, remarques ; une couleur et une puce activable chacune.
 - **REC-006** : disposition déterministe (même graphe, même dessin).
 - **REC-017.2** : groupe « Gestion » en tête du volet Projet (backlog, plans) ; un plan s'affiche en colonnes « à faire / en cours / fait » à partir de son tableau de suivi.
 - **REC-018.2** : tout identifiant connu, chemin de fichier ou symbole cité dans un document devient un lien.
