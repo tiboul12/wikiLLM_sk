@@ -44,7 +44,7 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 
 - [x] Traiter les 39 remarques du périmètre : PLAN-v7 (branche temporaire `v7-retours`), 7 phases, toutes traitées le 19/10.
 - [ ] **Relire et recevoir la v7** (Tibo) : tester la branche, puis la fusionner dans `master` ; nouvelle campagne de réception au besoin.
-- [ ] **v8** : front en Rust / WebAssembly (REC-009.2) : BDR, ADR qui remplace ADR-0004, puis portage écran par écran.
+- [ ] **v8** : front en Rust / WebAssembly (REC-009.2), **en attente du design system complet en Rust que Tibo fournira** ; alors BDR, ADR qui remplace ADR-0004, puis portage écran par écran.
 
 ## 🧩 Constats de la v1 à traiter
 
