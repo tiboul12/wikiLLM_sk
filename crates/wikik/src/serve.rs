@@ -39,6 +39,8 @@ pub(crate) struct Etat {
     pub(crate) cle: String,
     /// Terminal intégré, ouvert à la première connexion (EF-148).
     pub(crate) terminal: Mutex<Option<Arc<crate::terminal::Terminal>>>,
+    /// Bouton « Arrêter le serveur » (ADR-0014).
+    pub(crate) arret: tokio::sync::Notify,
 }
 
 pub(crate) type Partage = Arc<Etat>;
@@ -63,6 +65,7 @@ impl Port {
 
 /// Démarre le serveur du projet sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C ; `factice`
 /// remplace le LLM par les exemples des fiches. La clé du propriétaire est lue ou créée (`.wikik/cle`).
+/// @relu 2026-10-20 5ba2f739
 pub fn servir(
     racine: &Path,
     adresse: &str,
@@ -88,19 +91,28 @@ pub fn servir(
         factice,
         cle: cle.clone(),
         terminal: Mutex::new(None),
+        arret: tokio::sync::Notify::new(),
     });
-    lancer(routes(etat), ip, port, &racine, &cle)
+    lancer(routes(etat.clone()), ip, port, &racine, &cle, etat)
 }
 
 /// Toutes les routes : lecture du wiki, atelier, réception, paramètres, terminal ; écritures gardées
 /// (corps JSON, même origine, 25 Mo au plus pour les captures) ; paramètres et terminal réservés au
-/// propriétaire (ADR-0013).
+/// propriétaire (ADR-0013), comme le bouton d'arrêt (ADR-0014).
 pub(crate) fn routes(etat: Partage) -> Router {
     routes_wiki()
         .merge(crate::atelier::routes())
         .merge(crate::reception::routes())
         .merge(crate::parametres::routes(etat.clone()))
         .merge(crate::terminal::routes(etat.clone()))
+        .merge(
+            Router::new()
+                .route("/api/serveur/arreter", axum::routing::post(api_arreter))
+                .route_layer(axum::middleware::from_fn_with_state(
+                    etat.clone(),
+                    crate::acces::reserve,
+                )),
+        )
         // Le front aussi passe par les gardes : `/?cle=…` (adresse du lancement) pose le cookie.
         .fallback(statique)
         .layer(axum::extract::DefaultBodyLimit::max(25 * 1024 * 1024))
@@ -182,8 +194,15 @@ async fn api_image(State(e): State<Partage>, Query(p): Query<ParamImage>) -> Res
 /// projet ouvert) fait essayer les 20 suivants ; le port obtenu est noté dans `.wikik/serveur.json`
 /// (adresse renvoyée par `atelier_rappel`) et retiré à l'arrêt. En écoute sur toutes les interfaces,
 /// affiche aussi l'adresse à ouvrir depuis un autre poste (IP du réseau local), et celle qui porte la
-/// clé du propriétaire (`cle`, ADR-0013).
-fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, cle: &str) -> Result<()> {
+/// clé du propriétaire (`cle`, ADR-0013). S'arrête au bouton d'arrêt, à Ctrl+C ou à SIGTERM (ADR-0014).
+fn lancer(
+    app: Router,
+    ip: IpAddr,
+    port: Port,
+    racine: &Path,
+    cle: &str,
+    etat: Partage,
+) -> Result<()> {
     let app = app.layer(axum::middleware::map_response(entetes_securite));
     let projet = racine
         .file_name()
@@ -213,12 +232,13 @@ fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, cle: &str) -> Resu
                     if port.automatique { " (et les 19 suivants)" } else { "" }
                 );
             };
+            let racine_arret = racine.clone();
             let adresse_socket = ecoute.local_addr()?;
             let port = adresse_socket.port();
             wikik_core::reseau::noter_port(&racine, Some(port));
             if adresse_socket.ip().is_unspecified() {
                 // Écoute sur toutes les interfaces : l'adresse utile est celle du réseau local.
-                eprintln!("{nom} : http://127.0.0.1:{port} sur cette machine (Ctrl+C pour arrêter)");
+                eprintln!("{nom} : http://127.0.0.1:{port} sur cette machine");
                 match wikik_core::reseau::ip_locale() {
                     Some(ip) => eprintln!(
                         "  → depuis un autre poste : http://{ip}:{port}\n  → avec le terminal et les paramètres (ton poste, ne la partage pas) : http://{ip}:{port}/?cle={cle}"
@@ -226,20 +246,56 @@ fn lancer(app: Router, ip: IpAddr, port: Port, racine: &Path, cle: &str) -> Resu
                     None => eprintln!("  → adresse réseau introuvable : utiliser l'IP de cette machine, port {port}"),
                 }
             } else {
-                eprintln!("{nom} : http://{adresse_socket} (Ctrl+C pour arrêter)");
+                eprintln!("{nom} : http://{adresse_socket}");
             }
+            // Fin du bloc d'adresses, réaffiché par `wikik` quand le serveur tourne déjà.
+            eprintln!();
             let r = axum::serve(
                 ecoute,
                 app.into_make_service_with_connect_info::<SocketAddr>(),
             )
-                .with_graceful_shutdown(async {
-                    let _ = tokio::signal::ctrl_c().await;
+                .with_graceful_shutdown(async move {
+                    arret(&etat).await;
+                    // Un terminal ouvert garde sa connexion : passé 3 s, on n'attend plus.
+                    let r = racine_arret.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_secs(3));
+                        wikik_core::reseau::noter_port(&r, None);
+                        std::process::exit(0);
+                    });
                 })
                 .await;
             wikik_core::reseau::noter_port(&racine, None);
             r?;
             Ok(())
         })
+}
+
+/// Bouton « Arrêter le serveur » (propriétaire seulement, ADR-0014) : la réponse part, puis le serveur
+/// s'arrête.
+async fn api_arreter(State(e): State<Partage>, Json(_): Json<serde_json::Value>) -> Response {
+    e.arret.notify_one();
+    Json(true).into_response()
+}
+
+/// Attend une demande d'arrêt : bouton « Arrêter le serveur », Ctrl+C (premier plan) ou SIGTERM.
+async fn arret(etat: &Partage) {
+    #[cfg(unix)]
+    let terme = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut s) => {
+                s.recv().await;
+            }
+            Err(_) => std::future::pending::<()>().await,
+        }
+    };
+    #[cfg(not(unix))]
+    let terme = std::future::pending::<()>();
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = terme => {}
+        _ = etat.arret.notified() => {}
+    }
 }
 
 /// Exécute `f` sur l'index à jour, hors du fil asynchrone, et répond en JSON.

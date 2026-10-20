@@ -17,6 +17,8 @@ wikik init                 # wikik.toml, docs/projet/, gabarits
 wikik                      # puis ouvrir l'adresse affichée, section Design thinking
 ```
 
+`wikik` lance le serveur en arrière-plan et rend la main : il reste allumé après la fin de la connexion SSH, jusqu'au bouton ⏻ « Arrêter » en bas de la barre (ADR-0014). Relancé, `wikik` réaffiche ses adresses.
+
 Depuis un autre poste : `reseau = true` dans la section `[serveur]` de `wikik.toml` (une fois), puis `wikik` affiche l'adresse à ouvrir. Les liens entre wiki et atelier suivent l'adresse du navigateur : aucune IP à configurer. Avec plusieurs projets ouverts, chacun prend le port suivant libre (affiché au démarrage) ; le lien renvoyé par `atelier_rappel` vise le bon.
 
 - Mode **Express** par défaut (moins de propositions, moins de temps) ; **Complet** par étape, au besoin.

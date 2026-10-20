@@ -8,6 +8,7 @@ use wikik_core::Index;
 
 mod acces;
 mod atelier;
+mod detache;
 mod export;
 mod mcp;
 mod parametres;
@@ -158,12 +159,15 @@ fn main() {
     std::process::exit(code);
 }
 
-/// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec).
-/// @relu 2026-10-19 31f8fd6b
+/// Exécute la commande et renvoie le code de retour (0 succès, 1 diagnostics bloquants, 2 échec). Sans
+/// sous-commande, lance le serveur du projet en arrière-plan (ADR-0014), sauf pour le serveur lui-même.
 fn executer(cli: Cli) -> anyhow::Result<i32> {
     let Some(commande) = cli.commande else {
         let o = cli.serveur;
         let (adresse, autoriser) = ecoute(&cli.racine, o.adresse, o.reseau)?;
+        if std::env::var_os(detache::PREMIER_PLAN).is_none() {
+            return detache::lancer(&cli.racine);
+        }
         let port = serve::Port::choisir(o.port, wikik_core::reseau::PORT_DEFAUT);
         serve::servir(&cli.racine, &adresse, port, autoriser, o.factice)?;
         return Ok(0);

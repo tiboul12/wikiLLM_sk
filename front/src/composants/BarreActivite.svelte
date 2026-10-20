@@ -1,7 +1,7 @@
 <script lang="ts">
   // Barre d'activité, à la VS Code (EF-131) : une icône par section, toujours visible, avec un badge pour
-  // ce qui attend (remarques ouvertes en Réception, clarifications ouvertes en Projet) ; le graphe et les
-  // paramètres en bas. Sur téléphone, elle
+  // ce qui attend (remarques ouvertes en Réception, clarifications ouvertes en Projet) ; le graphe, les
+  // paramètres et, pour le propriétaire, l'arrêt du serveur (ADR-0014) en bas. Sur téléphone, elle
   // passe en barre du bas.
   import { SECTIONS, NOMS, type Section } from "../lib/sections.svelte";
   import { url } from "../lib/routeur.svelte";
@@ -9,6 +9,11 @@
   import { reception, actuelles } from "../lib/reception.svelte";
   import Icone from "./Icone.svelte";
   import { statique } from "../lib/statique";
+  import { terminal, arreterServeur } from "../lib/terminal.svelte";
+
+  async function arreter() {
+    if (confirm("Arrêter le serveur wikik de ce projet ? Il faudra relancer « wikik » dans le projet pour le rouvrir.")) await arreterServeur();
+  }
 
   let { active, graphe = false }: { active: Section | null; graphe?: boolean } = $props();
   const LIENS: Record<Section, () => string> = {
@@ -38,4 +43,5 @@
   <span class="espace"></span>
   <a href={url.graphe()} class:actif={graphe} title="Graphe"><Icone nom="graphe" /><span class="libelle">Graphe</span></a>
   {#if !statique}<a href={url.parametres()} class:actif={active === "parametres"} title="Paramètres" class="bas"><Icone nom="parametres" /><span class="libelle">Paramètres</span></a>{/if}
+  {#if terminal.proprietaire}<button class="arret" onclick={arreter} title="Arrêter le serveur (déconnexion)"><Icone nom="arret" /><span class="libelle">Arrêter</span></button>{/if}
 </nav>

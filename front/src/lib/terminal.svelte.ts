@@ -1,12 +1,12 @@
 // Terminal intégré et paramètres (EF-147, EF-148) : volet droit, droits du navigateur (propriétaire ou
-// non, ADR-0013) et envoi de la consigne de traitement à l'agent.
+// non, ADR-0013), envoi de la consigne de traitement à l'agent, arrêt du serveur (ADR-0014).
 //
 // @req EF-147, EF-148
 import type { Parametres } from "../types/Parametres";
 import { statique } from "./statique";
 
-/** `ouvert` : volet affiché ; `proprietaire` : ce navigateur peut ouvrir le terminal et régler l'IA. */
-export const terminal = $state({ ouvert: false, proprietaire: false, factice: false, parametres: null as Parametres | null });
+/** `ouvert` : volet affiché ; `proprietaire` : ce navigateur peut ouvrir le terminal et régler l'IA ; `arrete` : le serveur a été arrêté. */
+export const terminal = $state({ ouvert: false, proprietaire: false, factice: false, arrete: false, parametres: null as Parametres | null });
 
 /** Charge les paramètres et les droits du navigateur ; sans effet dans le site exporté. */
 export async function chargerParametres() {
@@ -24,6 +24,13 @@ async function poster<T>(route: string, corps: unknown): Promise<T> {
   const v = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(v.erreur ?? `${r.status}`);
   return v as T;
+}
+
+/** Arrête le serveur du projet (ADR-0014) : il faudra relancer `wikik` dans le projet. */
+export async function arreterServeur() {
+  await poster("/api/serveur/arreter", {});
+  terminal.ouvert = false;
+  terminal.arrete = true;
 }
 
 /** Enregistre les paramètres dans wikik.toml ; le LLM change sans relancer wikik. */

@@ -19,6 +19,7 @@ serde = { workspace = true, features = ["derive"] }
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
 portable-pty = "0.9"
+libc = "0.2"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 
 [dev-dependencies]

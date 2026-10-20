@@ -2,7 +2,8 @@
   // Mise en page (EF-131, EF-140) : barre d'activité à gauche (sections), panneau de la section active
   // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le
   // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler ;
-  // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal. Le serveur du projet sert les quatre sections
+  // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal ; après le
+  // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   // @relu 2026-10-19 64b2a015
   import { api } from "./lib/api";
@@ -199,3 +200,11 @@
   </main>
 </div>
 {#if terminal.ouvert}<PanneauTerminal bind:largeur={largeurTerminal} />{/if}
+{#if terminal.arrete}
+  <div class="serveur-arrete" role="alertdialog" aria-label="Serveur arrêté">
+    <div>
+      <h1>Serveur arrêté</h1>
+      <p>Pour rouvrir wikik, lance <code>wikik</code> dans le dossier du projet.</p>
+    </div>
+  </div>
+{/if}

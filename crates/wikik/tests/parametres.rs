@@ -29,6 +29,8 @@ fn demarrer(racine: &Path) -> Serveur {
             "--port",
             &port.to_string(),
         ])
+        // Au premier plan : le test arrête le serveur en tuant ce processus.
+        .env("WIKIK_PREMIER_PLAN", "1")
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -100,4 +102,50 @@ fn parametres_et_cle() {
     );
     let (c, entetes, _) = http(p, "GET", "/?cle=0123", "");
     assert!(c == 200 && !entetes.contains("wikik_cle"), "{entetes}");
+}
+
+/// Sans `WIKIK_PREMIER_PLAN`, `wikik` rend la main et le serveur tourne détaché ; relancé, il le
+/// signale ; le bouton « Arrêter le serveur » l'arrête (ADR-0014).
+///
+/// @req EF-130
+#[test]
+fn serveur_detache_et_arret() {
+    let d = tempfile::tempdir().unwrap();
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let lancer = || {
+        Command::new(env!("CARGO_BIN_EXE_wikik"))
+            .args([
+                "--racine",
+                d.path().to_str().unwrap(),
+                "--factice",
+                "--port",
+                &port.to_string(),
+            ])
+            .output()
+            .unwrap()
+    };
+    let o = lancer();
+    let texte = String::from_utf8_lossy(&o.stderr).to_string();
+    assert!(
+        o.status.success() && texte.contains("arrière-plan") && texte.contains(&port.to_string()),
+        "{texte}"
+    );
+    assert!(
+        TcpStream::connect(("127.0.0.1", port)).is_ok(),
+        "le serveur tourne après le retour de wikik"
+    );
+    let o = lancer();
+    assert!(String::from_utf8_lossy(&o.stderr).contains("tourne déjà"));
+    let (c, _, _) = http(port, "POST", "/api/serveur/arreter", "{}");
+    assert_eq!(c, 200);
+    let limite = Instant::now() + Duration::from_secs(8);
+    while TcpStream::connect(("127.0.0.1", port)).is_ok() {
+        assert!(Instant::now() < limite, "le serveur ne s'arrête pas");
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(!d.path().join(".wikik/serveur.json").exists());
 }

@@ -43,6 +43,8 @@ fn demarrer(racine: &Path) -> Serveur {
             "--port",
             &port.to_string(),
         ])
+        // Au premier plan : le test arrête le serveur en tuant ce processus.
+        .env("WIKIK_PREMIER_PLAN", "1")
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
