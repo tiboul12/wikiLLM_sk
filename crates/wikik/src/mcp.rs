@@ -181,7 +181,7 @@ fn erreur(id: Value, code: i64, message: &str) -> Value {
 }
 
 /// Réponse à un message ; `None` pour une notification.
-/// @relu 2026-10-19 2f982a20
+/// @relu 2026-10-22 05d9f294
 fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
     let id = m.get("id").cloned();
     let methode = m.get("method").and_then(Value::as_str).unwrap_or_default();
@@ -196,7 +196,7 @@ fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "wikik", "version": env!("CARGO_PKG_VERSION") },
                 // Méthode de lecture du wiki, réglable dans les paramètres (EF-147).
-                "instructions": index.config.ia.consigne_lecture,
+                "instructions": wikik_core::skills::corps(&index.racine, &index.config, "wikik-lecture"),
             })
         }
         "ping" => json!({}),

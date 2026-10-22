@@ -892,6 +892,7 @@ pub fn cherche(index: &Index, texte: &str) -> Result<Vec<Resultat>> {
 /// `{ cible, raison }` où `cible` est un identifiant de document, un chemin de fichier ou `chemin::Symbole`,
 /// que le front transforme en lien.
 /// @req EF-152
+/// @relu 2026-10-22 499eb872
 pub fn demande_recherche(index: &Index, question: &str) -> Result<(String, serde_json::Value)> {
     let question = question.trim();
     if question.is_empty() {
@@ -905,13 +906,13 @@ pub fn demande_recherche(index: &Index, question: &str) -> Result<(String, serde
     let consigne = format!(
         "Tu aides l'utilisateur à trouver ce qui répond à sa question dans son projet (code, documents, décisions).\n\
          Lis le projet avec les outils wikik si tu les as (carte, cherche, symbole, document) ; tu n'écris rien.\n\
-         Méthode de lecture du wiki : {}\n\n\
+         Méthode de lecture du wiki (skill wikik-lecture) :\n{}\n\n\
          Question : {question}\n\n\
          Résultats de la recherche plein texte, comme point de départ :\n{}\n\n\
          Réponds par les éléments du projet qui répondent le mieux, du plus utile au moins utile (8 au plus). \
          Pour chacun : `cible`, l'identifiant exact (ex. `EF-140`, `crates/x/src/a.rs`, `crates/x/src/a.rs::Type::f`), \
          et `raison`, une ou deux phrases qui disent ce qu'on y trouve. N'invente aucune cible ; `elements: []` si rien ne répond.",
-        index.config.ia.consigne_lecture,
+        crate::skills::corps(&index.racine, &index.config, "wikik-lecture"),
         if indices.is_empty() {
             "(aucun)".to_string()
         } else {

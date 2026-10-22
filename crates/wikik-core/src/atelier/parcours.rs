@@ -730,7 +730,7 @@ fn verifier_cible<'d>(
 
 /// Construit la demande au LLM pour une sous-étape d'un parcours (sous verrou ; l'appel se fait ensuite
 /// sans). Une clarification, hors parcours, peut viser un document de n'importe quel parcours.
-/// @relu 2026-10-19 6da16c27
+/// @relu 2026-10-22 d6d347e5
 pub fn preparer(
     index: &Index,
     pid: &str,
@@ -773,8 +773,8 @@ pub fn preparer(
     c.push_str(&format!("Tu animes l'étape « {} » d'un atelier de définition du besoin (framework Fast Design Thinking).\n", fiche.titre));
     c.push_str("Réponds en français. Tu lis le projet avec les outils wikik (atelier, document, cherche) ; tu n'écris rien toi-même.\n");
     c.push_str(&format!(
-        "Méthode de lecture du wiki : {}\n\n",
-        index.config.ia.consigne_lecture
+        "Méthode de lecture du wiki (skill wikik-lecture) :\n{}\n\n",
+        crate::skills::corps(&index.racine, &index.config, "wikik-lecture")
     ));
     if let Some(pt) = pitch {
         c.push_str(&format!(

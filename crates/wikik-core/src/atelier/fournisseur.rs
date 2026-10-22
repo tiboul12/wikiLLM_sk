@@ -1,9 +1,12 @@
-//! Fournisseur LLM de l'atelier (SPEC-19) : le CLI local (`claude -p`, abonnement) branché sur le serveur
-//! MCP de wikik, ou un fournisseur factice pour les tests et la démonstration.
+//! Fournisseur LLM de l'atelier (SPEC-19) : un connecteur (ADR-0015 : Claude Code branché sur le serveur
+//! MCP de wikik, Antigravity, Mistral Vibe, Ollama, llama.cpp, commande libre), ou un fournisseur factice
+//! pour les tests et la démonstration.
 //!
-//! @req EF-104, EF-111, ENF-007, ENF-008
+//! @req EF-104, EF-111, EF-155, ENF-007, ENF-008
 //! @adr 11
+//! @adr 15
 
+use super::connecteurs::{self, Lecture};
 use super::fiches::valider;
 use crate::config::ConfigLlm;
 use anyhow::{Context, Result, bail};
@@ -82,18 +85,21 @@ impl Fournisseur for Factice {
     }
 }
 
-/// Fournisseur par ligne de commande (SPEC-19 R2) ; un appel s'arrête au délai ou à l'annulation (R7).
+/// Fournisseur par connecteur (SPEC-19 R2, ADR-0015) : un CLI, ou `curl` vers un serveur local ; un appel
+/// s'arrête au délai ou à l'annulation (R7).
 pub struct Cli {
     pub config: ConfigLlm,
     /// Fichier `--mcp-config` écrit par l'atelier (`{mcp}`).
     pub mcp: PathBuf,
+    /// Racine du projet : la carte en est tirée pour un connecteur sans MCP.
+    racine: PathBuf,
     /// Avance à chaque annulation : un appel lancé avant s'arrête.
     annulations: AtomicU64,
 }
 
 impl Cli {
     /// Prépare le fournisseur et écrit la configuration MCP qui pointe sur le binaire courant et `racine`.
-    /// @relu 2026-10-19 d4900ae3
+    /// @relu 2026-10-22 4ab8bbf1
     pub fn preparer(config: ConfigLlm, racine: &Path, dossier_travail: &Path) -> Result<Cli> {
         std::fs::create_dir_all(dossier_travail)?;
         let exe = std::env::current_exe().context("chemin du binaire wikik")?;
@@ -106,49 +112,93 @@ impl Cli {
         Ok(Cli {
             config,
             mcp,
+            racine: racine.to_path_buf(),
             annulations: AtomicU64::new(0),
         })
     }
 
-    fn un_appel(&self, d: &Demande, depart: u64) -> Result<(Option<Value>, Option<Consommation>)> {
-        let schema = serde_json::to_string(d.schema)?;
-        let args: Vec<String> = self
-            .config
-            .arguments
-            .iter()
-            .map(|a| {
-                a.replace("{consigne}", d.consigne)
-                    .replace("{schema}", &schema)
-                    .replace("{mcp}", &self.mcp.to_string_lossy())
+    /// Consigne envoyée : telle quelle pour un connecteur qui lit le projet par MCP ; sinon précédée de la
+    /// carte du projet (`wikik query carte`), seule lecture possible pour un modèle sans outils.
+    fn consigne_complete(&self, consigne: &str) -> String {
+        if connecteurs::avec_mcp(&self.config) {
+            return consigne.to_string();
+        }
+        let carte = std::env::current_exe()
+            .ok()
+            .and_then(|exe| {
+                Command::new(exe)
+                    .arg("--racine")
+                    .arg(&self.racine)
+                    .args(["query", "carte"])
+                    .output()
+                    .ok()
             })
-            .collect();
-        let mut commande = Command::new(&self.config.commande);
+            .map(|s| String::from_utf8_lossy(&s.stdout).into_owned())
+            .unwrap_or_default();
+        format!(
+            "Tu n'as pas d'outils : voici la carte du projet (fichiers, rôle de chacun), tirée de son index wikik.\n\n{carte}\n\n---\n\n{consigne}"
+        )
+    }
+
+    fn un_appel(&self, d: &Demande, depart: u64) -> Result<(Option<Value>, Option<Consommation>)> {
+        let consigne = self.consigne_complete(d.consigne);
+        let appel = connecteurs::preparer(
+            &self.config,
+            &consigne,
+            d.schema,
+            &self.mcp.to_string_lossy(),
+        )?;
+        let mut commande = Command::new(&appel.programme);
         // Son propre groupe de processus : l'arrêter arrête aussi ce qu'il a lancé (serveur MCP, shell).
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut commande, 0);
         let mut enfant = commande
-            .args(&args)
-            .stdin(Stdio::null())
+            .args(&appel.arguments)
+            .envs(appel.environnement.iter().map(|(k, v)| (k, v)))
+            .stdin(if appel.entree.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .with_context(|| format!("lancement de `{}`", self.config.commande))?;
+            .with_context(|| format!("lancement de `{}`", appel.programme))?;
+        if let (Some(corps), Some(mut e)) = (appel.entree.clone(), enfant.stdin.take()) {
+            std::thread::spawn(move || {
+                use std::io::Write;
+                let _ = e.write_all(corps.as_bytes());
+            });
+        }
         let sortie = enfant.stdout.take().unwrap();
-        let lecteur = std::thread::spawn(move || analyser_flux(BufReader::new(sortie)));
+        let lecture = appel.lecture;
+        let lecteur = std::thread::spawn(move || {
+            if lecture == Lecture::FluxClaude {
+                analyser_flux(BufReader::new(sortie))
+            } else {
+                let mut texte = String::new();
+                use std::io::Read;
+                let _ = BufReader::new(sortie).read_to_string(&mut texte);
+                let (v, e) = connecteurs::lire_sortie(lecture, &texte);
+                (v, None, e)
+            }
+        });
         let limite = Instant::now() + Duration::from_secs(self.config.delai.max(1));
         loop {
             if let Some(statut) = enfant.try_wait()? {
                 let (donnees, conso, erreur) = lecteur.join().unwrap_or((None, None, None));
-                if donnees.is_none() && !statut.success() {
+                if donnees.is_none() && (!statut.success() || erreur.is_some()) {
                     let mut msg = String::new();
                     if let Some(mut e) = enfant.stderr.take() {
                         use std::io::Read;
                         let _ = e.read_to_string(&mut msg);
                     }
-                    bail!(
-                        "le LLM a échoué ({statut}) : {}",
-                        erreur.unwrap_or(msg).trim()
-                    );
+                    let detail = match (erreur, msg.trim()) {
+                        (Some(e), "") => e,
+                        (Some(e), m) => format!("{e} ({m})"),
+                        (None, m) => m.to_string(),
+                    };
+                    bail!("le LLM a échoué ({statut}) : {}", detail.trim());
                 }
                 return Ok((donnees, conso));
             }
@@ -201,7 +251,12 @@ pub fn analyser_flux(
 
 impl Fournisseur for Cli {
     fn nom(&self) -> String {
-        self.config.commande.clone()
+        let c = self.config.connecteur();
+        match (c.as_str(), self.config.modele.trim()) {
+            ("cli", _) => self.config.commande.clone(),
+            (c, "") => c.to_string(),
+            (c, m) => format!("{c} · {m}"),
+        }
     }
 
     fn proposer(&self, d: &Demande) -> Result<Reponse> {
@@ -255,19 +310,20 @@ fn arreter(enfant: &mut std::process::Child) {
 }
 
 /// Construit le fournisseur décrit par la configuration.
+/// @relu 2026-10-22 0e7c1f36
 pub fn depuis_config(
     config: &ConfigLlm,
     racine: &Path,
     dossier_travail: &Path,
 ) -> Result<Box<dyn Fournisseur>> {
-    match config.fournisseur.as_str() {
+    match config.connecteur().as_str() {
         "factice" => Ok(Box::new(Factice)),
-        "cli" => Ok(Box::new(Cli::preparer(
+        "claude" | "cli" | "agy" | "vibe" | "ollama" | "llama-cpp" => Ok(Box::new(Cli::preparer(
             config.clone(),
             racine,
             dossier_travail,
         )?)),
-        autre => bail!("fournisseur inconnu : {autre} (cli ou factice)"),
+        autre => bail!("connecteur inconnu : {autre}"),
     }
 }
 
@@ -284,10 +340,11 @@ mod tests {
         let script = dossier.join("faux.sh");
         std::fs::write(&script, format!("#!/bin/sh\n{corps}\n")).unwrap();
         ConfigLlm {
-            fournisseur: "cli".into(),
+            connecteur: Some("cli".into()),
             commande: "sh".into(),
             arguments: vec![script.to_string_lossy().into(), "{consigne}".into()],
             delai: 5,
+            ..ConfigLlm::default()
         }
     }
 

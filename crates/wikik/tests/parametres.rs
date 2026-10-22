@@ -82,15 +82,30 @@ fn parametres_et_cle() {
     );
     assert_eq!(params["factice"], true);
     let mut p2 = params["parametres"].take();
-    p2["consigne_traitement"] = "Commence par un plan.".into();
+    p2["modele"] = "sonnet".into();
     let (c, _, _) = http(p, "POST", "/api/parametres", &p2.to_string());
     assert_eq!(c, 200);
     let toml = std::fs::read_to_string(d.path().join("wikik.toml")).unwrap();
     assert!(
-        toml.starts_with("# commentaire gardé")
-            && toml.contains("consigne_traitement = \"Commence par un plan.\""),
+        toml.starts_with("# commentaire gardé") && toml.contains("modele = \"sonnet\""),
         "{toml}"
     );
+
+    // Un skill modifié est écrit dans .claude/skills du projet, puis retiré par « revenir à l'origine ».
+    let corps =
+        r#"{"nom":"wikik-lecture","texte":"---\nname: wikik-lecture\ndescription: x\n---\nLis."}"#;
+    let (c, _, _) = http(p, "POST", "/api/skills", corps);
+    assert_eq!(c, 200);
+    let skill = d.path().join(".claude/skills/wikik-lecture/SKILL.md");
+    assert!(std::fs::read_to_string(&skill).unwrap().ends_with("Lis.\n"));
+    let (c, _, _) = http(
+        p,
+        "POST",
+        "/api/skills/retablir",
+        r#"{"nom":"wikik-lecture"}"#,
+    );
+    assert_eq!(c, 200);
+    assert!(!skill.exists());
 
     // La clé du lancement pose le cookie ; une fausse clé ne pose rien.
     let cle = std::fs::read_to_string(d.path().join(".wikik/cle")).unwrap();

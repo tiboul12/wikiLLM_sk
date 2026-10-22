@@ -68,7 +68,7 @@ impl Port {
 /// Démarre le serveur du projet sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C ; `factice`
 /// remplace le LLM par les exemples des fiches. La clé du propriétaire est lue ou créée (`.wikik/cle`).
 /// Le premier `check` est calculé en tâche de fond (EF-154).
-/// @relu 2026-10-20 5ba2f739
+/// @relu 2026-10-22 fb16f1ce
 pub fn servir(
     racine: &Path,
     adresse: &str,
@@ -81,7 +81,7 @@ pub fn servir(
     index.mettre_a_jour()?;
     let mut config = index.config.atelier.llm.clone();
     if factice {
-        config.fournisseur = "factice".into();
+        config.connecteur = Some("factice".into());
     }
     let travail = wikik_core::atelier::parcours::travail(&index.racine);
     let fournisseur = fournisseur::depuis_config(&config, &index.racine, &travail)?;

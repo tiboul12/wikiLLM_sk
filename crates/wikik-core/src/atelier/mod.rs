@@ -6,6 +6,7 @@
 //! @adr 10
 
 pub mod artefacts;
+pub mod connecteurs;
 pub mod fiches;
 pub mod fournisseur;
 pub mod parcours;

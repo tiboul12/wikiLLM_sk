@@ -21,6 +21,7 @@ pub mod reception;
 pub mod relu;
 pub mod reseau;
 pub mod resolution;
+pub mod skills;
 pub mod stats;
 pub mod wiki;
 
