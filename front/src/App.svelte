@@ -7,7 +7,7 @@
   // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153) ;
   // Ctrl+Z / Ctrl+Y annulent ou rétablissent la dernière écriture, puis tout est relu (EF-159). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
-  // @relu 2026-10-22 889b0a2d
+  // @relu 2026-10-22 f3e2b7ca
   import { untrack } from "svelte";
   import { api } from "./lib/api";
   import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
@@ -37,6 +37,7 @@
   import CarteReception from "./pages/reception/CarteReception.svelte";
   import Traitement from "./pages/reception/Traitement.svelte";
   import Parametres from "./pages/Parametres.svelte";
+  import Git from "./pages/Git.svelte";
   import PanneauTerminal from "./composants/PanneauTerminal.svelte";
   import Icone from "./composants/Icone.svelte";
   import { terminal, chargerParametres } from "./lib/terminal.svelte";
@@ -216,6 +217,8 @@
       <Accueil {projet} />
     {:else if routeur.route.page === "parametres"}
       <Parametres />
+    {:else if routeur.route.page === "git"}
+      <Git />
     {:else if !atelier.actif && !reception.actif}
       <p class="discret">Cette page n'existe pas dans le site exporté : lance <code>wikik</code> dans le projet.</p>
     {:else if routeur.route.page === "etape"}

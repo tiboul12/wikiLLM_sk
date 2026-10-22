@@ -4,7 +4,7 @@
   // groupe par type avec ⚙ (skill de structure) et, en orange, ce qui attend une relecture, compté jusqu'à
   // l'accordéon ; les besoins en cascade avec leurs exigences et leurs tests (EF-160). Design thinking :
   // les ateliers (numéro, statut, étapes, « + ») puis, à part, les clarifications par sujet (EF-161) et
-  // les artefacts. Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
+  // les artefacts. Git : l'historique, les branches et les tags (EF-166). Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
   // version qui a publié sa correction (EF-165).
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
@@ -78,7 +78,19 @@
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
   };
   const groupes = $derived(grouper(docsDe(section === "atelier" ? "atelier" : section === "reception" ? "reception" : "projet")));
-  const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception };
+  const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception, git: () => url.git() };
+
+  // Section Git (EF-166) : branches, branches distantes et tags ; un clic montre leur commit.
+  type Refs = { branche: string; branches: string[]; distantes: string[]; tags: string[] };
+  let refs = $state<Refs | null>(null);
+  $effect(() => {
+    edition.revision;
+    if (section !== "git") return;
+    fetch("/api/git/historique?limite=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((h) => (refs = h))
+      .catch(() => (refs = null));
+  });
   const titreDoc = (id: string) => projet.documents.find((d) => d.id === id)?.titre ?? "";
   const groupesClar = $derived(atelier.etat ? sujets(titreDoc) : []);
   const aRelire = $derived(aRelireDe(projet.documents));
@@ -248,7 +260,17 @@
     <button class="replier" onclick={basculer} title={replie ? "Déplier tout" : "Replier tout"} aria-label={replie ? "Déplier tout" : "Replier tout"}>{replie ? "⊞" : "⊟"}</button>
   </div>
 
-  {#if section === "produit"}
+  {#if section === "git"}
+    <ul class="liens-section"><li><a href={url.git()} class:actif={actif(url.git())}>Historique</a></li></ul>
+    {#if refs}
+      {#each [["Branches", refs.branches], ["Branches distantes", refs.distantes], ["Tags", refs.tags]] as [titre, liste] (titre)}
+        <details open={titre === "Branches"}>
+          <summary>{titre} <small>{(liste as string[]).length}</small></summary>
+          <ul>{#each liste as string[] as r (r)}<li><a href={url.git({ ref: r })} title={r}>{r === refs.branche ? "● " : ""}{r}</a></li>{/each}</ul>
+        </details>
+      {/each}
+    {/if}
+  {:else if section === "produit"}
     <ul class="liens-section">
       <li><a href={url.graphe()} class:actif={actif(url.graphe())}>Graphe du projet</a></li>
     </ul>

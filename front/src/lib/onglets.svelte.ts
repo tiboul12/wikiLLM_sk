@@ -162,5 +162,6 @@ const TITRES: Record<string, string> = {
   reception: "Cahier de réception",
   traitement: "Traitement",
   parametres: "Paramètres",
+  git: "Historique git",
 };
 

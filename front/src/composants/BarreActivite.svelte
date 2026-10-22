@@ -2,7 +2,7 @@
   // Barre d'activité, à la VS Code (EF-131) : une icône par section, toujours visible, avec un badge pour
   // ce qui attend (remarques ouvertes en Réception, clarifications ouvertes dans le Design thinking,
   // décisions attendues en Projet) ; en bas les outils
-  // (Code, avec son graphe : EF-150), les paramètres et, pour le propriétaire, l'arrêt du serveur
+  // (Code, avec son graphe : EF-150 ; Git : EF-166), les paramètres et, pour le propriétaire, l'arrêt du serveur
   // (ADR-0014). Sur téléphone, elle passe en barre du bas.
   import { SECTIONS, OUTILS, NOMS, type Section } from "../lib/sections.svelte";
   import { url } from "../lib/routeur.svelte";
@@ -24,6 +24,7 @@
     atelier: () => url.atelier(atelier.parcours),
     reception: url.reception,
     parametres: url.parametres,
+    git: () => url.git(),
   };
   const badge = (s: Section): number => {
     if (s === "reception") return reception.etat ? actuelles().filter((r) => r.statut === "ouverte").length : 0;

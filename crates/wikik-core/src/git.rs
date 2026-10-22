@@ -169,6 +169,214 @@ impl Depot {
     }
 }
 
+/// Un commit de l'historique (EF-166) : de quoi dessiner le graphe des branches.
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct CommitVue {
+    pub hash: String,
+    pub parents: Vec<String>,
+    pub auteur: String,
+    /// Date et heure du commit (`AAAA-MM-JJ HH:MM`).
+    pub date: String,
+    pub sujet: String,
+    /// Branches, branches distantes et tags qui pointent dessus ; `HEAD` en tête s'il y est.
+    pub refs: Vec<String>,
+}
+
+/// Historique du dépôt et sa situation (EF-166).
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct Historique {
+    pub commits: Vec<CommitVue>,
+    /// Branche courante (vide : HEAD détaché).
+    pub branche: String,
+    pub branches: Vec<String>,
+    pub distantes: Vec<String>,
+    pub tags: Vec<String>,
+    /// Fichiers modifiés et non commités.
+    pub modifies: u32,
+    /// Commits de la branche pas encore poussés, et commits distants pas encore récupérés.
+    pub en_avance: u32,
+    pub en_retard: u32,
+    /// L'historique a été coupé à la limite demandée.
+    pub tronque: bool,
+}
+
+/// Un fichier touché par un commit.
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct FichierCommit {
+    /// `A` ajouté, `M` modifié, `D` supprimé, `R` renommé.
+    pub statut: String,
+    pub chemin: String,
+    pub ajouts: u32,
+    pub suppressions: u32,
+}
+
+/// Détail d'un commit : message complet et fichiers touchés.
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct DetailCommit {
+    pub hash: String,
+    pub auteur: String,
+    pub date: String,
+    pub message: String,
+    pub fichiers: Vec<FichierCommit>,
+}
+
+fn hash_valide(h: &str) -> bool {
+    (4..=40).contains(&h.len()) && h.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+impl Depot {
+    /// Historique de toutes les branches, du plus récent au plus ancien (ordre des dates, parents après
+    /// leurs enfants), `limite` commits au plus.
+    pub fn historique(&self, limite: usize) -> Historique {
+        let n = limite.max(1);
+        let texte = self
+            .git(&[
+                "log",
+                "--all",
+                "--date-order",
+                "--date=format:%Y-%m-%d %H:%M",
+                "--format=%H%x1f%P%x1f%an%x1f%cd%x1f%D%x1f%s",
+                &format!("-n{}", n + 1),
+            ])
+            .unwrap_or_default();
+        let mut commits: Vec<CommitVue> = texte
+            .lines()
+            .filter_map(|l| {
+                let c: Vec<&str> = l.split('\u{1f}').collect();
+                if c.len() < 6 {
+                    return None;
+                }
+                let refs = c[4]
+                    .split(", ")
+                    .filter(|r| !r.is_empty())
+                    .map(|r| r.trim_start_matches("tag: ").replace("HEAD -> ", "HEAD → "))
+                    .collect();
+                Some(CommitVue {
+                    hash: c[0].to_string(),
+                    parents: c[1].split_whitespace().map(str::to_string).collect(),
+                    auteur: c[2].to_string(),
+                    date: c[3].to_string(),
+                    refs,
+                    sujet: c[5..].join("\u{1f}"),
+                })
+            })
+            .collect();
+        let tronque = commits.len() > n;
+        commits.truncate(n);
+        let liste = |args: &[&str]| -> Vec<String> {
+            self.git(args)
+                .unwrap_or_default()
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !l.ends_with("/HEAD"))
+                .map(str::to_string)
+                .collect()
+        };
+        let compte = |args: &[&str]| -> u32 {
+            self.git(args)
+                .and_then(|t| t.trim().parse().ok())
+                .unwrap_or(0)
+        };
+        let branche = self.git(&["branch", "--show-current"]).unwrap_or_default();
+        let amont = self.git(&["rev-parse", "--abbrev-ref", "@{upstream}"]);
+        let (en_avance, en_retard) = match &amont {
+            Some(a) => (
+                compte(&["rev-list", "--count", &format!("{a}..HEAD")]),
+                compte(&["rev-list", "--count", &format!("HEAD..{a}")]),
+            ),
+            None => (0, 0),
+        };
+        Historique {
+            commits,
+            branche,
+            branches: liste(&["branch", "--format=%(refname:short)"]),
+            distantes: liste(&["branch", "-r", "--format=%(refname:short)"]),
+            tags: liste(&["tag", "--sort=-creatordate"]),
+            modifies: self
+                .git(&["status", "--porcelain"])
+                .map_or(0, |t| t.lines().count() as u32),
+            en_avance,
+            en_retard,
+            tronque,
+        }
+    }
+
+    /// Message complet et fichiers touchés d'un commit (par rapport à son premier parent).
+    pub fn detail(&self, hash: &str) -> Option<DetailCommit> {
+        if !hash_valide(hash) {
+            return None;
+        }
+        let entete = self.git(&[
+            "log",
+            "-1",
+            "--date=format:%Y-%m-%d %H:%M",
+            "--format=%H%x1f%an%x1f%cd%x1f%B",
+            hash,
+        ])?;
+        let c: Vec<&str> = entete.splitn(4, '\u{1f}').collect();
+        let statuts = self
+            .git(&["show", "--format=", "--name-status", "-M", hash])
+            .unwrap_or_default();
+        let nombres = self
+            .git(&["show", "--format=", "--numstat", "-M", hash])
+            .unwrap_or_default();
+        let compteurs: Vec<(u32, u32)> = nombres
+            .lines()
+            .map(|l| {
+                let mut x = l.split('\t');
+                (
+                    x.next().and_then(|v| v.parse().ok()).unwrap_or(0),
+                    x.next().and_then(|v| v.parse().ok()).unwrap_or(0),
+                )
+            })
+            .collect();
+        let fichiers = statuts
+            .lines()
+            .enumerate()
+            .filter_map(|(i, l)| {
+                let parts: Vec<&str> = l.split('\t').collect();
+                let statut = parts.first()?.chars().next()?.to_string();
+                let chemin = parts.last()?.to_string();
+                let (ajouts, suppressions) = compteurs.get(i).copied().unwrap_or((0, 0));
+                Some(FichierCommit {
+                    statut,
+                    chemin,
+                    ajouts,
+                    suppressions,
+                })
+            })
+            .collect();
+        Some(DetailCommit {
+            hash: c.first()?.to_string(),
+            auteur: c.get(1)?.to_string(),
+            date: c.get(2)?.to_string(),
+            message: c.get(3).unwrap_or(&"").trim().to_string(),
+            fichiers,
+        })
+    }
+
+    /// Diff d'un fichier dans un commit (format unifié), 400 Ko au plus.
+    pub fn diff(&self, hash: &str, chemin: &str) -> Option<String> {
+        if !hash_valide(hash) || chemin.contains("..") {
+            return None;
+        }
+        let mut d = self.git(&["show", "--format=", "-M", hash, "--", chemin])?;
+        if d.len() > 400_000 {
+            let mut fin = 400_000;
+            while !d.is_char_boundary(fin) {
+                fin -= 1;
+            }
+            d.truncate(fin);
+            d.push_str("\n… (diff coupé)");
+        }
+        Some(d)
+    }
+}
+
 fn analyser_porcelain(texte: &str) -> Vec<LigneBlame> {
     let mut lignes = vec![];
     let mut commit = String::new();

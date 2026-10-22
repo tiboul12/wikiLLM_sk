@@ -11,6 +11,7 @@ mod atelier;
 mod detache;
 mod edition;
 mod export;
+mod historique;
 mod mcp;
 mod parametres;
 mod reception;

@@ -115,6 +115,7 @@ pub fn servir(
 /// journal d'annulation par requête d'écriture, ADR-0016) ; écritures gardées
 /// (corps JSON, même origine, 25 Mo au plus pour les captures) ; paramètres et terminal réservés au
 /// propriétaire (ADR-0013), comme le bouton d'arrêt (ADR-0014).
+/// @relu 2026-10-22 575fd80b
 pub(crate) fn routes(etat: Partage) -> Router {
     routes_wiki()
         .merge(crate::atelier::routes())
@@ -122,6 +123,7 @@ pub(crate) fn routes(etat: Partage) -> Router {
         .merge(crate::parametres::routes(etat.clone()))
         .merge(crate::terminal::routes(etat.clone()))
         .merge(crate::edition::routes(etat.clone()))
+        .merge(crate::historique::routes())
         .merge(
             Router::new()
                 .route("/api/serveur/arreter", axum::routing::post(api_arreter))
