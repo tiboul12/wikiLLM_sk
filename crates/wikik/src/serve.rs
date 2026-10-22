@@ -41,6 +41,8 @@ pub(crate) struct Etat {
     pub(crate) terminal: Mutex<Option<Arc<crate::terminal::Terminal>>>,
     /// Bouton « Arrêter le serveur » (ADR-0014).
     pub(crate) arret: tokio::sync::Notify,
+    /// Dernier rapport de `check` et son empreinte (EF-154) : rendu tel quel tant que rien n'a changé.
+    pub(crate) dernier_check: Mutex<Option<(String, check::RapportCheck)>>,
 }
 
 pub(crate) type Partage = Arc<Etat>;
@@ -65,6 +67,7 @@ impl Port {
 
 /// Démarre le serveur du projet sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C ; `factice`
 /// remplace le LLM par les exemples des fiches. La clé du propriétaire est lue ou créée (`.wikik/cle`).
+/// Le premier `check` est calculé en tâche de fond (EF-154).
 /// @relu 2026-10-20 5ba2f739
 pub fn servir(
     racine: &Path,
@@ -92,6 +95,18 @@ pub fn servir(
         cle: cle.clone(),
         terminal: Mutex::new(None),
         arret: tokio::sync::Notify::new(),
+        dernier_check: Mutex::new(None),
+    });
+    // Premier `check` calculé en tâche de fond : la première page de fichier n'attend pas les blames.
+    let chaud = etat.clone();
+    std::thread::spawn(move || {
+        let i = chaud.index.lock().unwrap_or_else(|x| x.into_inner());
+        if let (Ok(em), Ok(r)) = (check::empreinte(&i), check::verifier(&i)) {
+            *chaud
+                .dernier_check
+                .lock()
+                .unwrap_or_else(|x| x.into_inner()) = Some((em, r));
+        }
     });
     lancer(routes(etat.clone()), ip, port, &racine, &cle, etat)
 }
@@ -369,8 +384,22 @@ async fn api_cherche(State(e): State<Partage>, Query(p): Query<ParamCherche>) ->
     repondre(e, move |i| wiki::cherche(i, &p.q)).await
 }
 
+/// Rapport de `check`, gardé tant que l'empreinte du projet ne change pas (EF-154, REC-047).
 async fn api_check(State(e): State<Partage>) -> Response {
-    repondre(e, check::verifier).await
+    let memo = e.clone();
+    repondre(e, move |i| {
+        let empreinte = check::empreinte(i)?;
+        let mut d = memo.dernier_check.lock().unwrap_or_else(|x| x.into_inner());
+        if let Some((em, r)) = d.as_ref()
+            && *em == empreinte
+        {
+            return Ok(r.clone());
+        }
+        let r = check::verifier(i)?;
+        *d = Some((empreinte, r.clone()));
+        Ok(r)
+    })
+    .await
 }
 
 /// Fichiers du front ; toute autre route renvoie `index.html` (application monopage).

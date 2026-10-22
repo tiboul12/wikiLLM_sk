@@ -667,9 +667,11 @@ pub fn document(index: &Index, id: &str) -> Result<PageDocument> {
 }
 
 /// Graphe local autour de `centre` (symbole ou document), ou graphe global : documents, code ramené au
-/// fichier, pages de l'application et remarques (EF-141).
+/// fichier, pages de l'application et remarques (EF-141). Le graphe global relie aussi les fichiers de
+/// code entre eux (appels sûrs et composants rendus, ramenés au fichier) et les pages entre elles
+/// (arborescence des routes, page dont le code cite la route d'une autre, ou appelle son fichier) : EF-153.
 ///
-/// @req EF-043, EF-141
+/// @req EF-043, EF-141, EF-153
 pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<Graphe> {
     let res = Resolveur::charger(index)?;
     let mut ar: BTreeMap<(String, String, String), String> = BTreeMap::new();
@@ -712,17 +714,24 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
                     .get(id)
                     .map_or_else(|| id.to_string(), |(f, _)| f.clone())
             };
+            // Les appels « probables » (nom seul) restent hors du graphe global : trop de faux liens.
             let mut st = index.conn.prepare(
-                "SELECT source, cible, genre, confiance FROM aretes WHERE genre IN ('lien', 'req', 'adr')",
+                "SELECT source, cible, genre, confiance FROM aretes
+                 WHERE genre IN ('lien', 'req', 'adr', 'rend') OR (genre = 'appel' AND confiance = 'certain')",
             )?;
             let v: Vec<(String, String, String, String)> = st
                 .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
                 .collect::<rusqlite::Result<_>>()?;
+            let mut entre_fichiers: BTreeSet<(String, String)> = BTreeSet::new();
             for (s, c, g, conf) in v {
                 let (s, c) = (fichier_de(&s), fichier_de(&c));
-                if s != c {
-                    ar.insert((s, c, g), conf);
+                if s == c {
+                    continue;
                 }
+                if g == "appel" || g == "rend" {
+                    entre_fichiers.insert((s.clone(), c.clone()));
+                }
+                ar.insert((s, c, g), conf);
             }
             for id in res.documents.keys() {
                 ar.entry((id.clone(), id.clone(), "_".into())).or_default();
@@ -731,7 +740,12 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
                 &crate::reception::carte::lire(index),
                 crate::reception::carte::detecter(index).unwrap_or_default(),
             );
-            for p in carte.iter().filter(|p| !p.masque) {
+            let visibles: Vec<&crate::reception::carte::Page> =
+                carte.iter().filter(|p| !p.masque).collect();
+            for (a, b, g) in liens_entre_pages(index, &visibles, &entre_fichiers, &fichier_de) {
+                ar.insert((a, b, g), "certain".into());
+            }
+            for p in visibles {
                 let id = format!("page:{}", p.cle);
                 pages.insert(
                     id.clone(),
@@ -785,6 +799,63 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
         })
         .collect();
     Ok(Graphe { noeuds, aretes })
+}
+
+/// Liens entre pages de l'application (EF-153) : `contient` de la page dont la route est le plus long
+/// préfixe, `navigue` quand le fichier d'une page cite la route d'une autre (`"/reception/traitement"`)
+/// ou appelle son fichier. Une route à paramètre n'est citée que par sa partie fixe.
+fn liens_entre_pages(
+    index: &Index,
+    pages: &[&crate::reception::carte::Page],
+    entre_fichiers: &BTreeSet<(String, String)>,
+    fichier_de: &dyn Fn(&str) -> String,
+) -> Vec<(String, String, String)> {
+    let id = |p: &crate::reception::carte::Page| format!("page:{}", p.cle);
+    let fixe = |r: &str| -> String {
+        let fin = r.find([':', '{', '[', '*', '<']).unwrap_or(r.len());
+        r[..fin].trim_end_matches('/').to_string()
+    };
+    let fichier = |p: &crate::reception::carte::Page| {
+        p.symboles
+            .first()
+            .map(|s| fichier_de(s))
+            .or(p.fichier.clone())
+    };
+    let mut liens = vec![];
+    for p in pages {
+        let Some(r) = p.route.as_deref().map(fixe) else {
+            continue;
+        };
+        let parent = pages
+            .iter()
+            .filter(|q| q.cle != p.cle)
+            .filter_map(|q| Some((q, fixe(q.route.as_deref()?))))
+            .filter(|(_, rq)| {
+                !rq.is_empty() && r.len() > rq.len() && r.starts_with(&format!("{rq}/"))
+            })
+            .max_by_key(|(_, rq)| rq.len());
+        if let Some((q, _)) = parent {
+            liens.push((id(q), id(p), "contient".to_string()));
+        }
+    }
+    for a in pages {
+        let Some(fa) = fichier(a) else { continue };
+        let texte = std::fs::read_to_string(index.racine.join(&fa)).unwrap_or_default();
+        for b in pages.iter().filter(|b| b.cle != a.cle) {
+            let cite = b.route.as_deref().map(fixe).is_some_and(|r| {
+                r.len() > 1
+                    && ["\"", "'", "`"]
+                        .iter()
+                        .any(|q| texte.contains(&format!("{q}{r}")))
+            });
+            let appelle =
+                fichier(b).is_some_and(|fb| fb != fa && entre_fichiers.contains(&(fa.clone(), fb)));
+            if cite || appelle {
+                liens.push((id(a), id(b), "navigue".to_string()));
+            }
+        }
+    }
+    liens
 }
 
 /// Recherche plein texte, mêmes règles que `wikik query cherche`.

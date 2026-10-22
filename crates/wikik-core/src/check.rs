@@ -11,6 +11,7 @@ use crate::index::{DOSSIER, Index};
 use crate::lang::{Langage, rust};
 use anyhow::Result;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Un problème trouvé par `check`.
@@ -22,6 +23,39 @@ pub struct Diagnostic {
     pub symbole: Option<String>,
     pub severite: String,
     pub message: String,
+}
+
+/// Empreinte de tout ce dont dépend un rapport (EF-154) : commit courant, contenu de chaque fichier de
+/// code et de chaque document, configuration. Deux appels de même empreinte donnent le même rapport : le
+/// serveur garde le dernier au lieu de relancer un `git blame` par fichier à chaque page ouverte.
+/// @req EF-154
+pub fn empreinte(index: &Index) -> Result<String> {
+    let mut h = Sha256::new();
+    let tete = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&index.racine)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map(|s| s.stdout)
+        .unwrap_or_default();
+    h.update(&tete);
+    for requete in [
+        "SELECT chemin, hash_contenu FROM fichiers ORDER BY chemin",
+        "SELECT chemin, hash_contenu FROM documents ORDER BY chemin",
+    ] {
+        let mut st = index.conn.prepare(requete)?;
+        let mut lignes = st.query([])?;
+        while let Some(l) = lignes.next()? {
+            h.update(l.get::<_, String>(0)?.as_bytes());
+            h.update(
+                l.get::<_, Option<String>>(1)?
+                    .unwrap_or_default()
+                    .as_bytes(),
+            );
+        }
+    }
+    h.update(std::fs::read(index.racine.join("wikik.toml")).unwrap_or_default());
+    Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
 /// Résultat complet, sérialisé tel quel par `--format json`.

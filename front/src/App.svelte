@@ -4,7 +4,7 @@
   // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler ;
   // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal ; après le
   // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Les pages ouvertes ont leurs onglets au-dessus
-  // du contenu (EF-151), sauf dans une fenêtre détachée. Le serveur du projet sert les quatre sections
+  // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   // @relu 2026-10-22 58c85d1b
   import { untrack } from "svelte";
@@ -39,6 +39,7 @@
   import Icone from "./composants/Icone.svelte";
   import { terminal, chargerParametres } from "./lib/terminal.svelte";
   import Onglets from "./composants/Onglets.svelte";
+  import { precharger } from "./lib/graphe";
   import { detachee, suivre, titreDe, ouvrir } from "./lib/onglets.svelte";
   import { nouvelOnglet } from "./lib/routeur.svelte";
 
@@ -57,6 +58,8 @@
     })
     .catch((e) => (erreur = String(e)));
   detecter().then((ok) => ok && choisirParcours(parcoursDeUrl()));
+  // Le graphe global et sa disposition se préparent en tâche de fond (REC-045).
+  precharger();
   detecterReception();
   chargerParametres();
 
