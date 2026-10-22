@@ -28,6 +28,7 @@ use wikik_core::{Index, check, wiki};
 #[folder = "../../front/dist"]
 pub(crate) struct Front;
 
+/// État partagé par toutes les routes du serveur : index du projet sous verrou, fournisseur LLM, mode factice, propriétaire.
 pub(crate) struct Etat {
     pub(crate) index: Mutex<Index>,
     /// Fournisseur LLM de l'atelier et du complément de la carte de réception, remplacé par les
@@ -45,6 +46,7 @@ pub(crate) struct Etat {
     pub(crate) dernier_check: Mutex<Option<(String, check::RapportCheck)>>,
 }
 
+/// État du serveur tel que le reçoivent les gestionnaires axum.
 pub(crate) type Partage = Arc<Etat>;
 
 /// Port d'écoute : celui demandé (`--port`), ou le port par défaut et, s'il est pris (un autre projet
@@ -167,6 +169,7 @@ pub(crate) fn routes_wiki() -> Router<Partage> {
         .route("/api/image", get(api_image))
 }
 
+/// Paramètre `?chemin=` d'une image.
 #[derive(Deserialize)]
 struct ParamImage {
     chemin: String,
@@ -341,39 +344,47 @@ where
     }
 }
 
+/// Paramètre `?chemin=` d'un fichier de code.
 #[derive(Deserialize)]
 struct ParamChemin {
     chemin: String,
 }
 
+/// Paramètre `?id=` d'un document.
 #[derive(Deserialize)]
 struct ParamId {
     id: String,
 }
 
+/// Paramètres du graphe : centre (symbole, fichier ou document) et profondeur ; sans centre, graphe global.
 #[derive(Deserialize)]
 struct ParamGraphe {
     centre: Option<String>,
     profondeur: Option<usize>,
 }
 
+/// Paramètre `?q=` de la recherche.
 #[derive(Deserialize)]
 struct ParamCherche {
     q: String,
 }
 
+/// Projet : nom, documents résumés et fichiers indexés, pour la barre et les accueils.
 async fn api_projet(State(e): State<Partage>) -> Response {
     repondre(e, wiki::projet).await
 }
 
+/// Page d'un fichier de code : en-tête et cellules des symboles.
 async fn api_fichier(State(e): State<Partage>, Query(p): Query<ParamChemin>) -> Response {
     repondre(e, move |i| wiki::fichier(i, &p.chemin)).await
 }
 
+/// Page d'un document : frontmatter, corps, liens résolus et rétroliens.
 async fn api_document(State(e): State<Partage>, Query(p): Query<ParamId>) -> Response {
     repondre(e, move |i| wiki::document(i, &p.id)).await
 }
 
+/// Graphe local d'un nœud à la profondeur demandée (1 par défaut), ou graphe global du projet.
 async fn api_graphe(State(e): State<Partage>, Query(p): Query<ParamGraphe>) -> Response {
     repondre(e, move |i| {
         wiki::graphe(
@@ -385,6 +396,7 @@ async fn api_graphe(State(e): State<Partage>, Query(p): Query<ParamGraphe>) -> R
     .await
 }
 
+/// Recherche plein texte dans la doc du code et les documents.
 async fn api_cherche(State(e): State<Partage>, Query(p): Query<ParamCherche>) -> Response {
     repondre(e, move |i| wiki::cherche(i, &p.q)).await
 }

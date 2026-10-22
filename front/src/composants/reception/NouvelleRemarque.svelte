@@ -7,20 +7,34 @@
 
   let { page, remarque = null, fini }: { page: string; remarque?: Remarque | null; fini?: (id: string) => void } = $props();
   // svelte-ignore state_referenced_locally
+  /** Texte de la remarque ; prérempli avec la version modifiée. */
   let texte = $state(remarque?.texte ?? "");
   // svelte-ignore state_referenced_locally
+  /** Genre de la remarque (ergonomie par défaut). */
   let genre = $state(remarque?.genre ?? "ergonomie");
   // svelte-ignore state_referenced_locally
+  /** Gravité de la remarque (gênant par défaut). */
   let gravite = $state(remarque?.gravite ?? "genant");
+  /** Nouvelles captures, en data URL, envoyées avec la remarque. */
   let images = $state<string[]>([]);
   // svelte-ignore state_referenced_locally
+  /** Captures de la version précédente qu'on garde dans la nouvelle. */
   let gardees = $state<string[]>(remarque ? [...remarque.images] : []);
+  /** Erreur d'enregistrement. */
   let erreur = $state("");
+  /** Enregistrement en cours. */
   let enCours = $state(false);
+  /** Confirmation après l'ajout d'une remarque. */
   let message = $state("");
+  /** Formulaire, pour enregistrer au Ctrl+Entrée depuis n'importe quel champ. */
   let formulaire = $state<HTMLFormElement>();
+  /** Rien à enregistrer : ni texte ni capture. */
   const vide = $derived(!texte.trim() && !images.length && !gardees.length);
 
+  /**
+   * Enregistre la remarque, ou sa nouvelle version ; une nouvelle remarque vide le formulaire pour la suivante,
+   * une modification rend la main avec le nouvel identifiant.
+   */
   async function enregistrer(e?: Event) {
     e?.preventDefault();
     if (vide) return;

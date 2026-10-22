@@ -23,10 +23,14 @@
   import { aRelire as aRelireDe, tachesBacklog, favoris, basculerFavori, edition } from "../lib/edition.svelte";
 
   let { projet, section }: { projet: Projet; section: Section } = $props();
-  // Parcours et clarifications ont leur arbre : ils ne sont pas répétés dans les groupes de documents.
+  /** Documents d'une zone pour les groupes du panneau ; parcours et clarifications ont leur propre arbre et n'y sont pas répétés. */
   const docsDe = (zone: string) => projet.documents.filter((d) => d.zone === zone && (zone !== "atelier" || !["parcours", "clarification"].includes(d.genre)));
 
-  // La gestion vient en tête du volet Projet (REC-017.2, REC-051) ; les plans ont leur groupe.
+  /**
+   * Rang et nom de groupe de chaque genre de document : la gestion en tête du volet Projet (REC-017.2, REC-051),
+   * les plans à part, puis l'ordre de la démarche ; l'atelier suit l'ordre du parcours (SPEC-17), la réception
+   * vient après (SPEC-23). Un genre absent tombe dans « Autres ».
+   */
   const ORDRE: Record<string, [number, string]> = {
     backlog: [-2, "Gestion"],
     plan: [-1, "Plans"],
@@ -58,6 +62,7 @@
     remarque: [41, "Remarques"],
   };
 
+  /** Fichiers du code regroupés par dossier, pour l'arbre de la section Code. */
   const dossiers = $derived.by(() => {
     const m = new Map<string, typeof projet.fichiers>();
     for (const f of projet.fichiers) {
@@ -68,6 +73,7 @@
     return [...m.entries()];
   });
 
+  /** Range des documents en groupes nommés, triés selon `ORDRE`. */
   const grouper = (docs: DocumentResume[]) => {
     const m = new Map<string, { rang: number; docs: DocumentResume[] }>();
     for (const d of docs) {
@@ -77,11 +83,15 @@
     }
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
   };
+  /** Groupes de documents de la zone qui correspond à la section affichée. */
   const groupes = $derived(grouper(docsDe(section === "atelier" ? "atelier" : section === "reception" ? "reception" : "projet")));
+  /** Accueil de chaque section, sur lequel mène le titre du panneau. */
   const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception, git: () => url.git() };
 
   // Section Git (EF-166) : branches, branches distantes et tags ; un clic montre leur commit.
+  /** Références git listées dans la section Git (EF-166) : branche courante, branches locales et distantes, tags. */
   type Refs = { branche: string; branches: string[]; distantes: string[]; tags: string[] };
+  /** Références git, relues quand le journal d'édition change ; rien hors de la section Git ou hors d'un dépôt. */
   let refs = $state<Refs | null>(null);
   $effect(() => {
     edition.revision;
@@ -91,13 +101,18 @@
       .then((h) => (refs = h))
       .catch(() => (refs = null));
   });
+  /** Titre d'un document par identifiant, pour nommer les sujets des clarifications. */
   const titreDoc = (id: string) => projet.documents.find((d) => d.id === id)?.titre ?? "";
+  /** Clarifications regroupées par sujet (EF-161). */
   const groupesClar = $derived(atelier.etat ? sujets(titreDoc) : []);
+  /** Documents qui attendent une relecture, signalés en orange. */
   const aRelire = $derived(aRelireDe(projet.documents));
+  /** Nombre de clarifications encore ouvertes, comptées dans « À traiter ». */
   const ouvertes = $derived(atelier.etat?.clarifications.filter((c) => c.frontmatter.etat === "ouverte").length ?? 0);
 
-  // Tâches du backlog à la charge de l'utilisateur (REC-048), relues avec le projet.
+  /** Backlog du projet, d'où sont tirées les tâches à la charge de l'utilisateur (REC-048). */
   const backlog = $derived(projet.documents.find((d) => d.genre === "backlog"));
+  /** Tâches cochables du backlog encore ouvertes, relues avec le projet. */
   let taches = $state<string[]>([]);
   $effect(() => {
     edition.revision;
@@ -107,10 +122,12 @@
       .then((d) => (taches = tachesBacklog(d.corps)))
       .catch(() => (taches = []));
   });
+  /** Remarques traitées que l'utilisateur n'a pas encore validées (EF-165). */
   const remarquesAValider = $derived((reception.etat?.remarques ?? []).filter((r) => r.statut === "traitee" && r.validation !== "validee").length);
+  /** Total de ce qui attend l'utilisateur : tâches, relectures, clarifications, remarques ; affiché sur « À traiter ». */
   const enAttente = $derived(taches.length + aRelire.length + ouvertes + remarquesAValider);
 
-  // ⚙ d'un groupe : le skill qui dit comment ses documents sont structurés (REC-054).
+  /** ⚙ d'un groupe : le skill qui dit comment ses documents sont structurés (REC-054, ADR-0017). */
   const SKILL_DE: Record<string, string> = {
     BDR: "wikik-structure-bdr",
     "Cahier des charges": "wikik-structure-cahier-des-charges",
@@ -121,13 +138,18 @@
     Specs: "wikik-structure-spec",
     Tests: "wikik-structure-test",
   };
+  /** Identifiants à relire, pour colorer chaque lien du panneau sans reparcourir la liste. */
   const aRelireIds = $derived(new Set(aRelire.map((d) => d.id)));
 
-  // « + » du groupe Parcours (REC-039) : titre et version du nouveau parcours.
+  /** Formulaire « + » du groupe Parcours ouvert (REC-039). */
   let ajout = $state(false);
+  /** Titre du nouveau parcours. */
   let titreParcours = $state("");
+  /** Version visée par le nouveau parcours. */
   let versionParcours = $state("");
+  /** Erreur de création du parcours. */
   let erreurParcours = $state("");
+  /** Crée le parcours et l'ouvre ; le formulaire se referme et se vide. */
   async function creerParcours(e: SubmitEvent) {
     e.preventDefault();
     erreurParcours = "";
@@ -141,18 +163,24 @@
     }
   }
 
-  // Lire la route rend l'état « actif » réactif : le panneau n'est plus recréé à chaque page, les
-  // accordéons gardent leur état.
+  /**
+   * Lien de la page ouverte ? Lire la route rend le résultat réactif : le panneau n'est pas recréé à chaque page
+   * et les accordéons gardent leur état.
+   */
   const actif = (href: string) => (routeur.route, estCourant(href));
+  /** Clé de la page de réception ouverte, pour surligner son nœud dans l'arborescence. */
   const cleCourante = $derived(routeur.route.page === "reception-page" ? routeur.route.cle : null);
+  /** Arborescence des pages de réception visibles. */
   const arbre = $derived(reception.etat ? arbrePages(reception.etat.pages.filter(visible)) : []);
 
+  /** Racine du panneau, où l'on cherche les accordéons à replier et le lien actif. */
   let panneau: HTMLElement;
-  // Le bouton alterne : replier tout (REC-008, REC-010), puis tout déplier (REC-046).
+  /** Prochaine action du bouton : replier tout (REC-008, REC-010) puis tout déplier (REC-046) ; replié à l'arrivée hors de Produit. */
   let replie = $state(true);
   $effect(() => {
     replie = section !== "produit";
   });
+  /** Replie ou déplie tous les accordéons du panneau. */
   function basculer() {
     replie = !replie;
     panneau.querySelectorAll("details").forEach((d) => (d.open = !replie));

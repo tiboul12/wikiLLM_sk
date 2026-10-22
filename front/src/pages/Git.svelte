@@ -10,21 +10,34 @@
   import { routeur } from "../lib/routeur.svelte";
   import { autoLien } from "../lib/connus.svelte";
 
+  /** Commits, références et situation de la branche ; vide hors d'un dépôt git (l'erreur le dit). */
   let historique = $state<Historique | null>(null);
+  /** Erreur de lecture de l'historique ou d'un commit. */
   let erreur = $state("");
+  /** Nombre de commits demandés : au-delà, le graphe devient lent à tracer. */
   let limite = $state(400);
+  /** Filtre sur le sujet, le début du hash, l'auteur ou une référence. */
   let filtre = $state("");
+  /** Hash du commit sélectionné. */
   let choisi = $state<string | null>(null);
+  /** Message et fichiers du commit sélectionné. */
   let detail = $state<DetailCommit | null>(null);
+  /** Fichier du commit dont le diff est affiché. */
   let fichier = $state<string | null>(null);
+  /** Diff du fichier choisi, ou le message d'erreur à sa place. */
   let diff = $state<string | null>(null);
 
+  /** GET JSON qui lève l'erreur `{erreur}` du serveur, ou le code HTTP à défaut. */
   async function lire<T>(chemin: string): Promise<T> {
     const r = await fetch(chemin);
     const v = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(v.erreur ?? `${r.status}`);
     return v as T;
   }
+  /**
+   * Charge l'historique puis sélectionne le commit désigné par `?commit=` ou celui que porte `?ref=` (branche ou tag),
+   * en le faisant défiler au centre.
+   */
   async function charger() {
     try {
       historique = await lire<Historique>(`/api/git/historique?limite=${limite}`);
@@ -41,8 +54,11 @@
     charger();
   });
 
+  /** Lignes du graphe : couloir de chaque commit et traits qui la traversent. */
   const lignes = $derived(historique ? couloirs(historique.commits) : []);
+  /** Couloirs affichés : 14 au plus pour que le message reste lisible ; au-delà, le graphe est rogné. */
   const largeur = $derived(Math.min(Math.max(1, ...lignes.map((l) => l.largeur)), 14));
+  /** Lignes qui passent le filtre ; le graphe garde ses couloirs, quitte à montrer des traits interrompus. */
   const visibles = $derived(
     filtre.trim()
       ? lignes.filter((l) => {
@@ -52,6 +68,7 @@
       : lignes,
   );
 
+  /** Sélectionne un commit, charge son détail et, depuis une adresse, le fait venir au centre. */
   async function choisir(hash: string, defiler = false) {
     choisi = hash;
     detail = null;
@@ -66,6 +83,7 @@
       document.getElementById("c-" + hash)?.scrollIntoView({ block: "center" });
     }
   }
+  /** Affiche le diff d'un fichier du commit sélectionné. */
   async function voirDiff(chemin: string) {
     if (!detail) return;
     fichier = chemin;
@@ -77,17 +95,24 @@
     }
   }
 
+  /** Hauteur d'une ligne du graphe, en pixels (doit suivre la hauteur des lignes du tableau). */
   const H = 28;
+  /** Largeur d'un couloir, en pixels. */
   const W = 16;
+  /** Abscisse du centre d'un couloir. */
   const x = (k: number) => k * W + W / 2;
+  /** Ordonnée d'une position dans la ligne : 0 haut, 1 milieu (le commit), 2 bas. */
   const y = (p: number) => (p * H) / 2;
+  /** Tracé SVG d'un trait : droit dans un même couloir, en courbe d'un couloir à l'autre. */
   const chemin = (t: { de: number; a: number; depuis: number; vers: number }) => {
     const [x1, y1, x2, y2] = [x(t.de), y(t.depuis), x(t.a), y(t.vers)];
     if (x1 === x2) return `M${x1} ${y1}L${x2} ${y2}`;
     const m = (y1 + y2) / 2;
     return `M${x1} ${y1}C${x1} ${m} ${x2} ${m} ${x2} ${y2}`;
   };
+  /** Genre d'une référence pour sa couleur : HEAD, branche distante (`origin/…`), tag ou branche locale. */
   const genreRef = (r: string) => (r.startsWith("HEAD") ? "head" : r.includes("/") ? "distante" : /^v\d|^v[0-9.]/.test(r) || historique?.tags.includes(r) ? "tag" : "branche");
+  /** Classe d'une ligne de diff : ajout, retrait, en-tête de bloc ou de fichier. */
   const classeLigne = (l: string) => (l.startsWith("+++") || l.startsWith("---") ? "fichier" : l.startsWith("+") ? "ajout" : l.startsWith("-") ? "retrait" : l.startsWith("@@") ? "bloc" : l.startsWith("diff ") || l.startsWith("index ") ? "fichier" : "");
 </script>
 

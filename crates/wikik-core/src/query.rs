@@ -14,6 +14,7 @@ use rusqlite::{OptionalExtension, params};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
+/// Voisins d'un genre d'arête donné (`req`, `adr`, `appel`…), dans l'ordre de la requête.
 fn filtre<'a>(v: &'a [(String, Voisin)], g: &str) -> Vec<&'a Voisin> {
     v.iter().filter(|(x, _)| x == g).map(|(_, y)| y).collect()
 }
@@ -46,10 +47,12 @@ fn finaliser(titre: &str, corps: String, json: Value) -> Sortie {
     }
 }
 
+/// Première phrase d'un texte, à la manière du résumé d'un bloc de doc.
 fn une_ligne(t: &str) -> String {
     resume(&t.lines().map(str::to_string).collect::<Vec<_>>()).unwrap_or_default()
 }
 
+/// Titre de chaque document, par identifiant, pour nommer les liens sans requête par document.
 fn titres_documents(index: &Index) -> Result<HashMap<String, String>> {
     let mut st = index.conn.prepare("SELECT id, titre FROM documents")?;
     let v = st
@@ -90,6 +93,8 @@ pub fn resoudre_symbole(
     Ok(Err(candidats))
 }
 
+/// Sortie d'un identifiant ambigu ou inconnu : les candidats, ou un renvoi vers `cherche` s'il n'y en a aucun.
+/// Le JSON porte `ambigu` pour que l'agent sache qu'il doit préciser.
 fn sortie_ambigue(demande: &str, candidats: &[String]) -> Sortie {
     let corps = if candidats.is_empty() {
         "aucun symbole ne correspond ; essayer `wikik query cherche`\n".to_string()
@@ -393,12 +398,14 @@ pub fn fichier(index: &Index, demande: &str) -> Result<Sortie> {
     ))
 }
 
+/// Voisin d'un nœud dans le graphe : identifiant, confiance de l'arête et résumé s'il s'agit d'un symbole.
 struct Voisin {
     id: String,
     confiance: String,
     resume: Option<String>,
 }
 
+/// Voisins d'un nœud par les arêtes des genres demandés : entrants (qui le cite) ou sortants (ce qu'il cite).
 fn voisins(
     index: &Index,
     id: &str,
@@ -435,6 +442,7 @@ fn voisins(
     Ok(v)
 }
 
+/// Mention ajoutée après un lien qui n'est que probable (résolution par le nom seul).
 fn marque_confiance(c: &str) -> &'static str {
     if c == "certain" { "" } else { " (probable)" }
 }
@@ -739,6 +747,7 @@ pub fn cherche(index: &Index, texte: &str) -> Result<Sortie> {
     Ok(finaliser(&titre, corps, json))
 }
 
+/// Document par identifiant, en JSON, frontmatter décodé ; `None` s'il n'existe pas.
 fn document(index: &Index, id: &str) -> Result<Option<Value>> {
     let v = requete_json(
         &index.conn,
@@ -850,6 +859,7 @@ pub fn adr(index: &Index, demande: &str) -> Result<Sortie> {
     ))
 }
 
+/// Valeur d'un champ écrit `**Champ** : valeur` (ou `Champ valeur`) dans le corps d'une exigence.
 fn ligne_champ(corps: &str, champ: &str) -> Option<String> {
     corps.lines().find_map(|l| {
         let l = l.trim();
@@ -1032,6 +1042,7 @@ fn section_par_ancre(corps: &str, a: &str, max: usize) -> Option<String> {
     (!lignes.is_empty()).then(|| tronquer(&lignes.join("\n"), max))
 }
 
+/// Texte rogné et coupé à `max` caractères avec « … ».
 fn tronquer(t: &str, max: usize) -> String {
     let t = t.trim();
     if t.chars().count() > max {

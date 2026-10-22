@@ -7,23 +7,33 @@
   import { signaler } from "../../lib/edition.svelte";
   import { terminal } from "../../lib/terminal.svelte";
 
+  /** État du parcours affiché ; la page n'est montrée qu'une fois l'atelier chargé. */
   const etat = $derived(atelier.etat!);
+  /** Étapes terminées ou sautées, pour l'avancement. */
   const faites = $derived(etat.etapes.filter((e) => e.etat === "faite" || e.etat === "sautee").length);
+  /** Première étape ni faite ni sautée : le bouton « Continuer » y mène. */
   const prochaine = $derived(etat.etapes.find((e) => e.etat !== "faite" && e.etat !== "sautee"));
+  /** Atelier affiché parmi ceux du projet (titre, version, statut). */
   const courant = $derived(etat.tous_parcours.find((p) => p.id === etat.parcours));
+  /** Fraction de 0 à 1 en pourcentage entier, pour la consommation de quota. */
   const pct = (x: number) => `${Math.round(x * 100)} %`;
 
-  // Modifier l'atelier (REC-073) : titre, version documentée, statut de session (vide : déduit des étapes).
+  /** Formulaire de modification de l'atelier ouvert (REC-073). */
   let edition = $state(false);
+  /** Titre de l'atelier en cours de modification. */
   let titre = $state("");
+  /** Version documentée par l'atelier. */
   let version = $state("");
+  /** Statut de session choisi ; vide, il est déduit des étapes. */
   let statut = $state("");
+  /** Ouvre le formulaire prérempli avec l'atelier affiché ; le statut repart vide (déduit). */
   function ouvrirEdition() {
     titre = courant?.titre ?? "";
     version = courant?.version ?? "";
     statut = "";
     edition = true;
   }
+  /** Enregistre titre, version et statut de l'atelier ; Ctrl+Z annule. */
   async function enregistrer(e: SubmitEvent) {
     e.preventDefault();
     try {

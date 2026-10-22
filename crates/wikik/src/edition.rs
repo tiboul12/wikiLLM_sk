@@ -94,6 +94,7 @@ fn libelle(chemin: &str) -> &'static str {
     }
 }
 
+/// Paramètre `?id=` d'un document.
 #[derive(Deserialize)]
 struct ParamId {
     id: String,
@@ -111,12 +112,15 @@ async fn api_source(State(e): State<Partage>, Query(p): Query<ParamId>) -> Respo
     resultat(r)
 }
 
+/// Corps de `/api/document/ecrire` : identifiant du document et texte complet (frontmatter compris).
 #[derive(Deserialize)]
 struct CorpsEcrire {
     id: String,
     texte: String,
 }
 
+/// Réécrit un document en entier depuis l'éditeur (EF-158) et rend son chemin ; l'écriture passe par le journal,
+/// Ctrl+Z la défait.
 async fn api_ecrire(State(e): State<Partage>, Json(c): Json<CorpsEcrire>) -> Response {
     let r = tokio::task::spawn_blocking(move || -> Result<String> {
         let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
@@ -129,12 +133,14 @@ async fn api_ecrire(State(e): State<Partage>, Json(c): Json<CorpsEcrire>) -> Res
     resultat(r)
 }
 
+/// Corps de `/api/document/statut`.
 #[derive(Deserialize)]
 struct CorpsStatut {
     id: String,
     statut: String,
 }
 
+/// Change le statut d'un document (« Valider » de la relecture) sans toucher au reste du fichier.
 async fn api_statut(State(e): State<Partage>, Json(c): Json<CorpsStatut>) -> Response {
     let r = tokio::task::spawn_blocking(move || -> Result<String> {
         let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
@@ -147,6 +153,7 @@ async fn api_statut(State(e): State<Partage>, Json(c): Json<CorpsStatut>) -> Res
     resultat(r)
 }
 
+/// Corps de `/api/document/nouveau` : genre et titre du document à créer.
 #[derive(Deserialize)]
 struct CorpsNouveau {
     genre: String,
@@ -197,6 +204,7 @@ async fn api_nouveau(State(e): State<Partage>, Json(c): Json<CorpsNouveau>) -> R
     resultat(r)
 }
 
+/// Corps de `/api/document/valider-test` : `utilisateur`, `echec` ou `a_valider`.
 #[derive(Deserialize)]
 struct CorpsVerdict {
     id: String,
@@ -216,6 +224,7 @@ async fn api_valider_test(State(e): State<Partage>, Json(c): Json<CorpsVerdict>)
     resultat(r)
 }
 
+/// Corps de `/api/dessin` : nom du dessin et SVG complet.
 #[derive(Deserialize)]
 struct CorpsDessin {
     nom: String,
@@ -233,11 +242,13 @@ async fn api_ecrire_dessin(State(e): State<Partage>, Json(c): Json<CorpsDessin>)
     resultat(r)
 }
 
+/// Paramètre `?nom=` d'un dessin.
 #[derive(Deserialize)]
 struct ParamDessin {
     nom: String,
 }
 
+/// Texte SVG d'un dessin, `null` s'il n'existe pas encore (l'éditeur part d'une page blanche).
 async fn api_lire_dessin(State(e): State<Partage>, Query(p): Query<ParamDessin>) -> Response {
     let r = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
         let i = e.index.lock().unwrap_or_else(|x| x.into_inner());
@@ -247,6 +258,7 @@ async fn api_lire_dessin(State(e): State<Partage>, Query(p): Query<ParamDessin>)
     resultat(r)
 }
 
+/// Noms des dessins enregistrés de l'atelier.
 async fn api_dessins(State(e): State<Partage>) -> Json<Vec<String>> {
     let i = e.index.lock().unwrap_or_else(|x| x.into_inner());
     Json(edition::lister_dessins(&i))
@@ -276,6 +288,7 @@ async fn api_retablir(State(e): State<Partage>, Json(_): Json<Value>) -> Respons
     resultat(r)
 }
 
+/// Nombre d'actions annulables et rétablissables, pour l'état des boutons et des raccourcis.
 async fn api_journal() -> Json<Value> {
     let (a, r) = journal::etat();
     Json(json!({ "annulables": a, "retablissables": r }))
@@ -288,6 +301,7 @@ struct Favori {
     titre: String,
 }
 
+/// Fichier des favoris de la machine, dans le dossier `.wikik` du projet.
 fn fichier_favoris(e: &Partage) -> std::path::PathBuf {
     let i = e.index.lock().unwrap_or_else(|x| x.into_inner());
     i.racine.join(".wikik").join("favoris.json")
@@ -304,6 +318,7 @@ async fn api_favoris(State(e): State<Partage>) -> Json<Vec<Favori>> {
     )
 }
 
+/// Remplace la liste des favoris ; hors journal d'annulation, c'est un réglage de la machine et non le projet.
 async fn api_ecrire_favoris(State(e): State<Partage>, Json(liste): Json<Vec<Favori>>) -> Response {
     let f = fichier_favoris(&e);
     let r = tokio::task::spawn_blocking(move || -> Result<bool> {

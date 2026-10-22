@@ -13,6 +13,7 @@ use std::sync::Mutex;
 /// Actions gardées au plus.
 const TAILLE: usize = 100;
 
+/// Une écriture de fichier : contenus avant et après, de quoi la défaire et la refaire.
 #[derive(Debug, Clone)]
 struct Entree {
     chemin: PathBuf,
@@ -22,6 +23,7 @@ struct Entree {
     apres: Option<Vec<u8>>,
 }
 
+/// Une action de l'utilisateur (une requête d'écriture) et toutes les écritures qu'elle a faites, défaites ensemble.
 #[derive(Debug, Clone)]
 struct Action {
     numero: u64,
@@ -29,6 +31,7 @@ struct Action {
     entrees: Vec<Entree>,
 }
 
+/// Piles des actions faites et défaites, et action en cours d'enregistrement (numéro et libellé).
 #[derive(Default)]
 struct Journal {
     faites: Vec<Action>,
@@ -37,6 +40,7 @@ struct Journal {
     libelle: String,
 }
 
+/// Journal du processus : un seul serveur par projet (ADR-0012), donc une seule pile ; perdu à l'arrêt du serveur.
 static JOURNAL: Mutex<Journal> = Mutex::new(Journal {
     faites: Vec::new(),
     defaites: Vec::new(),
@@ -44,16 +48,21 @@ static JOURNAL: Mutex<Journal> = Mutex::new(Journal {
     libelle: String::new(),
 });
 
+/// Accès au journal ; un verrou empoisonné par une panique est repris, le journal reste utilisable.
 fn journal() -> std::sync::MutexGuard<'static, Journal> {
     JOURNAL.lock().unwrap_or_else(|x| x.into_inner())
 }
 
 impl Journal {
+    /// Ouvre une nouvelle action : les écritures suivantes s'y rattachent jusqu'à la prochaine ouverture.
     fn ouvrir(&mut self, libelle: &str) {
         self.courante += 1;
         self.libelle = libelle.to_string();
     }
 
+    /// Note une écriture dans l'action courante. Une écriture sans effet est ignorée, toute écriture vide les actions
+    /// défaites (on ne rétablit pas par-dessus un nouveau travail), un fichier écrit deux fois garde son premier « avant ».
+    /// Les actions les plus anciennes tombent au-delà de `TAILLE`.
     fn noter(&mut self, chemin: &Path, avant: Option<Vec<u8>>, apres: Option<Vec<u8>>) {
         if avant == apres {
             return;
@@ -88,6 +97,7 @@ impl Journal {
         }
     }
 
+    /// Écrit un fichier (dossiers créés au besoin) et note l'écriture.
     fn ecrire(&mut self, chemin: &Path, contenu: &[u8]) -> std::io::Result<()> {
         let avant = std::fs::read(chemin).ok();
         if let Some(d) = chemin.parent() {
@@ -98,6 +108,7 @@ impl Journal {
         Ok(())
     }
 
+    /// Supprime un fichier et note la suppression ; un fichier absent n'est pas une erreur.
     fn supprimer(&mut self, chemin: &Path) -> std::io::Result<()> {
         let Ok(avant) = std::fs::read(chemin) else {
             return Ok(());
@@ -107,6 +118,7 @@ impl Journal {
         Ok(())
     }
 
+    /// Défait la dernière action ; `None` s'il n'y en a pas.
     fn annuler(&mut self, racine: &Path) -> Result<Option<Bilan>> {
         let Some(a) = self.faites.last().cloned() else {
             return Ok(None);
@@ -118,6 +130,7 @@ impl Journal {
         Ok(Some(b))
     }
 
+    /// Refait la dernière action défaite ; `None` s'il n'y en a pas.
     fn retablir(&mut self, racine: &Path) -> Result<Option<Bilan>> {
         let Some(a) = self.defaites.last().cloned() else {
             return Ok(None);
@@ -152,6 +165,8 @@ pub struct Bilan {
     pub fichiers: Vec<String>,
 }
 
+/// Remet les fichiers d'une action dans leur état d'avant (ou d'après). Tout est vérifié avant d'écrire :
+/// si un seul fichier a changé depuis, rien n'est touché, pour ne pas écraser le travail de l'agent ou d'un éditeur.
 fn appliquer(entrees: &[Entree], vers_avant: bool) -> Result<()> {
     // Refus si un fichier a changé depuis (l'agent, l'éditeur) : on n'écrase pas son travail.
     for e in entrees {
@@ -184,6 +199,7 @@ fn appliquer(entrees: &[Entree], vers_avant: bool) -> Result<()> {
     Ok(())
 }
 
+/// Résumé d'une action défaite ou refaite : libellé et fichiers relatifs à la racine, pour le message à l'écran.
 fn bilan(a: &Action, racine: &Path) -> Bilan {
     Bilan {
         libelle: a.libelle.clone(),

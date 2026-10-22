@@ -60,6 +60,8 @@ pub(crate) fn routes(etat: Partage) -> Router<Partage> {
         ))
 }
 
+/// Paramètres, connecteurs et skills, et si le visiteur est le propriétaire : lisible par tous (l'écran se montre
+/// en lecture seule), seules les écritures sont réservées (ADR-0013).
 async fn api_lire(
     State(e): State<Partage>,
     ConnectInfo(adresse): ConnectInfo<SocketAddr>,
@@ -80,6 +82,8 @@ async fn api_lire(
     resultat(r)
 }
 
+/// Enregistre les paramètres dans wikik.toml et remplace à chaud le fournisseur LLM (sauf en `--factice`), sans redémarrer
+/// le serveur ; l'index reprend la nouvelle configuration.
 async fn api_ecrire(State(e): State<Partage>, Json(p): Json<Parametres>) -> Response {
     let r = tokio::task::spawn_blocking(move || -> Result<bool> {
         let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
@@ -111,6 +115,7 @@ fn config_llm(p: &Parametres) -> wikik_core::config::ConfigLlm {
     }
 }
 
+/// Paramètres de `/api/parametres/modeles` : connecteur, et commande ou adresse saisies à l'écran.
 #[derive(Deserialize)]
 struct ParamModeles {
     connecteur: String,
@@ -174,6 +179,7 @@ async fn api_tester(State(e): State<Partage>, Json(p): Json<Parametres>) -> Resp
     resultat(r)
 }
 
+/// Corps de `/api/skills` : nom du skill et texte modifié.
 #[derive(Deserialize)]
 struct CorpsSkill {
     nom: String,
@@ -218,29 +224,36 @@ async fn api_skill_installer(State(e): State<Partage>, Json(c): Json<CorpsSkill>
 pub(crate) struct Commutable(RwLock<Arc<dyn Fournisseur>>);
 
 impl Commutable {
+    /// Enveloppe le fournisseur de départ.
     pub(crate) fn new(f: Box<dyn Fournisseur>) -> Commutable {
         Commutable(RwLock::new(Arc::from(f)))
     }
 
+    /// Fournisseur en place ; l'`Arc` cloné laisse un appel en cours finir même si les paramètres changent pendant ce temps.
     fn courant(&self) -> Arc<dyn Fournisseur> {
         self.0.read().unwrap_or_else(|x| x.into_inner()).clone()
     }
 
+    /// Remplace le fournisseur pour les appels suivants.
     fn remplacer(&self, f: Arc<dyn Fournisseur>) {
         *self.0.write().unwrap_or_else(|x| x.into_inner()) = f;
     }
 }
 
 impl Fournisseur for Commutable {
+    /// Nom du fournisseur en place.
     fn nom(&self) -> String {
         self.courant().nom()
     }
+    /// Délègue l'appel au fournisseur en place.
     fn proposer(&self, d: &Demande) -> Result<Reponse> {
         self.courant().proposer(d)
     }
+    /// Annule les appels du fournisseur en place.
     fn annuler(&self) {
         self.courant().annuler();
     }
+    /// Jeton d'annulation du fournisseur en place.
     fn jeton(&self) -> u64 {
         self.courant().jeton()
     }

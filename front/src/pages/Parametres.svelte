@@ -10,10 +10,15 @@
   import { terminal, chargerParametres, enregistrerParametres, ecrireSkill, poster } from "../lib/terminal.svelte";
   import { reception, ecrireReception } from "../lib/reception.svelte";
 
+  /** Copie modifiable des réglages : rien n'est écrit tant que le formulaire n'est pas enregistré. */
   let p = $state<Parametres | null>(null);
+  /** Arguments du connecteur, un par ligne dans le champ ; découpés à l'envoi par `avecArguments`. */
   let arguments_ = $state("");
+  /** Adresse de l'application reçue (section Réception), enregistrée à part dans le cahier. */
   let adresse = $state("");
+  /** Confirmation d'enregistrement, effacée à chaque nouvel envoi. */
   let message = $state("");
+  /** Erreur d'enregistrement renvoyée par le serveur. */
   let erreur = $state("");
 
   chargerParametres().then(async () => {
@@ -27,12 +32,20 @@
     ouvrirAncre();
   });
 
+  /** Description du connecteur choisi (commande par défaut, besoin d'une adresse, efforts possibles). */
   const connecteur = $derived(terminal.connecteurs.find((c) => c.id === p?.connecteur));
 
   // Modèles proposés par le connecteur choisi (EF-155) ; le champ reste libre.
+  /** Modèles proposés par le connecteur, vides pour `cli` et `factice` qui n'en listent pas. */
   let modeles = $state<Modele[]>([]);
+  /** Erreur de la liste des modèles (connecteur absent, serveur local injoignable) : le champ reste saisissable. */
   let erreurModeles = $state("");
+  /** Liste des modèles en cours de chargement. */
   let chargeModeles = $state(false);
+  /**
+   * Demande au serveur les modèles du connecteur avec la commande et l'adresse saisies, sans les enregistrer.
+   * Réservé au propriétaire : la route lance un programme local.
+   */
   async function chargerModeles() {
     if (!p || !terminal.proprietaire) return;
     erreurModeles = "";
@@ -51,6 +64,10 @@
       chargeModeles = false;
     }
   }
+  /**
+   * Change de connecteur : modèle, effort et adresse repartent à vide, car ils n'ont pas de sens d'un connecteur à l'autre ;
+   * la commande prend la valeur par défaut du nouveau connecteur (vide pour les API HTTP appelées par `curl`).
+   */
   function choisirConnecteur(id: string) {
     if (!p || p.connecteur === id) return;
     p.connecteur = id;
@@ -63,11 +80,15 @@
     chargerModeles();
   }
 
+  /** Arguments sans les lignes vides, sauf la dernière : on garde la ligne en cours de saisie. */
   const avecArguments = () => arguments_.split("\n").map((a) => a.trim()).filter((a, i, t) => a || i < t.length - 1);
 
   // Test de connexion : un appel minimal avec les réglages de l'écran, sans les enregistrer.
+  /** Résultat du dernier test de connexion, effacé au changement de connecteur. */
   let test = $state<{ ok: boolean; fournisseur: string; reponse?: string; duree_ms?: number; erreur?: string } | null>(null);
+  /** Test de connexion en cours (bouton désactivé). */
   let enTest = $state(false);
+  /** Envoie les réglages affichés à `/api/parametres/tester` ; une erreur réseau est présentée comme un test raté. */
   async function tester() {
     if (!p) return;
     test = null;
@@ -81,6 +102,7 @@
     }
   }
 
+  /** Enregistre les réglages dans wikik.toml, puis l'adresse de l'application si la réception est active et qu'elle a changé. */
   async function enregistrer(e: SubmitEvent) {
     e.preventDefault();
     if (!p) return;
@@ -95,14 +117,19 @@
   }
 
   // Prompts système (EF-156) : un skill par sous-accordéon, enregistré à part.
+  /** Texte de chaque skill tel qu'édité, par nom ; initialisé depuis le projet au chargement. */
   let textes = $state<Record<string, string>>({});
+  /** Message par skill après enregistrement, rétablissement ou installation. */
   let etatSkill = $state<Record<string, string>>({});
+  /** Groupes de skills affichés : identifiant, titre, à qui ils s'adressent (ADR-0017). */
   const GROUPES: [string, string, string][] = [
     ["agent", "Pour l'agent de développement", "Ce que l'agent qui code dans le projet (Claude Code, dans le terminal) reçoit ou trouve dans .claude/skills/."],
     ["llm", "Pour le LLM de wikik", "Ce que wikik envoie à son LLM (Design thinking, réception, recherche) et à tout client de son serveur MCP."],
     ["structure", "Structure des documents", "Comment sont rédigés les documents de chaque section du projet : donnés au LLM quand il en produit, et à l'agent."],
   ];
+  /** Skills d'un groupe, dans l'ordre fourni par le serveur. */
   const deGroupe = (g: string) => terminal.skills.filter((s) => s.groupe === g);
+  /** Écrit le skill dans son `SKILL.md` du projet. */
   async function enregistrerSkill(s: Skill) {
     etatSkill[s.nom] = "";
     try {
@@ -112,12 +139,14 @@
       etatSkill[s.nom] = "Erreur : " + String(x instanceof Error ? x.message : x);
     }
   }
+  /** Rétablit le texte livré avec wikik en supprimant le fichier du projet, après confirmation. */
   async function retablirSkill(s: Skill) {
     if (!confirm(`Revenir au texte d'origine de « ${s.titre} » ? Le fichier ${s.chemin} sera supprimé.`)) return;
     await ecrireSkill(s.nom, null);
     textes[s.nom] = terminal.skills.find((x) => x.nom === s.nom)?.texte ?? "";
     etatSkill[s.nom] = "Texte d'origine rétabli.";
   }
+  /** Installe le skill dans `.claude/skills/` pour que l'agent de développement le trouve. */
   async function installerSkill(s: Skill) {
     await ecrireSkill(s.nom, textes[s.nom]);
     etatSkill[s.nom] = "Installé dans " + s.chemin + " : l'agent le trouve.";

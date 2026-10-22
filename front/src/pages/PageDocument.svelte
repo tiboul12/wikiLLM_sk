@@ -27,10 +27,14 @@
   import { statique } from "../lib/statique";
 
   let { id, ancre }: { id: string; ancre: string } = $props();
+  /** Document chargé (frontmatter, corps, liens résolus, rétroliens). */
   let page = $state<PageDocument | null>(null);
+  /** Erreur de chargement, affichée à la place du document. */
   let erreur = $state("");
+  /** Conteneur du corps rendu : on y branche les hooks de référence et on y rend les diagrammes Mermaid. */
   let corps = $state<HTMLElement | null>(null);
 
+  /** Champs du frontmatter montrés dans l'en-tête, dans cet ordre ; les autres restent dans le détail repliable. */
   const CHAMPS = ["statut", "priorite", "version", "date", "besoins", "exigences", "decisions", "remplace", "remplace_par", "sources"];
 
   // Page recréée par {#key} à chaque changement de route : la valeur initiale suffit.
@@ -40,6 +44,10 @@
     .then((p) => (page = p))
     .catch((e) => (erreur = String(e)));
 
+  /**
+   * Corps rendu en HTML : liens Markdown remplacés par leur cible résolue par l'index (fichier ou document),
+   * identifiants et chemins cités liés d'office.
+   */
   const html = $derived.by(() => {
     if (!page) return "";
     const table = new Map(page.liens.map((l) => [l.brute, l.cible]));
@@ -55,14 +63,21 @@
       autoLien,
     );
   });
+  /** Colonnes du tableau d'un plan ou du backlog ; `null` pour les autres genres, rendus en document. */
   const colonnes = $derived(page?.genre === "plan" ? colonnesPlan(page.corps) : page?.genre === "backlog" ? colonnesBacklog(page.corps) : null);
+  /** Vue d'un plan ou du backlog : tableau à colonnes ou document brut. */
   let vue = $state<"tableau" | "document">("tableau");
+  /** Éditeur complet ouvert ; `?editer=1` l'ouvre d'office, jamais dans le site statique. */
   let edite = $state(!statique && new URLSearchParams(location.search).get("editer") === "1");
+  /** Éditeur Mermaid ouvert sur les diagrammes du document. */
   let diagramme = $state(false);
+  /** Document proposé ou brouillon d'un genre qui se relit : le bouton « Valider » s'affiche. */
   const aValider = $derived(page && GENRES_A_RELIRE.includes(page.genre) && (page.statut === "proposé" || page.statut === "brouillon"));
-  // Cascade (EF-160) : les tests d'une exigence, le ticket d'un test.
+  /** Tests qui vérifient l'exigence affichée (cascade, EF-160). */
   const tests = $derived(page && (page.genre === "exigence" || page.genre === "exigence-nf") ? connus.tests.filter((t) => t.exigences.includes(page!.id)) : []);
+  /** Ticket de validation du test affiché : libellé et couleur de son verdict. */
   const ticket = $derived(page?.genre === "test" ? (VALIDATIONS[String(page.frontmatter.validation ?? "a_valider")] ?? VALIDATIONS.a_valider) : null);
+  /** Enregistre le verdict de l'utilisateur sur le test ; une erreur s'affiche dans le bandeau. */
   async function verdict(v: "utilisateur" | "echec" | "a_valider") {
     if (!page) return;
     try {
@@ -71,6 +86,7 @@
       signaler(String(e instanceof Error ? e.message : e), true);
     }
   }
+  /** Crée un test relié à l'exigence affichée, titré « Vérifier … », puis l'ouvre. */
   async function creerTest() {
     if (!page) return;
     try {
@@ -79,6 +95,7 @@
       signaler(String(e instanceof Error ? e.message : e), true);
     }
   }
+  /** Valide le document : « accepté » pour un ADR, « validé » pour les autres genres. */
   async function valider() {
     if (!page) return;
     try {
@@ -97,12 +114,17 @@
     });
   });
 
+  /** Valeurs d'un champ de frontmatter sous forme de liste, qu'il soit scalaire ou tableau. */
   const valeurs = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : v === undefined || v === null ? [] : [String(v)]);
+  /** Valeur qui ressemble à un identifiant de document plutôt qu'à un chemin de fichier. */
   const estId = (v: string) => !v.includes("/") && !v.endsWith(".md");
-  // Besoins, exigences et artefacts de l'atelier s'ouvrent dans l'atelier et peuvent y être clarifiés (SPEC-21 R1).
+  /** Genres qui s'ouvrent dans l'atelier et peuvent y être clarifiés, en plus des artefacts (SPEC-21 R1). */
   const RAPPELABLES = ["besoin", "exigence", "exigence-nf"];
+  /** Technique de l'atelier qui a produit l'artefact, si c'en est un. */
   const technique = $derived(typeof page?.frontmatter.technique === "string" ? page.frontmatter.technique : null);
+  /** Lien « Ouvrir dans l'atelier » : l'étape de la technique, la clarification elle-même, ou l'accueil de l'atelier. */
   const ouvrir = $derived(page && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(technique && technique !== "clarification" ? `/atelier/${technique}` : page.genre === "clarification" ? url.clarification(page.id) : "/atelier") : null);
+  /** Lien « Clarifier » qui ouvre une clarification sur ce document ; absent pour une clarification. */
   const clarifier = $derived(page && page.genre !== "clarification" && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(url.clarifier(page.id)) : null);
 </script>
 

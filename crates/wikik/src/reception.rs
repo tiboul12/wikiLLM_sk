@@ -42,15 +42,18 @@ fn assurer_carte(i: &Index) -> Result<()> {
     Ok(())
 }
 
+/// État de la réception (carte, remarques, fournisseur LLM) pour les écrans de la section.
 async fn api_etat(State(e): State<Partage>) -> Response {
     let nom = e.fournisseur.nom();
     repondre(e, move |i| wikik_core::reception::etat(i, &nom)).await
 }
 
+/// Reconstruit la carte des pages à partir du code ; les corrections faites à l'écran sont gardées.
 async fn api_scanner(State(e): State<Partage>) -> Response {
     ecrire(e, carte::scanner).await
 }
 
+/// Corps d'une correction de page : seuls les champs présents changent.
 #[derive(Deserialize)]
 struct Correction {
     cle: String,
@@ -60,6 +63,7 @@ struct Correction {
     route: Option<String>,
 }
 
+/// Renomme, masque, regroupe une page ou change sa route.
 async fn api_page(State(e): State<Partage>, Json(p): Json<Correction>) -> Response {
     ecrire(e, move |i| {
         assurer_carte(i)?;
@@ -75,11 +79,13 @@ async fn api_page(State(e): State<Partage>, Json(p): Json<Correction>) -> Respon
     .await
 }
 
+/// Corps de `/api/reception/application`.
 #[derive(Deserialize)]
 struct Application {
     url: String,
 }
 
+/// Enregistre l'adresse de l'application reçue en tête de la carte (SPEC-23 R7).
 async fn api_application(State(e): State<Partage>, Json(p): Json<Application>) -> Response {
     ecrire(e, move |i| {
         assurer_carte(i)?;
@@ -102,6 +108,7 @@ struct SaisieRemarque {
     garder: Vec<String>,
 }
 
+/// Ajoute une remarque datée du jour et rend son identifiant ; crée la carte d'abord si elle n'existe pas encore.
 async fn api_remarque(State(e): State<Partage>, Json(p): Json<SaisieRemarque>) -> Response {
     ecrire(e, move |i| {
         assurer_carte(i)?;
@@ -123,15 +130,18 @@ async fn api_remarque(State(e): State<Partage>, Json(p): Json<SaisieRemarque>) -
     .await
 }
 
+/// Corps de `/api/reception/supprimer`.
 #[derive(Deserialize)]
 struct Suppression {
     id: String,
 }
 
+/// Supprime une remarque et toutes ses versions.
 async fn api_supprimer(State(e): State<Partage>, Json(p): Json<Suppression>) -> Response {
     ecrire(e, move |i| remarques::supprimer(i, &p.id)).await
 }
 
+/// Corps du traitement d'une remarque : statut, explication en une phrase, commit de la correction.
 #[derive(Deserialize)]
 struct Traitement {
     id: String,
@@ -141,6 +151,7 @@ struct Traitement {
     commit: Option<String>,
 }
 
+/// Enregistre le traitement d'une remarque, comme l'outil MCP `reception_traiter`.
 async fn api_traiter(State(e): State<Partage>, Json(p): Json<Traitement>) -> Response {
     ecrire(e, move |i| {
         remarques::traiter(i, &p.id, &p.statut, &p.resolution, p.commit.as_deref())
@@ -148,6 +159,7 @@ async fn api_traiter(State(e): State<Partage>, Json(p): Json<Traitement>) -> Res
     .await
 }
 
+/// Corps de `/api/reception/valider` : `validee` ou `a_reprendre`, avec ce qui reste à reprendre.
 #[derive(Deserialize)]
 struct Validation {
     id: String,

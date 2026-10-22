@@ -11,24 +11,40 @@
   import { statique } from "../lib/statique";
 
   let { projet }: { projet: Projet | null } = $props();
+  /** Documents de la zone Projet, seuls concernés par la cascade. */
   const docs = $derived((projet?.documents ?? []).filter((d) => d.zone === "projet"));
+  /** Besoins du projet. */
   const besoins = $derived(docs.filter((d) => d.genre === "besoin"));
+  /** Exigences fonctionnelles et non fonctionnelles. */
   const exigences = $derived(docs.filter((d) => d.genre === "exigence" || d.genre === "exigence-nf"));
+  /** Tests (`TEST-xxx`), reliés aux exigences qu'ils vérifient. */
   const tests = $derived(docs.filter((d) => d.genre === "test"));
+  /** Cahier des charges de chaque version, pour le rappeler à côté des exigences de cette version. */
   const cdc = $derived(new Map(docs.filter((d) => d.genre === "cahier-des-charges").map((d) => [d.version ?? "", d])));
+  /** Versions qui ont des exigences, de la plus récente à la plus ancienne (tri numérique : v10 après v9). */
   const versions = $derived([...new Set(exigences.map((e) => e.version ?? ""))].filter(Boolean).sort((a, b) => b.localeCompare(a, "fr", { numeric: true })));
+  /** Version filtrée ; vide pour toutes. */
   let version = $state("");
 
+  /** Exigences qui couvrent un besoin, dans la version filtrée. */
   const exigencesDe = (b: string) => exigences.filter((e) => e.besoins.includes(b) && (!version || e.version === version));
+  /** Tests qui vérifient une exigence. */
   const testsDe = (e: string) => tests.filter((t) => t.exigences.includes(e));
+  /** Exigences qui ne citent aucun besoin existant : montrées à part pour que le trou se voie. */
   const orphelines = $derived(exigences.filter((e) => !e.besoins.some((b) => besoins.some((x) => x.id === b)) && (!version || e.version === version)));
+  /** Besoins affichés : tous, ou ceux qui ont une exigence dans la version ou en relèvent. */
   const visibles = $derived(besoins.filter((b) => !version || exigencesDe(b.id).length || b.version === version));
 
+  /** Ticket de validation d'un test : libellé et couleur de son verdict. */
   const ticket = (t: DocumentResume) => VALIDATIONS[t.validation ?? "a_valider"] ?? VALIDATIONS.a_valider;
+  /** Exigences de la version qui ont au moins un test. */
   const couvertes = $derived(exigences.filter((e) => (!version || e.version === version) && testsDe(e.id).length).length);
+  /** Exigences de la version, base du taux de couverture. */
   const total = $derived(exigences.filter((e) => !version || e.version === version).length);
+  /** Tests validés, par l'utilisateur ou par le modèle. */
   const validees = $derived(tests.filter((t) => t.validation === "utilisateur" || t.validation === "modele").length);
 
+  /** Crée un test relié à l'exigence, titré « Vérifier … » ; une erreur s'affiche dans le bandeau. */
   async function creerTest(e: DocumentResume) {
     try {
       await nouveauDocument("test", `Vérifier ${e.titre.charAt(0).toLowerCase()}${e.titre.slice(1)}`, [e.id]);

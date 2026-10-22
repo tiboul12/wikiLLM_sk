@@ -51,9 +51,11 @@ pub struct Page {
 /// Page des remarques qui ne visent aucun écran en particulier.
 pub const GENERAL: &str = "general";
 
+/// Extensions des fichiers lus pour trouver les routes et les écrans.
 const EXTENSIONS: &[&str] = &[
     "rs", "ts", "tsx", "js", "jsx", "mjs", "vue", "svelte", "html",
 ];
+/// Dossiers dont les fichiers sont pris pour des pages quand aucun routeur n'est reconnu (Next, SvelteKit, conventions courantes).
 const DOSSIERS_PAGES: &[&str] = &["pages", "views", "routes", "screens", "ecrans", "vues"];
 /// Balises de structure des frameworks : jamais prises pour le composant d'une page.
 const STRUCTURE: &[&str] = &[
@@ -79,28 +81,36 @@ const STRUCTURE: &[&str] = &[
     "Navigate",
 ];
 
+/// Route déclarée en objet (`{ path: '/x', component: X }`, Angular, Vue Router) ; le second groupe garde le reste de l'objet.
 static OBJET_ROUTE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"\{\s*path\s*:\s*['"`]([^'"`]*)['"`]([^{}]*)\}"#).unwrap());
+/// Composant d'une route en objet : `component: X`, `element: <X`, ou `m.X` d'un import paresseux.
 static COMPOSANT_ROUTE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?:component|Component|element)\s*:\s*<?\s*([A-Z]\w*)|\bm\s*\.\s*([A-Z]\w*)")
         .unwrap()
 });
+/// Balise `<Route …>` (React Router, Leptos, Solid), lue sur 400 caractères au plus.
 static BALISE_ROUTE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<Route\b[^>]{0,400}").unwrap());
+/// Chemin d'une balise `<Route>` : `path="/x"`, `path={"/x"}`, `path!("/x")`, `StaticSegment("x")`.
 static CHEMIN_BALISE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"\bpath\s*=\s*\{?\s*(?:path!\(\s*|StaticSegment\(\s*)?["']([^"']*)["']"#).unwrap()
 });
+/// Composant d'une balise `<Route>` : `view=`, `element=`, `component=`.
 static VUE_BALISE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:view|element|component|Component)\s*=\s*\{?\s*<?\s*([A-Z]\w*)").unwrap()
 });
+/// Énumération des écrans d'un routeur maison (`enum Page { … }` et variantes françaises et anglaises).
 static ENUM: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"\benum\s+(Page|Pages|Screen|Screens|View|Views|Ecran|Ecrans|Vue|Vues)\s*\{([^}]*)\}",
     )
     .unwrap()
 });
+/// Titre d'une page HTML statique, pris comme nom de la page.
 static TITRE_HTML: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)<title>\s*([^<]*?)\s*</title>").unwrap());
+/// Première balise à majuscule : le composant affiché derrière une condition d'écran.
 static BALISE_MAJ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<([A-Z]\w*)").unwrap());
 /// Routeur maison à discriminant : `if (chemin === "/produit") return { page: "produit" }`.
 static ROUTE_DISCRIMINANT: LazyLock<Regex> = LazyLock::new(|| {
@@ -111,12 +121,14 @@ static AFFICHAGE_DISCRIMINANT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"\.page\s*===?\s*["']([\w-]+)["'][^<]{0,200}<([A-Z]\w*)"#).unwrap()
 });
 
+/// Fichier source lu pour la carte : chemin relatif, extension et texte.
 struct Source {
     chemin: String,
     ext: String,
     texte: String,
 }
 
+/// Fichiers sources du projet (marcheur de l'index, donc `.gitignore` respecté) ; ceux de plus d'1 Mo sont sautés.
 fn sources(index: &Index) -> Result<Vec<Source>> {
     let mut v = vec![];
     for e in index.marcheur()? {
@@ -180,6 +192,7 @@ fn humaniser(t: &str) -> String {
         .unwrap_or_default()
 }
 
+/// Route normalisée : un seul `/` en tête, aucun en fin (`/` pour la racine).
 fn route_normale(r: &str) -> String {
     let r = r.trim().trim_matches('/');
     format!("/{r}")
@@ -198,6 +211,7 @@ fn symbole(index: &Index, nom: &str) -> Option<(String, String)> {
         .ok()
 }
 
+/// Exigences implémentées par les symboles d'une page (`@req`), sans doublon et triées.
 fn exigences(index: &Index, symboles: &[String]) -> Vec<String> {
     let mut v = BTreeSet::new();
     for s in symboles {
@@ -728,6 +742,7 @@ fn composant_variante(
 
 // ---------------------------------------------------------------- carte persistée
 
+/// Chemin relatif de la carte des pages dans le dossier de réception.
 fn chemin_carte(index: &Index) -> String {
     format!(
         "{}/carte.md",
@@ -735,6 +750,7 @@ fn chemin_carte(index: &Index) -> String {
     )
 }
 
+/// Page « Général » toujours présente, pour les remarques qui ne visent pas un écran.
 fn page_generale() -> Page {
     Page {
         cle: GENERAL.into(),
@@ -760,6 +776,7 @@ pub fn lire(index: &Index) -> Vec<Page> {
         .unwrap_or_default()
 }
 
+/// Frontmatter de la carte écrite, s'il existe et se lit.
 fn frontmatter_carte(index: &Index) -> Option<Value> {
     let t = std::fs::read_to_string(index.racine.join(chemin_carte(index))).ok()?;
     let (yaml, _, _) = crate::projet::separer_frontmatter(&t);
@@ -814,6 +831,8 @@ pub fn ecrire(index: &Index, pages: &[Page]) -> Result<()> {
     ecrire_avec(index, pages, url_application(index).as_deref(), None)
 }
 
+/// Écrit la carte : frontmatter (pages, adresse de l'application, dernier numéro de remarque, qui ne doit jamais
+/// reculer) et un tableau lisible des pages non masquées. `numero` absent garde le dernier numéro connu.
 fn ecrire_avec(
     index: &Index,
     pages: &[Page],

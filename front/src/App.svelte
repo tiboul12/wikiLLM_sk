@@ -49,11 +49,16 @@
   import { detachee, suivre, titreDe, ouvrir } from "./lib/onglets.svelte";
   import { nouvelOnglet } from "./lib/routeur.svelte";
 
+  /** Projet chargé (nom, documents, fichiers) ; relu après chaque écriture. */
   let projet = $state<Projet | null>(null);
+  /** Erreur de chargement du projet, affichée à la place des pages. */
   let erreur = $state("");
+  /** Texte du champ de recherche de l'en-tête. */
   let saisie = $state("");
+  /** Panneau ouvert en surimpression sur téléphone ; refermé à chaque changement de page. */
   let barreOuverte = $state(false);
 
+  /** Charge le projet, le retient pour lier les identifiants cités et nomme l'onglet du navigateur. */
   function chargerProjet() {
     api
       .projet()
@@ -95,14 +100,15 @@
     if (atelier.actif && (p === "atelier" || p === "etape")) choisirParcours(parcoursDeUrl());
   });
 
-  // Section active : celle de la page, ou la dernière ouverte pour une page commune (recherche, graphe).
+  /** Section active : celle de la page, ou la dernière ouverte pour une page commune (recherche, graphe). */
   const section = $derived(sectionDe(routeur.route, projet) ?? navigation.section);
   $effect(() => {
     navigation.section = section;
   });
+  /** Le panneau latéral n'a pas lieu d'être sur l'accueil et les paramètres. */
   const avecPanneau = $derived(section !== "accueil" && section !== "parametres");
 
-  // Durée de l'appel au LLM en cours, pour le bandeau.
+  /** Heure courante pendant un appel au LLM, pour afficher sa durée dans le bandeau. */
   let maintenant = $state(Date.now());
   $effect(() => {
     if (!atelier.occupe) return;
@@ -110,6 +116,7 @@
     return () => clearInterval(t);
   });
 
+  /** Ouvre la page de recherche sur le texte saisi. */
   function chercher(e: SubmitEvent) {
     e.preventDefault();
     if (saisie.trim()) aller(url.recherche(saisie.trim()));
@@ -120,7 +127,7 @@
     barreOuverte = false;
   });
 
-  // Largeur du panneau, réglée en tirant son bord (REC-011) et gardée par ce navigateur.
+  /** Largeur du panneau gardée par ce navigateur (REC-011), 280 px par défaut ou sans stockage. */
   const lireLargeur = () => {
     try {
       return Number(localStorage.getItem("wikik.panneau")) || 280;
@@ -128,7 +135,9 @@
       return 280;
     }
   };
+  /** Largeur du panneau, réglée en tirant son bord. */
   let largeur = $state(lireLargeur());
+  /** Largeur du volet du terminal gardée par ce navigateur, 560 px par défaut. */
   const lireLargeurTerminal = () => {
     try {
       return Number(localStorage.getItem("wikik.terminal")) || 560;
@@ -136,7 +145,9 @@
       return 560;
     }
   };
+  /** Largeur du volet du terminal. */
   let largeurTerminal = $state(lireLargeurTerminal());
+  /** Tire le bord du panneau : largeur bornée entre 180 et 700 px, enregistrée au relâchement. */
   function tirer(e: PointerEvent) {
     const poignee = e.currentTarget as HTMLElement;
     poignee.setPointerCapture(e.pointerId);

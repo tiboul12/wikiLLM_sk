@@ -136,6 +136,7 @@ pub struct Preparation {
 
 // ---------------------------------------------------------------- état persistant
 
+/// Dossier de travail de l'atelier pour le projet de l'index.
 fn dossier_travail(index: &Index) -> PathBuf {
     travail(&index.racine)
 }
@@ -160,6 +161,7 @@ fn numero(pid: &str) -> Result<Option<&str>> {
     }
 }
 
+/// Dossier versionné des artefacts de l'atelier (`[atelier] dossier` de wikik.toml), sans `/` final.
 fn dossier_atelier(index: &Index) -> String {
     index
         .config
@@ -169,6 +171,8 @@ fn dossier_atelier(index: &Index) -> String {
         .to_string()
 }
 
+/// Chemin relatif du fichier d'un parcours : `PARCOURS` garde son emplacement historique, `PARCOURS-n` vit dans
+/// `<dossier>/parcours-n/parcours.md` avec ses artefacts.
 fn chemin_parcours(index: &Index, pid: &str) -> Result<String> {
     Ok(match numero(pid)? {
         None => artefacts::chemin_relatif(
@@ -361,6 +365,8 @@ pub fn modifier_parcours(
     sauver_parcours(index, pid, &p)
 }
 
+/// Réécrit le fichier du parcours : le frontmatter porte l'état, le corps est un tableau lisible étape · état · mode
+/// régénéré à chaque fois (ne pas l'éditer à la main, il serait écrasé).
 fn sauver_parcours(index: &Index, pid: &str, p: &Map<String, Value>) -> Result<()> {
     let relatif = chemin_parcours(index, pid)?;
     std::fs::create_dir_all(index.racine.join(&relatif).parent().unwrap())?;
@@ -385,6 +391,7 @@ fn sauver_parcours(index: &Index, pid: &str, p: &Map<String, Value>) -> Result<(
     artefacts::reecrire(&index.racine, &relatif, p, &lignes)
 }
 
+/// Mode d'une étape : celui choisi pour l'étape, sinon celui du parcours, sinon Express.
 fn mode_de(p: &Map<String, Value>, etape: &str) -> String {
     p.get("etapes")
         .and_then(|e| e.get(etape))
@@ -395,6 +402,7 @@ fn mode_de(p: &Map<String, Value>, etape: &str) -> String {
         .to_string()
 }
 
+/// Fixe l'état d'une étape dans le frontmatter du parcours, en créant l'entrée au besoin.
 fn marquer(p: &mut Map<String, Value>, etape: &str, etat: &str) {
     let etapes = p.entry("etapes").or_insert_with(|| json!({}));
     let e = etapes
@@ -418,12 +426,14 @@ fn cle_lot(pid: &str, etape: &str, sous: &str, cible: Option<&str>) -> String {
     }
 }
 
+/// Fichier JSON d'un lot de propositions dans le dossier de travail (non versionné).
 fn chemin_lot(index: &Index, cle: &str) -> PathBuf {
     dossier_travail(index)
         .join("propositions")
         .join(format!("{cle}.json"))
 }
 
+/// Lot d'une sous-étape ; un lot absent ou illisible repart vide plutôt que de bloquer l'écran.
 fn charger_lot(index: &Index, pid: &str, etape: &str, sous: &str, cible: Option<&str>) -> Lot {
     std::fs::read_to_string(chemin_lot(index, &cle_lot(pid, etape, sous, cible)))
         .ok()
@@ -437,6 +447,7 @@ fn charger_lot(index: &Index, pid: &str, etape: &str, sous: &str, cible: Option<
         })
 }
 
+/// Enregistre un lot par le journal d'annulation (ADR-0016) : Ctrl+Z revient au lot précédent.
 fn sauver_lot(index: &Index, pid: &str, lot: &Lot) -> Result<()> {
     let chemin = chemin_lot(
         index,
@@ -449,6 +460,7 @@ fn sauver_lot(index: &Index, pid: &str, lot: &Lot) -> Result<()> {
 
 // ---------------------------------------------------------------- lecture de l'index
 
+/// Document de l'index tel que l'atelier le lit : genre, statut et frontmatter décodé.
 struct Doc {
     id: String,
     genre: String,
@@ -458,6 +470,7 @@ struct Doc {
     fm: Value,
 }
 
+/// Tous les documents indexés, triés par identifiant ; un frontmatter illisible devient `null`.
 fn documents(index: &Index) -> Result<Vec<Doc>> {
     let mut st = index.conn.prepare("SELECT id, genre, titre, coalesce(statut, ''), chemin, frontmatter FROM documents ORDER BY id")?;
     let v = st
@@ -502,6 +515,7 @@ fn documents_de(index: &Index, pid: &str) -> Result<Vec<Doc>> {
         .collect())
 }
 
+/// Résumé d'artefact envoyé à l'écran (identifiant, genre, titre, statut, sources, frontmatter).
 fn resume(d: &Doc) -> ArtefactResume {
     ArtefactResume {
         id: d.id.clone(),
@@ -514,6 +528,7 @@ fn resume(d: &Doc) -> ArtefactResume {
     }
 }
 
+/// Liste de chaînes d'une valeur JSON ; ce qui n'est pas une chaîne est ignoré, l'absence donne une liste vide.
 fn chaines(v: Option<&Value>) -> Vec<String> {
     v.and_then(Value::as_array)
         .map(|a| {
@@ -525,6 +540,7 @@ fn chaines(v: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Champ texte d'une valeur JSON, rogné ; vide s'il manque ou n'est pas une chaîne.
 fn texte(v: &Value, cle: &str) -> String {
     v.get(cle)
         .and_then(Value::as_str)
@@ -658,6 +674,8 @@ fn lots_de(index: &Index, pid: &str, f: &Fiche) -> Vec<Lot> {
         .collect()
 }
 
+/// Dernière consommation de quota relevée dans le journal des appels au LLM, affichée dans l'atelier ; aucune si le
+/// fournisseur ne la donne pas.
 fn derniere_consommation(index: &Index) -> Option<Consommation> {
     let t = std::fs::read_to_string(dossier_travail(index).join("journal.jsonl")).ok()?;
     t.lines()
@@ -905,6 +923,7 @@ pub fn preparer(
     })
 }
 
+/// Texte aux blancs compactés et en minuscules, pour comparer un verbatim au texte libre sans dépendre de la mise en forme.
 fn compacter(t: &str) -> String {
     t.split_whitespace()
         .collect::<Vec<_>>()
@@ -1056,6 +1075,7 @@ fn connus(index: &Index) -> Result<BTreeSet<String>> {
     Ok(v)
 }
 
+/// Garde les identifiants qui existent dans le projet, sans doublon, dans l'ordre : un LLM invente parfois des sources.
 fn ids_reels(connus: &BTreeSet<String>, v: impl IntoIterator<Item = String>) -> Vec<String> {
     let mut vus = BTreeSet::new();
     v.into_iter()
@@ -1063,10 +1083,12 @@ fn ids_reels(connus: &BTreeSet<String>, v: impl IntoIterator<Item = String>) -> 
         .collect()
 }
 
+/// Objet JSON d'une valeur ; vide si ce n'en est pas un.
 fn objet(v: Value) -> Map<String, Value> {
     v.as_object().cloned().unwrap_or_default()
 }
 
+/// Texte rogné et coupé à `n` caractères avec « … », pour un titre tiré d'un texte long.
 fn tronquer(t: &str, n: usize) -> String {
     let t = t.trim();
     if t.chars().count() > n {
@@ -1416,6 +1438,7 @@ fn completer(index: &Index, ty: &str, id: &str, sous: &str, d: &Value) -> Result
     Ok(id.to_string())
 }
 
+/// Corps Markdown d'un storyboard : scénario, personnage · scène · intrigue s'ils sont remplis, tableau des vignettes.
 fn corps_storyboard(fm: &Map<String, Value>) -> String {
     let t = |k: &str| {
         fm.get(k)
@@ -1473,6 +1496,8 @@ fn corps_storyboard(fm: &Map<String, Value>) -> String {
     c
 }
 
+/// Corps d'une clarification : l'en-tête existant (question, contexte) est gardé tel quel, les sections « Pistes » et
+/// « Conclusion » sont régénérées depuis le frontmatter.
 pub(crate) fn corps_clarification(fm: &Map<String, Value>, ancien: &str) -> String {
     let entete = ancien
         .split("\n## Pistes")
@@ -1565,6 +1590,8 @@ pub fn saisir(
 
 // ---------------------------------------------------------------- synthèses
 
+/// Écrit un document produit par une synthèse, marqué `genere_par: atelier`. Un fichier existant écrit à la main
+/// n'est jamais écrasé : l'écriture échoue avec un message qui le dit.
 fn ecrire_genere(index: &Index, relatif: &str, fm: Map<String, Value>, corps: &str) -> Result<()> {
     let chemin = index.racine.join(relatif);
     if chemin.exists() {

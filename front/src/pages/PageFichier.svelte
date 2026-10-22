@@ -11,8 +11,11 @@
   import Balises from "../composants/Balises.svelte";
 
   let { chemin, ancre }: { chemin: string; ancre: string } = $props();
+  /** Fichier chargé : en-tête et une cellule par symbole. */
   let page = $state<PageFichier | null>(null);
+  /** Erreur de chargement, affichée à la place du fichier. */
   let erreur = $state("");
+  /** Montre aussi les tests, cachés par défaut. */
   let montrerTests = $state(false);
 
   // Page recréée par {#key} à chaque changement de route : la valeur initiale suffit.
@@ -26,6 +29,7 @@
     })
     .catch((e) => (erreur = String(e)));
 
+  /** Rapport du check, lu dans le cache du serveur (pas de nouveau check à chaque page) ; sans lui, pas d'alertes. */
   let rapport = $state<RapportCheck | null>(null);
   api.check().then((r) => (rapport = r)).catch(() => {});
 
@@ -34,19 +38,28 @@
     if (page && ancre) tick().then(() => document.getElementById(ancre)?.scrollIntoView({ block: "start" }));
   });
 
+  /** Symboles hors tests, seuls comptés dans le récapitulatif. */
   const vrais = $derived(page?.cellules.filter((c) => !c.est_test) ?? []);
+  /** Symboles sans bloc de doc. */
   const sansDoc = $derived(vrais.filter((c) => c.statut === "sans doc"));
+  /** Symboles dont la doc est périmée. */
   const aPerime = $derived(vrais.filter((c) => c.statut === "périmé"));
-  // « Pas utilisé » : fonction privée sans appelant connu (une fonction publique peut servir ailleurs).
+  /** « Pas utilisé » : fonction privée sans appelant connu ; une fonction publique peut servir ailleurs, `main` est appelé par le système. */
   const inutilises = $derived(vrais.filter((c) => c.visibilite === "prive" && /fn|fonction|methode|méthode/.test(c.genre) && !c.appelants.length && c.nom_qualifie !== "main"));
+  /** Alertes du check sur ce fichier, hors doc manquante ou périmée déjà comptées par ailleurs. */
   const alertes = $derived(
     rapport?.diagnostics.filter((d) => d.fichier === chemin && d.severite !== "info" && d.code !== "manquant" && !d.code.startsWith("perime")) ?? [],
   );
+  /** Rien à reprendre dans le fichier : le récapitulatif l'annonce au lieu de lister. */
   const conforme = $derived(!sansDoc.length && !aPerime.length && !inutilises.length && !alertes.length);
+  /** Lien vers un symbole du fichier (change seulement l'ancre). */
   const lienSymbole = (nq: string) => url.fichier(chemin, nq);
 
+  /** Cellules affichées, tests compris si demandé. */
   const cellules = $derived(page?.cellules.filter((c) => montrerTests || !c.est_test) ?? []);
+  /** Nombre de tests du fichier, rappelé sur la case qui les montre. */
   const tests = $derived(page?.cellules.filter((c) => c.est_test).length ?? 0);
+  /** Nombre de symboles à la doc périmée, tests compris. */
   const perimes = $derived(page?.cellules.filter((c) => c.statut === "périmé").length ?? 0);
 </script>
 

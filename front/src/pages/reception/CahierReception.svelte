@@ -16,19 +16,31 @@
   import Code from "../../composants/reception/Code.svelte";
   import EnvoiAgent from "../../composants/reception/EnvoiAgent.svelte";
 
+  /** État de la réception ; la page n'est affichée que lorsqu'il est chargé. */
   const etat = $derived(reception.etat!);
+  /** Montre aussi les pages masquées, pour pouvoir les réafficher. */
   let voirMasquees = $state(false);
+  /** Clé de la page dont le formulaire de modification est ouvert. */
   let edition = $state<string | null>(null);
+  /** Nom de la page en cours de modification. */
   let nom = $state("");
+  /** Groupe de la page en cours de modification. */
   let groupe = $state("");
+  /** Message de réussite de la dernière action. */
   let message = $state("");
+  /** Erreur de la dernière action. */
   let erreur = $state("");
+  /** Écrans ajoutés par la recherche du LLM, chacun avec sa raison (EF-146) ; `null` tant qu'elle n'a pas tourné. */
   let ajouts = $state<Ajout[] | null>(null);
 
+  /** Pages listées : visibles, ou toutes si l'on montre les masquées. */
   const pages = $derived(etat.pages.filter((p) => voirMasquees || visible(p)));
-  // Rangées comme l'application (REC-074, REC-075) : un groupe par page de tête de l'arborescence des
-  // routes, ses sous-pages en retrait (`/atelier` → ses étapes ; `/clarifications` → une clarification).
+  /** Profondeur de chaque page dans l'arborescence des routes, pour son retrait (REC-074, REC-075). */
   const profondeurs = new Map<string, number>();
+  /**
+   * Pages rangées comme l'application : « Général », l'accueil, puis un groupe par page de tête avec ses sous-pages
+   * (`/atelier` → ses étapes ; `/clarifications` → une clarification) ; les groupes vides sont retirés.
+   */
   const groupes = $derived.by(() => {
     const sortie: [string, Page[]][] = [["", pages.filter((p) => p.cle === "general")]];
     const aplatir = (n: Noeud, d: number, acc: Page[]) => {
@@ -44,11 +56,19 @@
     for (const t of tetes) sortie.push([t.page.nom, aplatir(t, 0, [])]);
     return sortie.filter(([, ps]) => ps.length);
   });
+  /** Remarques ouvertes de la réception en cours. */
   const ouvertes = $derived(actuelles().filter((r) => r.statut === "ouverte").length);
+  /** Toutes les remarques de la réception en cours. */
   const total = $derived(actuelles().length);
+  /** Remarques traitées qui attendent la validation de l'utilisateur (EF-165). */
   const aValider = $derived(actuelles().filter((r) => r.statut === "traitee" && r.validation !== "validee").length);
+  /** Nombre de pages masquées, rappelé sur la case qui les montre. */
   const masquees = $derived(etat.pages.filter((p) => !visible(p)).length);
 
+  /**
+   * Envoie une écriture de la réception et affiche son résultat. `completer` (recherche d'écrans par le LLM) occupe
+   * l'écran pendant l'appel et rend la liste des ajouts ; une annulation n'est pas une erreur.
+   */
   async function action(route: string, corps: unknown = {}, succes = "") {
     erreur = message = "";
     if (route === "completer") {
@@ -69,7 +89,9 @@
     }
   }
 
+  /** Route de la page en cours de modification. */
   let route = $state("");
+  /** Ouvre le formulaire de modification d'une page, prérempli. */
   function editer(p: Page) {
     edition = p.cle;
     nom = p.nom;

@@ -11,14 +11,21 @@
 
   let { r, traitement = false, avecPage = false }: { r: Remarque; traitement?: boolean; avecPage?: boolean } = $props();
   // svelte-ignore state_referenced_locally
+  /** Explication du traitement en une phrase, saisie dans le mode traitement. */
   let resolution = $state(r.resolution ?? "");
   // svelte-ignore state_referenced_locally
+  /** Commit de la correction, facultatif. */
   let commit = $state(r.commit ?? "");
+  /** Capture affichée en grand, ou aucune. */
   let grande = $state<string | null>(null);
+  /** Erreur de la dernière action sur la remarque. */
   let erreur = $state("");
+  /** Formulaire de modification ouvert (une modification crée une nouvelle version). */
   let edition = $state(false);
+  /** Demande de confirmation de la suppression affichée. */
   let confirmer = $state(false);
 
+  /** Enregistre le statut, l'explication et le commit de la remarque. */
   async function traiter(statut: string) {
     erreur = "";
     try {
@@ -28,9 +35,11 @@
     }
   }
 
-  // Validation par l'utilisateur (REC-079, REC-081).
+  /** Champ « À reprendre » ouvert, pour dire ce qui ne va pas (REC-079, REC-081). */
   let reprise = $state(false);
+  /** Ce qui reste à reprendre, renvoyé à l'agent avec la remarque. */
   let commentaire = $state("");
+  /** Valide la correction ou la renvoie à reprendre avec le commentaire. */
   async function valider(verdict: "validee" | "a_reprendre") {
     erreur = "";
     try {
@@ -41,8 +50,10 @@
       erreur = String(e instanceof Error ? e.message : e);
     }
   }
+  /** Remarque traitée que l'utilisateur n'a pas encore validée. */
   const aValider = $derived(r.statut === "traitee" && r.validation !== "validee");
 
+  /** Supprime la remarque et toutes ses versions ; en cas d'échec, la confirmation se referme. */
   async function supprimer() {
     erreur = "";
     try {
@@ -52,7 +63,9 @@
       confirmer = false;
     }
   }
+  /** Adresse d'une capture servie par le serveur. */
   const image = (chemin: string) => `/api/image?chemin=${encodeURIComponent(chemin)}`;
+  /** Versions de la remarque, de la première à la courante ; la remarque seule si elle n'a jamais été modifiée. */
   const versions = $derived(r.historique.length ? r.historique : [r.id]);
 </script>
 

@@ -5,12 +5,15 @@ use std::process::Command;
 use wikik_core::Index;
 use wikik_core::check::{RapportCheck, verifier};
 
+/// Dépôt git jetable pour rejouer un scénario de péremption ; `horloge` donne à chaque commit une date distincte et
+/// reproductible, dont dépend l'ordre des commits lu par `check`.
 struct Depot {
     dir: tempfile::TempDir,
     horloge: u32,
 }
 
 impl Depot {
+    /// Dépôt initialisé avec un `wikik.toml`, un `src/` et une exigence EF-001.
     fn nouveau() -> Depot {
         let d = Depot {
             dir: tempfile::tempdir().unwrap(),
@@ -27,10 +30,12 @@ impl Depot {
         d
     }
 
+    /// Racine du dépôt.
     fn chemin(&self) -> &Path {
         self.dir.path()
     }
 
+    /// Lance git dans le dépôt avec une identité, une date fixée par l'horloge et sans signature, pour ne pas dépendre de la machine.
     fn git(&self, args: &[&str]) {
         let ok = Command::new("git")
             .args([
@@ -57,22 +62,26 @@ impl Depot {
         assert!(ok, "git {args:?}");
     }
 
+    /// Remplace le code de `src/lib.rs`.
     fn ecrire(&self, code: &str) {
         std::fs::write(self.chemin().join("src/lib.rs"), code).unwrap();
     }
 
+    /// Commite tout, une seconde après le commit précédent.
     fn commit(&mut self, message: &str) {
         self.horloge += 1;
         self.git(&["add", "-A"]);
         self.git(&["commit", "-q", "--allow-empty", "-m", message]);
     }
 
+    /// Indexe le dépôt et lance le check.
     fn check(&self) -> RapportCheck {
         let mut i = Index::ouvrir(self.chemin()).unwrap();
         i.mettre_a_jour().unwrap();
         verifier(&i).unwrap()
     }
 
+    /// Codes des diagnostics, informations exclues.
     fn codes(&self) -> Vec<String> {
         self.check()
             .diagnostics
@@ -83,7 +92,9 @@ impl Depot {
     }
 }
 
+/// Version de départ : fonction documentée et reliée à EF-001.
 const V1: &str = "//! Démo.\n\n/// Double la valeur ; sature au lieu de déborder.\n///\n/// @req EF-001\npub fn f(x: u8) -> u8 {\n    x.saturating_mul(2)\n}\n";
+/// Même fonction, corps changé sans toucher à la doc : doit rendre la doc périmée.
 const V2_CORPS: &str = "//! Démo.\n\n/// Double la valeur ; sature au lieu de déborder.\n///\n/// @req EF-001\npub fn f(x: u8) -> u8 {\n    x.wrapping_mul(2)\n}\n";
 
 #[test]

@@ -8,22 +8,34 @@
   import ApercuDessin from "./ApercuDessin.svelte";
 
   let { id }: { id: string } = $props();
+  /** Storyboard affiché. */
   const sb = $derived(artefact(id));
+  /** Vignette du storyboard telle que le LLM la propose : titre, ce qui se passe, prompt d'illustration. */
   type Vignette = { id: string; titre: string; description: string; prompt: string };
+  /** Artefact à produire, rattaché à une vignette (écran, document, objet). */
   type Art = { id: string; nom: string; genre: string; vignette: string; description: string };
+  /** Vignettes du storyboard, dans l'ordre du récit. */
   const vignettes = $derived((sb?.frontmatter.vignettes ?? []) as Vignette[]);
+  /** Artefacts à produire listés par le storyboard. */
   const arts = $derived((sb?.frontmatter.artefacts ?? []) as Art[]);
 
+  /** Noms des dessins enregistrés, pour savoir quelles vignettes et maquettes existent déjà. */
   let dessins = $state<string[]>([]);
+  /** Compteur incrémenté à chaque enregistrement : force le rechargement des aperçus (le navigateur garderait l'ancien SVG). */
   let version = $state(0);
+  /** Relit la liste des dessins ; sans serveur (site statique), la liste reste vide. */
   const charger = () => fetch("/api/dessins").then((r) => r.json()).then((d) => (dessins = d)).catch(() => {});
   charger();
+  /** Dessin ouvert dans l'éditeur vectoriel : nom du fichier et titre affiché. */
   let ouvert = $state<{ nom: string; titre: string } | null>(null);
+  /** Maquettes d'interface de ce storyboard (`<id>-maquette-<n>`). */
   const maquettes = $derived(dessins.filter((d) => d.startsWith(`${id}-maquette-`)));
+  /** Ouvre l'éditeur sur une nouvelle maquette, numérotée après la plus haute existante. */
   function nouvelleMaquette() {
     const n = Math.max(0, ...maquettes.map((m) => Number(m.split("-").pop()) || 0)) + 1;
     ouvert = { nom: `${id}-maquette-${n}`, titre: `${id} · maquette ${n}` };
   }
+  /** Ferme l'éditeur ; après un enregistrement, relit les dessins et rafraîchit les aperçus. */
   function ferme(enregistre: boolean) {
     ouvert = null;
     if (enregistre) {

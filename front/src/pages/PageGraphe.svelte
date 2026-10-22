@@ -14,9 +14,13 @@
   import type { Graphe } from "../types/Graphe";
 
   let { centre }: { centre: string } = $props();
+  /** Élément où cytoscape dessine le graphe. */
   let conteneur = $state<HTMLElement | null>(null);
+  /** Graphe affiché : local autour de `centre`, global sinon. */
   let graphe = $state<Graphe | null>(null);
+  /** Profondeur du graphe local, en nombre de liens depuis le centre. */
   let profondeur = $state(1);
+  /** Instance cytoscape, détruite et recréée à chaque nouveau graphe (pas réactive : Svelte n'a pas à la suivre). */
   let cy: cytoscape.Core | null = null;
 
   /** Catégories, dans l'ordre des puces : nom affiché et variable de couleur. */
@@ -30,11 +34,16 @@
     ["reception", "Réception", "--rouge"],
     ["absent", "Introuvable", "--bord-fort"],
   ];
+  /** Catégories masquées par un clic sur leur puce. */
   let masquees = $state(new Set<string>());
+  /** Bulle du nœud survolé, en coordonnées d'écran. */
   let survol = $state<{ x: number; y: number; id: string; titre: string; categorie: string } | null>(null);
+  /** Nœud éclairé par un appui long (ou trouvé) et son nombre de liens, rappelés sous le graphe. */
   let focus = $state<{ id: string; liens: number } | null>(null);
 
+  /** Graphe en cours de chargement (le global peut prendre quelques secondes au premier calcul). */
   let chargement = $state(false);
+  /** Charge le graphe local, ou le graphe global gardé pour la session ; `forcer` (bouton ↻) le recalcule. */
   function charger(forcer = false) {
     chargement = true;
     const p = centre ? api.graphe(centre, profondeur) : grapheGlobal(forcer);
@@ -45,9 +54,13 @@
     charger();
   });
 
+  /** Valeur d'une variable CSS du thème, lue au moment du dessin (cytoscape n'accepte pas `var(...)`). */
   const couleur = (nom: string) => getComputedStyle(document.documentElement).getPropertyValue(nom).trim();
+  /** Couleur d'une catégorie dans le thème courant. */
   const couleurDe = (cat: string) => couleur(CATEGORIES.find((c) => c[0] === cat)?.[2] ?? "--accent");
+  /** Catégories présentes dans le graphe, les seules qui ont une puce. */
   const presentes = $derived(CATEGORIES.filter(([c]) => graphe?.noeuds.some((n) => n.categorie === c)));
+  /** Nombre de nœuds d'une catégorie, affiché sur sa puce. */
   const compte = (cat: string) => graphe?.noeuds.filter((n) => n.categorie === cat).length ?? 0;
 
   $effect(() => {
@@ -133,15 +146,22 @@
     });
     focus = { id: n.data("genre") === "document" ? n.id() : n.data("label"), liens: aretes.length };
   }
+  /** Retire l'éclairage : tout redevient visible. */
   function effacer() {
     cy?.elements().removeClass("estompe lie");
     focus = null;
   }
 
-  // Recherche dans le graphe (REC-070) : le nœud trouvé est mis en avant, centré et zoomé.
+  /** Texte cherché dans le graphe (REC-070) : le nœud trouvé est mis en avant, centré et zoomé. */
   let quete = $state("");
+  /** Aucun nœud visible ne correspond à la recherche. */
   let introuvable = $state(false);
+  /** Suggestions du champ : identifiant et titre des documents, libellé des pages, titre des symboles. */
   const suggestions = $derived((graphe?.noeuds ?? []).map((x) => (x.genre === "document" ? `${x.id} · ${x.titre}` : x.genre === "page" ? x.libelle : x.titre || x.libelle)));
+  /**
+   * Trouve le meilleur nœud visible (égalité exacte, puis fin de chemin, puis contient) et zoome dessus.
+   * Une suggestion « ID · titre » est ramenée à son identifiant.
+   */
   function trouver(e?: SubmitEvent) {
     e?.preventDefault();
     if (!cy || !quete.trim()) return;
@@ -167,15 +187,18 @@
     cy.animate({ center: { eles: n }, zoom: 2.4 }, { duration: 450 });
   }
 
+  /** Cache les nœuds des catégories masquées ; leurs liens disparaissent avec eux. */
   function appliquerMasque() {
     cy?.batch(() => cy!.nodes().forEach((x) => void x.style("display", masquees.has(x.data("categorie")) ? "none" : "element")));
   }
+  /** Masque ou réaffiche une catégorie. */
   function basculer(cat: string) {
     const m = new Set(masquees);
     if (!m.delete(cat)) m.add(cat);
     masquees = m;
     appliquerMasque();
   }
+  /** Nom affiché de chaque catégorie, pour la bulle de survol. */
   const NOMS = Object.fromEntries(CATEGORIES.map(([c, nom]) => [c, nom]));
 
   onDestroy(() => cy?.destroy());

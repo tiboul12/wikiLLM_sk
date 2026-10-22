@@ -9,20 +9,29 @@
   import { terminal, envoyer } from "../lib/terminal.svelte";
 
   let { largeur = $bindable(560) }: { largeur?: number } = $props();
+  /** Élément où xterm.js dessine le terminal. */
   let hote: HTMLElement;
+  /** État de la liaison WebSocket, affiché dans l'en-tête du volet. */
   let etat = $state<"connexion" | "ouvert" | "ferme">("connexion");
+  /** Erreur du lancement de l'agent. */
   let erreur = $state("");
+  /** Liaison avec le shell du serveur (`/api/terminal`). */
   let ws: WebSocket | null = null;
+  /** Terminal xterm.js, créé au montage. */
   let term: Terminal | null = null;
+  /** Module qui ajuste colonnes et lignes à la taille du volet. */
   let ajuster: FitAddon | null = null;
+  /** Suit la taille du volet pour réajuster le terminal. */
   let observateur: ResizeObserver | null = null;
 
+  /** Ajuste le terminal au volet et transmet colonnes et lignes au shell, sinon les programmes plein écran se dessinent mal. */
   function taille() {
     if (!term || !ajuster) return;
     ajuster.fit();
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ cols: term.cols, rows: term.rows }));
   }
 
+  /** Ouvre la liaison WebSocket (wss sous HTTPS) ; à l'ouverture, le serveur rejoue la sortie gardée du shell. */
   function connecter() {
     erreur = "";
     etat = "connexion";
@@ -60,6 +69,7 @@
     term?.dispose();
   });
 
+  /** Tape la commande de l'agent configurée (`claude` par défaut) dans le terminal. */
   async function lancerAgent() {
     erreur = "";
     try {
@@ -70,6 +80,7 @@
     }
   }
 
+  /** Tire le bord gauche du volet : largeur bornée (320 px au moins, 300 px laissés à la page), enregistrée au relâchement. */
   function tirer(e: PointerEvent) {
     const p = e.currentTarget as HTMLElement;
     p.setPointerCapture(e.pointerId);

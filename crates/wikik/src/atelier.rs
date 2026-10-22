@@ -45,6 +45,7 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/recherche/ia", post(api_recherche_ia))
 }
 
+/// Corps de `/api/recherche/ia` : la question posée en langage naturel.
 #[derive(Deserialize)]
 struct CorpsRechercheIa {
     question: String,
@@ -91,16 +92,19 @@ pub(crate) async fn meme_origine(requete: Request, suite: Next) -> Response {
     suite.run(requete).await
 }
 
+/// Parcours visé quand la requête n'en nomme pas : celui d'origine, pour les clients d'avant les parcours multiples.
 fn defaut() -> String {
     parcours::DEFAUT.to_string()
 }
 
+/// Paramètres de `/api/atelier/etat`.
 #[derive(Deserialize)]
 struct ParamEtat {
     #[serde(default = "defaut")]
     parcours: String,
 }
 
+/// État du parcours demandé (étapes, artefacts, clarifications) et nom du fournisseur LLM, pour l'écran de l'atelier.
 async fn api_etat(State(e): State<Partage>, Query(q): Query<ParamEtat>) -> Response {
     let nom = e.fournisseur.nom();
     repondre(e, move |i| parcours::etat(i, &q.parcours, &nom)).await
@@ -113,6 +117,7 @@ async fn api_annuler(State(e): State<Partage>, Json(_): Json<Value>) -> Response
     Json(true).into_response()
 }
 
+/// Corps de création d'un parcours : titre obligatoire, version visée facultative.
 #[derive(Deserialize)]
 struct NouveauParcours {
     titre: String,
@@ -120,6 +125,7 @@ struct NouveauParcours {
     version: String,
 }
 
+/// Crée un atelier et rend son identifiant (REC-039).
 async fn api_parcours(State(e): State<Partage>, Json(p): Json<NouveauParcours>) -> Response {
     ecrire(e, move |i| {
         parcours::creer_parcours(i, &p.titre, &p.version)
@@ -127,6 +133,7 @@ async fn api_parcours(State(e): State<Partage>, Json(p): Json<NouveauParcours>) 
     .await
 }
 
+/// Corps de modification d'un atelier ; un champ vide laisse la valeur en place.
 #[derive(Deserialize)]
 struct ModificationParcours {
     parcours: String,
@@ -148,6 +155,7 @@ async fn api_modifier_parcours(
     .await
 }
 
+/// Corps d'une action sur une clarification.
 #[derive(Deserialize)]
 struct ActionClarification {
     id: String,
@@ -155,6 +163,7 @@ struct ActionClarification {
     action: String,
 }
 
+/// Clôt, rouvre ou supprime une clarification (EF-161) ; une action inconnue est refusée en 400.
 async fn api_clarification(
     State(e): State<Partage>,
     Json(p): Json<ActionClarification>,
@@ -168,6 +177,7 @@ async fn api_clarification(
     .await
 }
 
+/// Corps du pilotage d'une étape : action (`terminer`, `rouvrir`, `sauter`, `mode`) et mode pour l'action `mode`.
 #[derive(Deserialize)]
 struct Pilotage {
     #[serde(default = "defaut")]
@@ -177,6 +187,7 @@ struct Pilotage {
     mode: Option<String>,
 }
 
+/// Change l'état ou le mode d'une étape du parcours.
 async fn api_piloter(State(e): State<Partage>, Json(p): Json<Pilotage>) -> Response {
     ecrire(e, move |i| {
         parcours::piloter(i, &p.parcours, &p.etape, &p.action, p.mode.as_deref())
@@ -184,6 +195,7 @@ async fn api_piloter(State(e): State<Partage>, Json(p): Json<Pilotage>) -> Respo
     .await
 }
 
+/// Corps d'une sélection : les artefacts retenus par une sous-étape de genre `selection`.
 #[derive(Deserialize)]
 struct Selection {
     #[serde(default = "defaut")]
@@ -193,6 +205,7 @@ struct Selection {
     ids: Vec<String>,
 }
 
+/// Enregistre la sélection d'une sous-étape, qui fixe les cibles des sous-étapes répétées.
 async fn api_selection(State(e): State<Partage>, Json(p): Json<Selection>) -> Response {
     ecrire(e, move |i| {
         parcours::selectionner(i, &p.parcours, &p.etape, &p.sous_etape, &p.ids)
@@ -200,6 +213,7 @@ async fn api_selection(State(e): State<Partage>, Json(p): Json<Selection>) -> Re
     .await
 }
 
+/// Corps d'une demande de propositions : la sous-étape, l'artefact visé si elle est répétée, une indication libre de l'utilisateur.
 #[derive(Deserialize)]
 struct Proposer {
     #[serde(default = "defaut")]
@@ -248,6 +262,7 @@ async fn api_proposer(State(e): State<Partage>, Json(p): Json<Proposer>) -> Resp
     resultat(r)
 }
 
+/// Corps d'une décision sur une proposition du LLM, désignée par son rang ; `donnees` porte la version corrigée par l'utilisateur.
 #[derive(Deserialize)]
 struct Decision {
     #[serde(default = "defaut")]
@@ -260,6 +275,7 @@ struct Decision {
     donnees: Option<Value>,
 }
 
+/// Garde, corrige ou écarte une proposition ; une proposition gardée devient un artefact.
 async fn api_decider(State(e): State<Partage>, Json(p): Json<Decision>) -> Response {
     ecrire(e, move |i| {
         parcours::decider(
@@ -276,6 +292,7 @@ async fn api_decider(State(e): State<Partage>, Json(p): Json<Decision>) -> Respo
     .await
 }
 
+/// Corps d'une saisie de l'utilisateur dans une sous-étape (pitch, écrit libre, champ d'un formulaire).
 #[derive(Deserialize)]
 struct Saisie {
     #[serde(default = "defaut")]
@@ -286,6 +303,7 @@ struct Saisie {
     donnees: Value,
 }
 
+/// Enregistre ce que l'utilisateur a écrit lui-même, sans passer par le LLM.
 async fn api_saisir(State(e): State<Partage>, Json(p): Json<Saisie>) -> Response {
     ecrire(e, move |i| {
         parcours::saisir(
@@ -300,6 +318,7 @@ async fn api_saisir(State(e): State<Partage>, Json(p): Json<Saisie>) -> Response
     .await
 }
 
+/// Corps d'une demande de synthèse.
 #[derive(Deserialize)]
 struct Synthese {
     #[serde(default = "defaut")]
@@ -308,6 +327,7 @@ struct Synthese {
     sous_etape: String,
 }
 
+/// Fait rédiger par le LLM le rapport d'une sous-étape de genre `synthese` (bilan, BDR, roadmap).
 async fn api_synthetiser(State(e): State<Partage>, Json(p): Json<Synthese>) -> Response {
     ecrire(e, move |i| {
         parcours::synthetiser(i, &p.parcours, &p.etape, &p.sous_etape)
@@ -315,6 +335,7 @@ async fn api_synthetiser(State(e): State<Partage>, Json(p): Json<Synthese>) -> R
     .await
 }
 
+/// Corps d'un rappel : le sujet flou et, si besoin, la question à poser.
 #[derive(Deserialize)]
 struct Rappel {
     sujet: String,
@@ -322,6 +343,7 @@ struct Rappel {
     question: String,
 }
 
+/// Ouvre une clarification sur un point flou du besoin, comme l'outil MCP `atelier_rappel`.
 async fn api_rappel(State(e): State<Partage>, Json(p): Json<Rappel>) -> Response {
     ecrire(e, move |i| {
         wikik_core::atelier::rappel(i, &p.sujet, &p.question)
@@ -346,6 +368,8 @@ where
     resultat(r)
 }
 
+/// Réponse HTTP d'une tâche bloquante : la valeur en JSON, une erreur métier en 400 `{erreur}` avec sa chaîne de causes,
+/// une tâche qui a paniqué en 500.
 pub(crate) fn resultat<T: serde::Serialize>(
     r: std::result::Result<Result<T>, tokio::task::JoinError>,
 ) -> Response {
