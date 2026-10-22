@@ -25,6 +25,7 @@ pub const STATUTS: &[&str] = &["ouverte", "traitee", "reportee", "rejetee"];
 const TAILLE_MAX: usize = 10 * 1024 * 1024;
 
 /// Remarque telle que l'écran et l'agent la lisent, avec sa place dans la chaîne des versions.
+/// @relu 2026-10-22 038851cd
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct Remarque {
@@ -43,6 +44,10 @@ pub struct Remarque {
     pub date: String,
     pub resolution: Option<String>,
     pub commit: Option<String>,
+    /// Validation de l'utilisateur après traitement (EF-165) : `validee`, ou absente.
+    pub validation: Option<String>,
+    /// Date de la validation, ou de la dernière demande de reprise.
+    pub valide_le: Option<String>,
     pub chemin: String,
     /// 1 pour la première saisie, puis 2, 3… à chaque modification (SPEC-23 R8).
     pub version: u32,
@@ -394,8 +399,71 @@ fn chaines(v: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Validation par l'utilisateur d'une remarque traitée (EF-165, REC-079) : `validee` la confirme ;
+/// `a_reprendre` la rouvre pour l'agent, avec le commentaire de l'utilisateur ajouté à son texte (l'outil
+/// `reception` le lui montre).
+pub fn valider(index: &Index, id: &str, verdict: &str, commentaire: &str) -> Result<()> {
+    let chemin = chemin_remarque(index, id);
+    let (mut fm, corps) = lire_fm(index, id)?;
+    let statut = fm
+        .get("statut")
+        .and_then(Value::as_str)
+        .unwrap_or("ouverte")
+        .to_string();
+    match verdict {
+        "validee" => {
+            if statut == "ouverte" || statut == "remplacee" {
+                bail!("{id} n'est pas traitée : rien à valider");
+            }
+            fm.insert("validation".into(), json!("validee"));
+            fm.insert("valide_le".into(), json!(crate::relu::aujourdhui()));
+            crate::atelier::artefacts::reecrire(&index.racine, &chemin, &fm, &corps)
+        }
+        "a_reprendre" => {
+            if commentaire.trim().is_empty() {
+                bail!("dis ce qui reste à reprendre");
+            }
+            let mut texte = corps
+                .split(
+                    "
+## Traitement",
+                )
+                .next()
+                .unwrap_or(&corps)
+                .trim_end()
+                .to_string();
+            let precedent = fm
+                .get("resolution")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            texte.push_str(&format!(
+                "
+
+**À reprendre** ({}) : {}{}
+",
+                crate::relu::aujourdhui(),
+                commentaire.trim(),
+                if precedent.is_empty() {
+                    String::new()
+                } else {
+                    format!(" (traitement précédent : {precedent})")
+                }
+            ));
+            fm.insert("statut".into(), json!("ouverte"));
+            fm.insert("valide_le".into(), json!(crate::relu::aujourdhui()));
+            for k in ["validation", "resolution", "commit"] {
+                fm.remove(k);
+            }
+            crate::atelier::artefacts::reecrire(&index.racine, &chemin, &fm, &texte)
+        }
+        autre => bail!("verdict inconnu : {autre} (validee ou a_reprendre)"),
+    }
+}
+
 /// Toutes les remarques (les plus récentes d'abord), lues dans l'index, versions remplacées comprises,
 /// chacune avec l'historique de sa chaîne.
+/// @relu 2026-10-22 ff30d620
 pub fn lister(index: &Index) -> Result<Vec<Remarque>> {
     let mut st = index.conn.prepare(
         "SELECT id, chemin, frontmatter FROM documents WHERE genre = 'remarque' ORDER BY id DESC",
@@ -445,6 +513,14 @@ pub fn lister(index: &Index) -> Result<Vec<Remarque>> {
                 .and_then(Value::as_str)
                 .map(str::to_string),
             commit: fm.get("commit").and_then(Value::as_str).map(str::to_string),
+            validation: fm
+                .get("validation")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            valide_le: fm
+                .get("valide_le")
+                .and_then(Value::as_str)
+                .map(str::to_string),
             chemin,
             version: fm
                 .get("version")
@@ -494,6 +570,7 @@ pub fn lister(index: &Index) -> Result<Vec<Remarque>> {
 
 /// Enregistre le traitement d'une remarque (statut, explication, commit éventuel) : frontmatter et
 /// section « Traitement » ; le reste du fichier n'est pas touché. Une version remplacée ne se traite plus.
+/// @relu 2026-10-22 ad88866a
 pub fn traiter(
     index: &Index,
     id: &str,
@@ -515,6 +592,8 @@ pub fn traiter(
         bail!("{id} a été remplacée par {par} : traiter la dernière version");
     }
     fm.insert("statut".into(), json!(statut));
+    // Un nouveau traitement attend une nouvelle validation de l'utilisateur.
+    fm.remove("validation");
     if statut == "ouverte" {
         fm.remove("resolution");
         fm.remove("commit");

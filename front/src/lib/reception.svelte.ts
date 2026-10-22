@@ -5,6 +5,7 @@
 import type { EtatReception } from "../types/EtatReception";
 import type { Remarque } from "../types/Remarque";
 import type { Page } from "../types/Page";
+import type { EtatCommit } from "../types/EtatCommit";
 import { statique } from "./statique";
 import { adapterHote } from "./atelier.svelte";
 import { url } from "./routeur.svelte";
@@ -23,12 +24,15 @@ async function lireEtat(): Promise<EtatReception> {
   return r.json();
 }
 
-/** Charge l'état du cahier ; sans effet dans le site exporté. */
+/** Charge l'état du cahier ; sans effet dans le site exporté.
+ * @relu 2026-10-22 de5ad004
+ */
 export async function detecterReception(): Promise<boolean> {
   if (statique) return false;
   try {
     reception.etat = await lireEtat();
     reception.actif = true;
+    chargerGit();
   } catch {
     reception.actif = false;
   }
@@ -44,6 +48,47 @@ export function lienRoute(t: string): string | null {
   if (!r.startsWith("/") || !reception.etat) return null;
   const p = reception.etat.pages.find((x) => x.route === r) ?? reception.etat.pages.find((x) => x.route && r.startsWith(x.route.replace(/[:<[{].*$/, "")) && x.route.length > 1);
   return p ? url.pageReception(p.cle) : null;
+}
+
+/** État git des commits de traitement (EF-165), par commit cité ; chargé à la demande. */
+export const git = $state({ commits: {} as Record<string, EtatCommit>, charge: false });
+
+/** Charge l'état git des commits cités par les remarques (existe, poussé, version). */
+export async function chargerGit() {
+  try {
+    const r = await fetch("/api/reception/git");
+    if (!r.ok) return;
+    const liste: EtatCommit[] = await r.json();
+    git.commits = Object.fromEntries(liste.map((e) => [e.commit, e]));
+    git.charge = true;
+  } catch {
+    /* sans git : pas de pastilles */
+  }
+}
+
+/** Versions publiées (tags) citées, de la plus ancienne à la plus récente. */
+export function versionsCitees(): string[] {
+  const v = new Set<string>();
+  for (const e of Object.values(git.commits)) if (e.version) v.add(e.version);
+  return [...v].sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
+}
+
+const TEINTES = [150, 210, 280, 30, 330, 90, 190, 250, 0, 120];
+/**
+ * Couleur d'une correction (REC-082) : une teinte par version publiée ; « poussé, pas encore publié » en
+ * bleu, « commité, pas poussé » en orange, commit introuvable en rouge.
+ */
+export function couleurCommit(commit: string | null | undefined): { couleur: string; libelle: string } | null {
+  if (!commit) return null;
+  const e = git.commits[commit];
+  if (!e) return git.charge ? { couleur: "var(--rouge)", libelle: "commit introuvable" } : null;
+  if (!e.existe) return { couleur: "var(--rouge)", libelle: "commit introuvable" };
+  if (e.version) {
+    const i = versionsCitees().indexOf(e.version);
+    return { couleur: `hsl(${TEINTES[i % TEINTES.length]} 55% 45%)`, libelle: `publié en ${e.version}` };
+  }
+  if (e.pousse) return { couleur: "var(--accent)", libelle: "poussé, pas encore publié" };
+  return { couleur: "var(--orange)", libelle: `commité sur ${e.branches.join(", ") || "?"}, pas poussé` };
 }
 
 /** Relit l'état du cahier (après une écriture faite ailleurs, ou Ctrl+Z). */
@@ -89,10 +134,13 @@ export function baseApplication(): string | null {
  * Lien vers une page de l'application reçue : adresse + route ; sans route connue, l'accueil de
  * l'application ; null si aucune adresse n'est connue. Une adresse de boucle locale prend l'hôte du
  * navigateur (même règle que les liens wiki ↔ atelier).
+ * @relu 2026-10-22 9806d9f6
  */
 export function lienApplication(route: string | null | undefined): string | null {
   const base = baseApplication();
   if (!base) return null;
+  // Route à paramètre (`/clarifications/:id`, déclarée par `@ecrans`) : on ouvre sa partie fixe.
+  if (route) route = route.replace(/\/[:<{[].*$/, "") || "/";
   return route ? base + (route.startsWith("/") ? route : "/" + route) : base + "/";
 }
 

@@ -105,7 +105,7 @@ fn rappel_cree_une_clarification() {
     let (id, url) = wikik_core::atelier::rappel(&i, "EF-001", "Pourquoi 200 m ?").unwrap();
     assert_eq!(
         (id.as_str(), url.as_str()),
-        ("CLAR-001", "http://127.0.0.1:8484/clarification/CLAR-001")
+        ("CLAR-001", "http://127.0.0.1:8484/clarifications/CLAR-001")
     );
     assert!(
         d.path()

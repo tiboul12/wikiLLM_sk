@@ -2,12 +2,21 @@
 
 /**
  * Remarque telle que l'écran et l'agent la lisent, avec sa place dans la chaîne des versions.
+ * @relu 2026-10-22 038851cd
  */
 export type Remarque = { id: string, titre: string, statut: string, page: string, nom_page: string, genre: string, gravite: string, texte: string, 
 /**
  * Chemins des images, relatifs à la racine du projet.
  */
-images: Array<string>, symboles: Array<string>, exigences: Array<string>, date: string, resolution: string | null, commit: string | null, chemin: string, 
+images: Array<string>, symboles: Array<string>, exigences: Array<string>, date: string, resolution: string | null, commit: string | null, 
+/**
+ * Validation de l'utilisateur après traitement (EF-165) : `validee`, ou absente.
+ */
+validation: string | null, 
+/**
+ * Date de la validation, ou de la dernière demande de reprise.
+ */
+valide_le: string | null, chemin: string, 
 /**
  * 1 pour la première saisie, puis 2, 3… à chaque modification (SPEC-23 R8).
  */

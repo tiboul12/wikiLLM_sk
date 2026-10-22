@@ -1,6 +1,7 @@
 <script lang="ts">
   // Lancer la clarification d'un document (EF-144, REC-024.2) : rien à écrire ; la clarification ouverte
   // sur ce sujet est reprise, sinon une nouvelle est créée, et l'on arrive directement sur ses pistes.
+  // @ecrans /clarifications/clarifier/:sujet Lancer une clarification
   import { ecrire } from "../../lib/atelier.svelte";
   import { aller, url } from "../../lib/routeur.svelte";
 

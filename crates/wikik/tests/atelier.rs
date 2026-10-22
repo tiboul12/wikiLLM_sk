@@ -163,7 +163,7 @@ fn atelier_factice_de_bout_en_bout() {
     assert_eq!(serveur, format!(r#"{{"port":{p}}}"#));
     let (_, rappel) = post(p, "rappel", r#"{"sujet":"PITCH","question":"Pourquoi ?"}"#);
     assert!(
-        rappel.contains(&format!("http://127.0.0.1:{p}/clarification/CLAR-001")),
+        rappel.contains(&format!("http://127.0.0.1:{p}/clarifications/CLAR-001")),
         "{rappel}"
     );
 }

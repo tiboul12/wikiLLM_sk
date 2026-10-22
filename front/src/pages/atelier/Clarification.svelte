@@ -3,6 +3,7 @@
   // lisant le projet par MCP (demandées d'office à l'ouverture) ; garder, corriger ou rejeter fait la
   // réponse ; « Clarifié » la clôt avec les pistes gardées. Se reprend, se rouvre, se supprime. Une question
   // jugée hors sujet par le LLM est signalée en tête (EF-162).
+  // @ecrans /clarifications/:id Clarification d'un sujet
   import { atelier, artefact, champ, ecrire } from "../../lib/atelier.svelte";
   import { aller, url } from "../../lib/routeur.svelte";
   import Propositions from "../../composants/atelier/Propositions.svelte";

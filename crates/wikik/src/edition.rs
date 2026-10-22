@@ -63,7 +63,7 @@ pub(crate) async fn action(requete: Request, suite: Next) -> Response {
 }
 
 /// Nom d'un geste, montré après Ctrl+Z (« Annulé : décision sur une proposition »).
-/// @relu 2026-10-22 848cded0
+/// @relu 2026-10-22 bf930a02
 fn libelle(chemin: &str) -> &'static str {
     match chemin {
         "/api/document/ecrire" => "modification du document",
@@ -81,6 +81,7 @@ fn libelle(chemin: &str) -> &'static str {
         "/api/atelier/piloter" => "étape de l'atelier",
         "/api/reception/remarque" => "remarque",
         "/api/reception/traiter" => "traitement d'une remarque",
+        "/api/reception/valider" => "validation d'une remarque",
         "/api/reception/supprimer" => "suppression d'une remarque",
         "/api/reception/page" => "carte des pages",
         "/api/parametres" => "paramètres",

@@ -242,7 +242,7 @@ fn page(
 }
 
 /// Applique les détecteurs (SPEC-22 R2), dans l'ordre ; une route ou un composant déjà vus ne sont
-/// pas repris.
+/// pas repris. Les écrans déclarés par `@ecrans` passent en premier (EF-164).
 /// @relu 2026-10-19 ce02aeb0
 pub fn detecter(index: &Index) -> Result<Vec<Page>> {
     let fichiers = sources(index)?;
@@ -265,6 +265,47 @@ pub fn detecter(index: &Index) -> Result<Vec<Page>> {
         }
         pages.push(p);
     };
+
+    // 0. Écrans déclarés dans le code (EF-164) : `@ecrans /route Nom` sur le composant d'une page à route
+    //    paramétrée (`/atelier/<étape>`) en donne les valeurs, une page chacune ; le composant n'est plus
+    //    une page à lui seul.
+    let mut st = index.conn.prepare(
+        "SELECT symbole, valeur FROM balises WHERE nom = 'ecrans' ORDER BY symbole, ligne",
+    )?;
+    let declares: Vec<(String, String)> = st
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let symboles_declares: BTreeSet<String> = declares.iter().map(|d| d.0.clone()).collect();
+    for (symbole, valeur) in declares {
+        let (route, nom) = valeur
+            .trim()
+            .split_once(char::is_whitespace)
+            .map_or((valeur.trim(), ""), |(r, n)| (r, n.trim()));
+        if !route.starts_with('/') {
+            continue;
+        }
+        let route = route_normale(route);
+        let nom = if nom.is_empty() {
+            humaniser(route.rsplit('/').next().unwrap_or(""))
+        } else {
+            nom.to_string()
+        };
+        let symboles = vec![symbole.clone()];
+        let p = Page {
+            cle: route.clone(),
+            nom,
+            route: Some(route),
+            exigences: exigences(index, &symboles),
+            fichier: symbole.split("::").next().map(str::to_string),
+            symboles,
+            source: "ecrans".into(),
+            groupe: None,
+            masque: false,
+            corrige: false,
+            disparue: false,
+        };
+        ajouter(p, None, &mut pages);
+    }
 
     // 1. Routes déclarées : objets (Angular, Vue, React Router en objets) et balises <Route> (React, Leptos).
     for f in fichiers.iter().filter(|f| f.ext != "html") {
@@ -616,6 +657,14 @@ pub fn detecter(index: &Index) -> Result<Vec<Page>> {
         );
         ajouter(p, Some(nom), &mut pages);
     }
+    // Un composant qui déclare ses écrans n'est pas une page de plus (REC-075).
+    pages.retain(|p| {
+        p.source == "ecrans"
+            || !p
+                .symboles
+                .first()
+                .is_some_and(|x| symboles_declares.contains(x))
+    });
     Ok(pages)
 }
 
@@ -808,6 +857,7 @@ fn ecrire_avec(
 /// Fusionne un scan avec la carte existante (SPEC-22 R4) : corrections gardées (nom, masque, groupe,
 /// route ajoutée à la main), page retrouvée sous une autre clé reconnue à son composant (elle garde sa
 /// clé et ses remarques), nouvelles pages ajoutées, pages disparues marquées.
+/// @relu 2026-10-22 474b8f7b
 pub fn fusionner(anciennes: &[Page], trouvees: Vec<Page>) -> Vec<Page> {
     let par_cle: BTreeMap<&str, &Page> = anciennes.iter().map(|p| (p.cle.as_str(), p)).collect();
     let cles_trouvees: BTreeSet<String> = trouvees.iter().map(|p| p.cle.clone()).collect();
@@ -818,11 +868,21 @@ pub fn fusionner(anciennes: &[Page], trouvees: Vec<Page>) -> Vec<Page> {
         .filter(|a| !cles_trouvees.contains(&a.cle))
         .filter_map(|a| Some((a.symboles.first()?.as_str(), a.cle.as_str())))
         .collect();
+    // Un composant qui fait plusieurs écrans (`@ecrans`) ne transmet sa clé à aucun : l'ancienne page
+    // reste, avec ses remarques, marquée disparue.
+    let mut par_composant: BTreeMap<String, usize> = BTreeMap::new();
+    for p in &trouvees {
+        if let Some(s) = p.symboles.first() {
+            *par_composant.entry(s.clone()).or_default() += 1;
+        }
+    }
     let mut sortie: Vec<Page> = vec![];
     let mut vues = BTreeSet::new();
     for mut p in trouvees {
         if !par_cle.contains_key(p.cle.as_str())
-            && let Some(ancienne) = p.symboles.first().and_then(|s| par_symbole.get(s.as_str()))
+            && let Some(s) = p.symboles.first()
+            && par_composant.get(s) == Some(&1)
+            && let Some(ancienne) = par_symbole.get(s.as_str())
             && !vues.contains(*ancienne)
         {
             p.cle = (*ancienne).to_string();

@@ -1,6 +1,7 @@
 <script lang="ts">
   // Page fichier (EF-041, EF-142) : récapitulatif de ce qui n'est pas conforme (sans doc, doc périmée,
   // sans appelant, alertes du check), en-tête //! puis une cellule par symbole.
+  // @ecrans /produit/:chemin Page d'un fichier de code
   import { tick } from "svelte";
   import { api, type RapportCheck } from "../lib/api";
   import { url } from "../lib/routeur.svelte";

@@ -12,8 +12,9 @@ use crate::modele::{AppelBrut, Balise, ExtraitFichier, Import, Symbole};
 use std::collections::HashMap;
 use tree_sitter::{Node, Parser};
 
-/// Balises reconnues par SPEC-01 ; les autres sont gardées mais signalées par `check`.
-pub const BALISES_CONNUES: &[&str] = &["adr", "req", "topic", "pitfall", "relu"];
+/// Balises reconnues par SPEC-01 (et `@ecrans`, les écrans d'une route à paramètre : EF-164) ; les
+/// autres sont gardées mais signalées par `check`.
+pub const BALISES_CONNUES: &[&str] = &["adr", "req", "topic", "pitfall", "relu", "ecrans"];
 
 /// Langage Rust.
 pub struct Rust;

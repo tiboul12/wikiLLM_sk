@@ -18,7 +18,8 @@ use wikik_core::Index;
 use wikik_core::atelier::fournisseur::{Demande, Fournisseur};
 use wikik_core::reception::{carte, remarques};
 
-/// Routes du cahier de réception.
+/// Routes du cahier de réception : carte, remarques, traitement, validation par l'utilisateur et état git
+/// des corrections (EF-165).
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/reception/etat", get(api_etat))
@@ -26,6 +27,8 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/reception/page", post(api_page))
         .route("/api/reception/remarque", post(api_remarque))
         .route("/api/reception/traiter", post(api_traiter))
+        .route("/api/reception/valider", post(api_valider))
+        .route("/api/reception/git", get(api_git))
         .route("/api/reception/supprimer", post(api_supprimer))
         .route("/api/reception/application", post(api_application))
         .route("/api/reception/completer", post(api_completer))
@@ -141,6 +144,41 @@ struct Traitement {
 async fn api_traiter(State(e): State<Partage>, Json(p): Json<Traitement>) -> Response {
     ecrire(e, move |i| {
         remarques::traiter(i, &p.id, &p.statut, &p.resolution, p.commit.as_deref())
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct Validation {
+    id: String,
+    verdict: String,
+    #[serde(default)]
+    commentaire: String,
+}
+
+/// Validation par l'utilisateur d'une remarque traitée (EF-165) : validée, ou à reprendre.
+async fn api_valider(State(e): State<Partage>, Json(p): Json<Validation>) -> Response {
+    ecrire(e, move |i| {
+        remarques::valider(i, &p.id, &p.verdict, &p.commentaire)
+    })
+    .await
+}
+
+/// État git des commits cités par les remarques (EF-165) : existe, poussé, première version.
+async fn api_git(State(e): State<Partage>) -> Response {
+    repondre(e, |i| {
+        let Some(depot) = wikik_core::git::Depot::trouver(&i.racine) else {
+            return Ok(vec![]);
+        };
+        let commits: std::collections::BTreeSet<String> = remarques::lister(i)?
+            .into_iter()
+            .filter_map(|r| r.commit)
+            .filter(|c| !c.trim().is_empty())
+            .collect();
+        Ok(commits
+            .iter()
+            .map(|c| depot.etat_commit(c))
+            .collect::<Vec<_>>())
     })
     .await
 }

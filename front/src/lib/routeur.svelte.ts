@@ -57,9 +57,9 @@ function analyser(): Route {
   if (chemin === "/graphe") return { page: "graphe", centre: params.get("centre") ?? "" };
   if (chemin === "/atelier") return { page: "atelier" };
   if (chemin.startsWith("/atelier/")) return { page: "etape", etape: chemin.slice("/atelier/".length) };
-  if (chemin.startsWith("/clarification/")) return { page: "clarification", id: chemin.slice("/clarification/".length) };
   if (chemin === "/clarifications") return { page: "clarifications" };
-  if (chemin.startsWith("/clarifier/")) return { page: "clarifier", sujet: chemin.slice("/clarifier/".length) };
+  if (chemin.startsWith("/clarifications/clarifier/")) return { page: "clarifier", sujet: chemin.slice("/clarifications/clarifier/".length) };
+  if (chemin.startsWith("/clarifications/")) return { page: "clarification", id: chemin.slice("/clarifications/".length) };
   if (chemin === "/parametres") return { page: "parametres" };
   if (chemin === "/reception") return { page: "reception" };
   if (chemin === "/reception/traitement") return { page: "traitement" };
@@ -154,7 +154,7 @@ export function parcoursDeUrl(): string {
  * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`, `/projet/cascade`,
  * `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
  * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>` (avec
- * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarification/<id>`, `/clarifier/<id>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres`.
+ * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarifications/<id>`, `/clarifications/clarifier/<sujet>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres`.
  */
 export const url = {
   accueil: () => `${prefixe}/`,
@@ -171,8 +171,9 @@ export const url = {
   atelier: (parcours?: string) => `${prefixe}/atelier${avecParcours(parcours)}`,
   etape: (etape: string, parcours?: string) => `${prefixe}/atelier/${encodeURIComponent(etape)}${avecParcours(parcours)}`,
   clarifications: () => `${prefixe}/clarifications`,
-  clarification: (id: string) => `${prefixe}/clarification/${encodeURIComponent(id)}`,
-  clarifier: (sujet: string) => `${prefixe}/clarifier/${encodeURIComponent(sujet)}`,
+  // Les clarifications sont rangées sous leur tableau (REC-074).
+  clarification: (id: string) => `${prefixe}/clarifications/${encodeURIComponent(id)}`,
+  clarifier: (sujet: string) => `${prefixe}/clarifications/clarifier/${encodeURIComponent(sujet)}`,
   reception: () => `${prefixe}/reception`,
   // La clé d'une page est souvent une route (`/configurer`) : elle voyage en paramètre.
   pageReception: (cle: string) => `${prefixe}/reception/page/?cle=${encodeURIComponent(cle)}`,

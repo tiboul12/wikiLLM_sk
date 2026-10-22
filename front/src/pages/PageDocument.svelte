@@ -5,6 +5,8 @@
   // Un plan ou le backlog s'ouvre en tableau à colonnes. Le propriétaire peut le valider ou l'éditer en
   // entier (EF-158) ; `?editer=1` ouvre directement l'éditeur (« Corriger » de la relecture). Une exigence
   // montre ses tests (« ＋ créer un test »), un test son ticket de validation (EF-160).
+  // @ecrans /projet/:id Page d'un document
+  // @relu 2026-10-22 2e86c67e
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -97,8 +99,8 @@
   // Besoins, exigences et artefacts de l'atelier s'ouvrent dans l'atelier et peuvent y être clarifiés (SPEC-21 R1).
   const RAPPELABLES = ["besoin", "exigence", "exigence-nf"];
   const technique = $derived(typeof page?.frontmatter.technique === "string" ? page.frontmatter.technique : null);
-  const ouvrir = $derived(page && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(technique && technique !== "clarification" ? `/atelier/${technique}` : page.genre === "clarification" ? `/clarification/${page.id}` : "/atelier") : null);
-  const clarifier = $derived(page && page.genre !== "clarification" && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(`/clarifier/${encodeURIComponent(page.id)}`) : null);
+  const ouvrir = $derived(page && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(technique && technique !== "clarification" ? `/atelier/${technique}` : page.genre === "clarification" ? url.clarification(page.id) : "/atelier") : null);
+  const clarifier = $derived(page && page.genre !== "clarification" && (technique || RAPPELABLES.includes(page.genre)) ? lienAtelier(url.clarifier(page.id)) : null);
 </script>
 
 {#if erreur}

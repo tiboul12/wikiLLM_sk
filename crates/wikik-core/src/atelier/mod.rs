@@ -26,6 +26,7 @@ use serde_json::json;
 /// d'en créer une autre.
 ///
 /// @req EF-110, EF-144
+/// @relu 2026-10-22 956e2351
 pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, String)> {
     let c = &index.conn;
     let existe: bool = c
@@ -44,7 +45,7 @@ pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, Str
     let adresse = |id: &str| {
         let serveur =
             crate::reseau::pour_le_reseau(&crate::reseau::adresse_serveur(index), &index.config);
-        format!("{}/clarification/{id}", serveur.trim_end_matches('/'))
+        format!("{}/clarifications/{id}", serveur.trim_end_matches('/'))
     };
     let question = if question.trim().is_empty() {
         if let Some(id) = clarifications(index)?

@@ -3,6 +3,7 @@
   // projet ; saisie sur place si rien n'est déduit), ce que le code en dit (route,
   // composant, exigences), ses remarques, et la carte pour en ajouter une ; on passe à la page suivante
   // sans revenir à la carte.
+  // @ecrans /reception/page/:cle Carte de réception d'une page
   import { reception, remarquesDe, lienApplication, ecrireReception, visible, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";

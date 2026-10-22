@@ -1,6 +1,18 @@
 <script lang="ts">
   // Écran d'une étape du parcours affiché : « en bref » (à quoi elle sert, ce qu'on fait, ce qu'elle produit), règles de la
   // fiche, mode, puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon).
+  // Une page de réception par étape (EF-164) :
+  // @ecrans /atelier/pitch Pitch
+  // @ecrans /atelier/free-writing Free writing
+  // @ecrans /atelier/carte-mentale Carte mentale
+  // @ecrans /atelier/analogies Pensée analogique
+  // @ecrans /atelier/5w1h 5W1H
+  // @ecrans /atelier/cubing Cubing
+  // @ecrans /atelier/scamper SCAMPER
+  // @ecrans /atelier/storyboard Storyboard
+  // @ecrans /atelier/bilan Bilan des besoins
+  // @ecrans /atelier/exigences Exigences
+  // @ecrans /atelier/roadmap Roadmap
   import type { SousEtape } from "../../types/SousEtape";
   import { atelier, deType, ecrire, PHASES, ETATS } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";

@@ -91,6 +91,84 @@ impl Depot {
     }
 }
 
+/// Où en est un commit (EF-165, REC-080, REC-082) : existe-t-il, est-il poussé, dans quelle version.
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct EtatCommit {
+    pub commit: String,
+    /// Le commit est dans le dépôt.
+    pub existe: bool,
+    /// Hash complet, sujet et date (`AAAA-MM-JJ`) du commit.
+    pub hash: String,
+    pub sujet: String,
+    pub date: String,
+    /// Branches locales qui le contiennent.
+    pub branches: Vec<String>,
+    /// Une branche distante le contient : il est poussé.
+    pub pousse: bool,
+    /// Première version (tag) qui le contient ; `None` : pas encore publié.
+    pub version: Option<String>,
+}
+
+impl Depot {
+    fn git(&self, args: &[&str]) -> Option<String> {
+        let s = Command::new("git")
+            .arg("-C")
+            .arg(&self.racine_git)
+            .args(args)
+            .output()
+            .ok()?;
+        s.status
+            .success()
+            .then(|| String::from_utf8_lossy(&s.stdout).trim().to_string())
+    }
+
+    /// État d'un commit cité par une remarque traitée.
+    pub fn etat_commit(&self, commit: &str) -> EtatCommit {
+        let mut e = EtatCommit {
+            commit: commit.to_string(),
+            existe: false,
+            hash: String::new(),
+            sujet: String::new(),
+            date: String::new(),
+            branches: vec![],
+            pousse: false,
+            version: None,
+        };
+        let c = commit.trim();
+        if c.is_empty() || !c.chars().all(|x| x.is_ascii_hexdigit()) {
+            return e;
+        }
+        let Some(info) = self.git(&[
+            "log",
+            "-1",
+            "--format=%H%x09%cs%x09%s",
+            &format!("{c}^{{commit}}"),
+        ]) else {
+            return e;
+        };
+        let mut champs = info.splitn(3, '\t');
+        e.existe = true;
+        e.hash = champs.next().unwrap_or("").to_string();
+        e.date = champs.next().unwrap_or("").to_string();
+        e.sujet = champs.next().unwrap_or("").to_string();
+        let liste = |args: &[&str]| -> Vec<String> {
+            self.git(args)
+                .unwrap_or_default()
+                .lines()
+                .map(|l| l.trim_start_matches(['*', ' ']).trim().to_string())
+                .filter(|l| !l.is_empty() && !l.contains("HEAD ->"))
+                .collect()
+        };
+        e.branches = liste(&["branch", "--contains", &e.hash]);
+        e.pousse = !liste(&["branch", "-r", "--contains", &e.hash]).is_empty();
+        e.version = liste(&["tag", "--contains", &e.hash, "--sort=creatordate"])
+            .into_iter()
+            .next();
+        e
+    }
+}
+
 fn analyser_porcelain(texte: &str) -> Vec<LigneBlame> {
     let mut lignes = vec![];
     let mut commit = String::new();

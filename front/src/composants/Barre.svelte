@@ -4,7 +4,8 @@
   // groupe par type avec ⚙ (skill de structure) et, en orange, ce qui attend une relecture, compté jusqu'à
   // l'accordéon ; les besoins en cascade avec leurs exigences et leurs tests (EF-160). Design thinking :
   // les ateliers (numéro, statut, étapes, « + ») puis, à part, les clarifications par sujet (EF-161) et
-  // les artefacts. Réception : l'arborescence des pages et les remarques.
+  // les artefacts. Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
+  // version qui a publié sa correction (EF-165).
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
   // déplie, centré.
@@ -15,7 +16,7 @@
   import { NOMS, type Section } from "../lib/sections.svelte";
   import { atelier, ETATS, ecrire, sujets, STATUTS_ATELIER } from "../lib/atelier.svelte";
   import { aller } from "../lib/routeur.svelte";
-  import { reception, remarquesDe, arbrePages, visible, type Noeud } from "../lib/reception.svelte";
+  import { reception, remarquesDe, arbrePages, visible, couleurCommit, type Noeud } from "../lib/reception.svelte";
   import { statique } from "../lib/statique";
   import { tick } from "svelte";
   import { api } from "../lib/api";
@@ -94,7 +95,8 @@
       .then((d) => (taches = tachesBacklog(d.corps)))
       .catch(() => (taches = []));
   });
-  const enAttente = $derived(taches.length + aRelire.length + ouvertes);
+  const remarquesAValider = $derived((reception.etat?.remarques ?? []).filter((r) => r.statut === "traitee" && r.validation !== "validee").length);
+  const enAttente = $derived(taches.length + aRelire.length + ouvertes + remarquesAValider);
 
   // ⚙ d'un groupe : le skill qui dit comment ses documents sont structurés (REC-054).
   const SKILL_DE: Record<string, string> = {
@@ -200,6 +202,7 @@
             {#if backlog}<li><a href={url.document(backlog.id)} title={taches.join("\n")}>Tâches du backlog à ta charge <span class="compteur" class:faible={taches.length > 0}>{taches.length}</span></a></li>{/if}
             <li><a href={url.relecture()} class:actif={actif(url.relecture())}>Documents à relire <span class="compteur" class:faible={aRelire.length > 0}>{aRelire.length}</span></a></li>
             {#if atelier.etat}<li><a href={url.clarifications()}>Clarifications ouvertes <span class="compteur" class:faible={ouvertes > 0}>{ouvertes}</span></a></li>{/if}
+            {#if reception.etat}<li><a href={url.traitement()}>Remarques à valider <span class="compteur" class:faible={remarquesAValider > 0}>{remarquesAValider}</span></a></li>{/if}
           </ul>
         </details>
       </li>
@@ -336,6 +339,11 @@
               <a {href} class:actif={actif(href)} title={d.titre}>
                 <span class="id">{d.id}</span> {d.titre === d.id ? "" : d.titre}
                 {#if aRelireIds.has(d.id)}<span class="compteur faible" title="à relire">●</span>{/if}
+                {#if d.genre === "remarque"}
+                  {@const rq = reception.etat?.remarques.find((x) => x.id === d.id)}
+                  {@const c = couleurCommit(rq?.commit)}
+                  {#if c}<span class="compteur" style="color: {c.couleur}" title={c.libelle}>●</span>{:else if rq?.statut === "ouverte"}<span class="compteur faible" title="ouverte">○</span>{/if}
+                {/if}
               </a>
               {#if d.genre === "besoin"}
                 {@const es = projet.documents.filter((e) => e.besoins.includes(d.id))}
