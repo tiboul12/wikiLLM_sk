@@ -6,12 +6,18 @@
   import { estFavori, basculerFavori } from "../lib/edition.svelte";
   import { statique } from "../lib/statique";
 
+  let barre = $state<HTMLElement | null>(null);
+  // L'onglet actif reste visible quand la barre défile.
+  $effect(() => {
+    const i = onglets.actif;
+    barre?.querySelectorAll(".onglet")[i]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  });
   let glisse = $state<number | null>(null);
   let cible = $state<number | null>(null);
 </script>
 
 {#if onglets.liste.length}
-  <div class="onglets" role="tablist" aria-label="Pages ouvertes">
+  <div class="onglets" role="tablist" aria-label="Pages ouvertes" bind:this={barre}>
     {#each onglets.liste as o, i (i + o.url)}
       <div
         class="onglet"
@@ -60,6 +66,8 @@
 <style>
   .onglets {
     display: flex;
+    max-width: 100%;
+    min-width: 0;
     gap: 2px;
     overflow-x: auto;
     border-bottom: 1px solid var(--bord);
