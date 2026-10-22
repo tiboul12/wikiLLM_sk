@@ -1,6 +1,7 @@
 <script lang="ts">
   // Écran d'une étape du parcours affiché : « en bref » (à quoi elle sert, ce qu'on fait, ce qu'elle produit), règles de la
-  // fiche, mode, puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon).
+  // fiche, mode, puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon) ; la
+  // carte mentale se modifie dans l'éditeur Mermaid (EF-167).
   // Une page de réception par étape (EF-164) :
   // @ecrans /atelier/pitch Pitch
   // @ecrans /atelier/free-writing Free writing
@@ -22,6 +23,8 @@
   import Pitch from "../../composants/atelier/Pitch.svelte";
   import FreeWriting from "../../composants/atelier/FreeWriting.svelte";
   import Tri from "../../composants/atelier/Tri.svelte";
+  import EditeurMermaid from "../../composants/atelier/EditeurMermaid.svelte";
+  import { terminal } from "../../lib/terminal.svelte";
   import Planche from "../../composants/atelier/Planche.svelte";
   import EnBref from "../../composants/atelier/EnBref.svelte";
 
@@ -106,6 +109,14 @@
       {/if}
     </details>
   {/each}
+
+  {#if etape === "carte-mentale" && terminal.proprietaire}
+    {@const carte = deType("carte")[0]}
+    {#if carte}
+      <h2>Modifier la carte mentale</h2>
+      {#key carte.id}<EditeurMermaid id={carte.id} />{/key}
+    {/if}
+  {/if}
 
   <div class="actions fin-etape">
     {#if e.etat !== "faite"}

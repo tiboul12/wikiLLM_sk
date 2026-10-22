@@ -4,7 +4,8 @@
   // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21), « Reprendre » pour une clarification.
   // Un plan ou le backlog s'ouvre en tableau à colonnes. Le propriétaire peut le valider ou l'éditer en
   // entier (EF-158) ; `?editer=1` ouvre directement l'éditeur (« Corriger » de la relecture). Une exigence
-  // montre ses tests (« ＋ créer un test »), un test son ticket de validation (EF-160).
+  // montre ses tests (« ＋ créer un test »), un test son ticket de validation (EF-160) ; un diagramme
+  // Mermaid se modifie avec son aperçu (EF-167).
   // @ecrans /projet/:id Page d'un document
   // @relu 2026-10-22 2e86c67e
   import { tick } from "svelte";
@@ -19,6 +20,7 @@
   import { colonnesPlan, colonnesBacklog } from "../lib/gestion";
   import Kanban from "../composants/Kanban.svelte";
   import Editeur from "../composants/Editeur.svelte";
+  import EditeurMermaid from "../composants/atelier/EditeurMermaid.svelte";
   import { terminal } from "../lib/terminal.svelte";
   import { GENRES_A_RELIRE, changerStatut, signaler, VALIDATIONS, validerTest, nouveauDocument } from "../lib/edition.svelte";
   import { connus } from "../lib/connus.svelte";
@@ -56,6 +58,7 @@
   const colonnes = $derived(page?.genre === "plan" ? colonnesPlan(page.corps) : page?.genre === "backlog" ? colonnesBacklog(page.corps) : null);
   let vue = $state<"tableau" | "document">("tableau");
   let edite = $state(!statique && new URLSearchParams(location.search).get("editer") === "1");
+  let diagramme = $state(false);
   const aValider = $derived(page && GENRES_A_RELIRE.includes(page.genre) && (page.statut === "proposé" || page.statut === "brouillon"));
   // Cascade (EF-160) : les tests d'une exigence, le ticket d'un test.
   const tests = $derived(page && (page.genre === "exigence" || page.genre === "exigence-nf") ? connus.tests.filter((t) => t.exigences.includes(page!.id)) : []);
@@ -127,10 +130,12 @@
       <span class="gestes-document">
         {#if aValider}<button class="valider-doc" onclick={valider} title="Passer à « {page.genre === 'adr' ? 'accepté' : 'validé'} » (Ctrl+Z pour annuler)">✓ Valider</button>{/if}
         {#if !edite}<button class="editer-doc" onclick={() => (edite = true)} title="Modifier tout le document, frontmatter compris">✎ Éditer</button>{/if}
+        {#if !diagramme && page.corps.includes("```mermaid")}<button class="editer-doc" onclick={() => (diagramme = true)} title="Modifier le diagramme avec son aperçu">✎ Diagramme</button>{/if}
       </span>
     {/if}
   </div>
   {#if edite}<Editeur id={page.id} fermer={() => (edite = false)} />{/if}
+  {#if diagramme}<EditeurMermaid id={page.id} fermer={() => (diagramme = false)} />{/if}
   {#if ticket}
     <div class="ticket-test ticket-{ticket[1]}">
       <span>Ticket de validation : <strong>{ticket[0]}</strong>{#if page.frontmatter.valide_le} · le {page.frontmatter.valide_le}{/if}</span>

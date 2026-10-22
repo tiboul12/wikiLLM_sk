@@ -65,6 +65,72 @@ pub fn changer_statut(index: &Index, id: &str, statut: &str) -> Result<String> {
     ecrire(index, id, &avec_champ(&texte, "statut", statut))
 }
 
+/// Dossier des dessins de l'atelier (EF-167) : `docs/atelier/dessins/`.
+fn dossier_dessins(index: &Index) -> PathBuf {
+    index
+        .racine
+        .join(index.config.atelier.dossier.trim_end_matches('/'))
+        .join("dessins")
+}
+
+fn nom_dessin(nom: &str) -> Result<&str> {
+    let ok = !nom.is_empty()
+        && nom.len() <= 80
+        && nom
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !ok {
+        bail!("nom de dessin invalide : {nom}");
+    }
+    Ok(nom)
+}
+
+/// Enregistre un dessin vectoriel (vignette de storyboard, maquette d'interface) en SVG. Le SVG doit
+/// rester un dessin : pas de script, d'attribut d'événement, de lien `javascript:` ni d'objet étranger.
+/// @req EF-167
+pub fn ecrire_dessin(index: &Index, nom: &str, svg: &str) -> Result<String> {
+    let nom = nom_dessin(nom)?;
+    let t = svg.trim();
+    if !t.starts_with("<svg") || !t.ends_with("</svg>") || t.len() > 2_000_000 {
+        bail!("un dessin est un élément <svg> complet (2 Mo au plus)");
+    }
+    let bas = t.to_lowercase();
+    let interdit =
+        regex::Regex::new(r#"<script|<foreignobject|<iframe|javascript:|\son[a-z]+\s*="#).unwrap();
+    if interdit.is_match(&bas) {
+        bail!("le dessin contient du code : refusé");
+    }
+    let f = dossier_dessins(index).join(format!("{nom}.svg"));
+    crate::journal::ecrire(&f, format!("{t}\n"))?;
+    Ok(f.strip_prefix(&index.racine)
+        .unwrap_or(&f)
+        .to_string_lossy()
+        .into_owned())
+}
+
+/// Texte d'un dessin, `None` s'il n'existe pas.
+pub fn lire_dessin(index: &Index, nom: &str) -> Result<Option<String>> {
+    let f = dossier_dessins(index).join(format!("{}.svg", nom_dessin(nom)?));
+    Ok(std::fs::read_to_string(f).ok())
+}
+
+/// Noms des dessins existants.
+pub fn lister_dessins(index: &Index) -> Vec<String> {
+    let mut v: Vec<String> = std::fs::read_dir(dossier_dessins(index))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .strip_suffix(".svg")
+                .map(str::to_string)
+        })
+        .collect();
+    v.sort();
+    v
+}
+
 /// Ticket de validation d'un test (EF-160) : `utilisateur` ou `modele` (validé), `echec`, ou `a_valider`
 /// (rouvert) ; la date et l'auteur du verdict sont notés dans le frontmatter.
 pub fn valider_test(index: &Index, id: &str, verdict: &str) -> Result<String> {
@@ -116,6 +182,22 @@ fn frontmatter(texte: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dessin_sans_code() {
+        let d = tempfile::tempdir().unwrap();
+        let i = Index::ouvrir(d.path()).unwrap();
+        assert!(ecrire_dessin(&i, "SB-001-V1", "<svg><rect onclick=\"x()\"/></svg>").is_err());
+        assert!(ecrire_dessin(&i, "../x", "<svg></svg>").is_err());
+        ecrire_dessin(&i, "SB-001-V1", "<svg><rect width=\"10\"/></svg>").unwrap();
+        assert_eq!(lister_dessins(&i), vec!["SB-001-V1".to_string()]);
+        assert!(
+            lire_dessin(&i, "SB-001-V1")
+                .unwrap()
+                .unwrap()
+                .contains("rect")
+        );
+    }
 
     #[test]
     fn champ_remplace_ou_ajoute() {

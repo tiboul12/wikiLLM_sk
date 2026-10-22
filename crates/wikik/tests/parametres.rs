@@ -158,9 +158,11 @@ fn serveur_detache_et_arret() {
     let (c, _, _) = http(port, "POST", "/api/serveur/arreter", "{}");
     assert_eq!(c, 200);
     let limite = Instant::now() + Duration::from_secs(8);
-    while TcpStream::connect(("127.0.0.1", port)).is_ok() {
+    // Le port se ferme avant que le serveur ne retire `serveur.json` : on attend les deux.
+    while TcpStream::connect(("127.0.0.1", port)).is_ok()
+        || d.path().join(".wikik/serveur.json").exists()
+    {
         assert!(Instant::now() < limite, "le serveur ne s'arrête pas");
         std::thread::sleep(Duration::from_millis(100));
     }
-    assert!(!d.path().join(".wikik/serveur.json").exists());
 }

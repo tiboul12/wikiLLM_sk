@@ -1,5 +1,5 @@
 //! Routes d'édition (ADR-0016) : documents modifiés dans le navigateur (EF-158), annuler et rétablir
-//! (EF-159), favoris (EF-157). L'édition et l'annulation écrivent dans le projet : elles sont réservées au
+//! (EF-159), favoris (EF-157), tests (EF-160) et dessins de l'atelier (EF-167). L'édition et l'annulation écrivent dans le projet : elles sont réservées au
 //! propriétaire (ADR-0013). Une couche ouvre une action du journal à chaque requête d'écriture, pour que
 //! Ctrl+Z défasse exactement ce geste.
 //!
@@ -22,7 +22,7 @@ use serde_json::{Value, json};
 use wikik_core::{edition, journal};
 
 /// Routes d'édition ; tout ce qui écrit dans le dépôt passe par la garde du propriétaire.
-/// @relu 2026-10-22 13a82864
+/// @relu 2026-10-22 7747fa71
 pub(crate) fn routes(etat: Partage) -> Router<Partage> {
     let reservees = Router::new()
         .route("/api/document/source", get(api_source))
@@ -30,11 +30,14 @@ pub(crate) fn routes(etat: Partage) -> Router<Partage> {
         .route("/api/document/statut", post(api_statut))
         .route("/api/document/valider-test", post(api_valider_test))
         .route("/api/document/nouveau", post(api_nouveau))
+        .route("/api/dessin", post(api_ecrire_dessin))
         .route("/api/annuler", post(api_annuler))
         .route("/api/retablir", post(api_retablir))
         .route_layer(axum::middleware::from_fn_with_state(etat, acces::reserve));
     Router::new()
         .route("/api/journal", get(api_journal))
+        .route("/api/dessins", get(api_dessins))
+        .route("/api/dessin/lire", get(api_lire_dessin))
         .route("/api/favoris", get(api_favoris).post(api_ecrire_favoris))
         .merge(reservees)
 }
@@ -63,13 +66,14 @@ pub(crate) async fn action(requete: Request, suite: Next) -> Response {
 }
 
 /// Nom d'un geste, montré après Ctrl+Z (« Annulé : décision sur une proposition »).
-/// @relu 2026-10-22 bf930a02
+/// @relu 2026-10-22 2b07bbc1
 fn libelle(chemin: &str) -> &'static str {
     match chemin {
         "/api/document/ecrire" => "modification du document",
         "/api/document/statut" => "changement de statut",
         "/api/document/valider-test" => "validation d'un test",
         "/api/document/nouveau" => "nouveau document",
+        "/api/dessin" => "dessin",
         "/api/atelier/decider" => "décision sur une proposition",
         "/api/atelier/saisir" => "saisie de l'atelier",
         "/api/atelier/selection" => "sélection",
@@ -210,6 +214,42 @@ async fn api_valider_test(State(e): State<Partage>, Json(c): Json<CorpsVerdict>)
     })
     .await;
     resultat(r)
+}
+
+#[derive(Deserialize)]
+struct CorpsDessin {
+    nom: String,
+    #[serde(default)]
+    svg: String,
+}
+
+/// Enregistre un dessin de l'atelier (EF-167).
+async fn api_ecrire_dessin(State(e): State<Partage>, Json(c): Json<CorpsDessin>) -> Response {
+    let r = tokio::task::spawn_blocking(move || -> Result<String> {
+        let i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+        edition::ecrire_dessin(&i, &c.nom, &c.svg)
+    })
+    .await;
+    resultat(r)
+}
+
+#[derive(Deserialize)]
+struct ParamDessin {
+    nom: String,
+}
+
+async fn api_lire_dessin(State(e): State<Partage>, Query(p): Query<ParamDessin>) -> Response {
+    let r = tokio::task::spawn_blocking(move || -> Result<Option<String>> {
+        let i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+        edition::lire_dessin(&i, &p.nom)
+    })
+    .await;
+    resultat(r)
+}
+
+async fn api_dessins(State(e): State<Partage>) -> Json<Vec<String>> {
+    let i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+    Json(edition::lister_dessins(&i))
 }
 
 /// Annule la dernière action (Ctrl+Z) ; `null` s'il n'y a rien à annuler.
