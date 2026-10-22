@@ -32,7 +32,9 @@ export async function lireDonnee<T>(relatif: string): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+/** Graphe complet du site exporté, chargé une fois au premier graphe demandé. */
 let grapheComplet: Promise<Graphe> | null = null;
+/** Index de recherche du site exporté, chargé une fois à la première recherche. */
 let indexRecherche: Promise<EntreeRecherche[]> | null = null;
 
 /** Graphe local autour de `centre`, mêmes règles que `wiki::graphe` (profondeur 1 à 3, 300 arêtes au plus). */
@@ -56,6 +58,7 @@ export async function grapheLocal(centre: string, profondeur: number): Promise<G
   return { noeuds, aretes: [...aretes.values()] };
 }
 
+/** Texte sans casse ni accents, pour comparer des mots. */
 const normaliser = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /** Recherche : tous les mots présents (sans casse ni accents), titres d'abord, 30 résultats. */

@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::path::{Path, PathBuf};
 use wikik_core::Index;
 
+/// Racine du dépôt wikiK, pour indexer ses fixtures et le dépôt lui-même.
 fn racine_depot() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -23,6 +24,7 @@ fn copie_fixture(nom: &str) -> tempfile::TempDir {
     dest
 }
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {
@@ -36,12 +38,14 @@ fn copier(de: &Path, vers: &Path) {
     }
 }
 
+/// Indexe un dossier : rapport de mise à jour et contenu de l'index en JSON.
 fn indexer(racine: &Path) -> (wikik_core::Rapport, Value) {
     let mut i = Index::ouvrir(racine).unwrap();
     let r = i.mettre_a_jour().unwrap();
     (r, i.dump_json().unwrap())
 }
 
+/// Symbole du dump par identifiant ; panique s'il manque.
 fn symbole<'a>(dump: &'a Value, id: &str) -> &'a Value {
     dump["symboles"]
         .as_array()
@@ -51,6 +55,7 @@ fn symbole<'a>(dump: &'a Value, id: &str) -> &'a Value {
         .unwrap_or_else(|| panic!("symbole absent : {id}"))
 }
 
+/// Arêtes d'un genre du dump : (source, cible, confiance).
 fn aretes(dump: &Value, genre: &str) -> Vec<(String, String, String)> {
     dump["aretes"]
         .as_array()

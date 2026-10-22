@@ -22,6 +22,7 @@ pub const GRAVITES: &[&str] = &["bloquant", "genant", "detail"];
 /// Statuts : une remarque naît ouverte et finit traitée, reportée ou rejetée.
 pub const STATUTS: &[&str] = &["ouverte", "traitee", "reportee", "rejetee"];
 // Une version modifiée passe à `remplacee` (SPEC-23 R8) : statut posé par `modifier`, jamais par `traiter`.
+/// Taille maximale d'une capture décodée (10 Mo), comme côté écran.
 const TAILLE_MAX: usize = 10 * 1024 * 1024;
 
 /// Remarque telle que l'écran et l'agent la lisent, avec sa place dans la chaîne des versions.
@@ -101,6 +102,7 @@ pub fn decoder(data_url: &str) -> Result<(Vec<u8>, &'static str)> {
     Ok((octets, ext))
 }
 
+/// Dossier du cahier de réception (`[reception] dossier`), sans `/` final.
 fn dossier(index: &Index) -> String {
     index
         .config
@@ -134,6 +136,7 @@ fn prochain_id(index: &Index) -> String {
     format!("REC-{:03}", max + 1)
 }
 
+/// Refuse une valeur hors de la liste permise (genre, gravité, statut) avec un message qui liste les valeurs admises.
 fn verifier(valeur: &str, permis: &[&str], quoi: &str) -> Result<()> {
     if !permis.contains(&valeur) {
         bail!("{quoi} inconnu(e) : {valeur} ({})", permis.join(", "));
@@ -168,6 +171,7 @@ pub struct Saisie<'a> {
     pub date: &'a str,
 }
 
+/// Chemin relatif du fichier d'une remarque.
 fn chemin_remarque(index: &Index, id: &str) -> String {
     format!("{}/remarques/{id}.md", dossier(index))
 }
@@ -267,6 +271,7 @@ fn decomposer(id: &str) -> (&str, u32) {
     }
 }
 
+/// Frontmatter et corps d'une remarque ; erreur claire si elle n'existe pas.
 fn lire_fm(index: &Index, id: &str) -> Result<(Map<String, Value>, String)> {
     let chemin = chemin_remarque(index, id);
     if !index.racine.join(&chemin).exists() {
@@ -388,6 +393,7 @@ pub fn supprimer(index: &Index, id: &str) -> Result<Vec<String>> {
     Ok(chaine)
 }
 
+/// Liste de chaînes d'une valeur JSON ; le reste est ignoré.
 fn chaines(v: Option<&Value>) -> Vec<String> {
     v.and_then(Value::as_array)
         .map(|a| {

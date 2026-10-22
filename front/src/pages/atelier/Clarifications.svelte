@@ -10,21 +10,30 @@
   import { signaler, rafraichir } from "../../lib/edition.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
+  /** Titre d'un document par identifiant, pour nommer les sujets. */
   const titreDoc = (id: string) => projet?.documents.find((d) => d.id === id)?.titre ?? "";
+  /** Clarifications regroupées par sujet. */
   const groupes = $derived(atelier.etat ? sujets(titreDoc) : []);
+  /** Documents qu'on peut faire clarifier : besoins, exigences, storyboards, idées. */
   const candidats = $derived((projet?.documents ?? []).filter((d) => ["besoin", "exigence", "exigence-nf", "storyboard", "idee"].includes(d.genre)));
+  /** Document choisi pour lancer une nouvelle clarification. */
   let nouveau = $state("");
   // svelte-ignore state_referenced_locally
+  /** Sujet filtré ; `?sujet=` (lien du panneau) le préremplit. */
   let sujet = $state((routeur.route, new URLSearchParams(location.search).get("sujet") ?? ""));
+  /** État filtré (« en cours » ou « clarifiée ») ; vide pour tous. */
   let etat = $state("");
 
+  /** État lisible d'une clarification. */
   const etatDe = (c: ArtefactResume) => (champ(c, "etat") === "close" ? "clarifiée" : "en cours");
+  /** Lignes du tableau : une par clarification, avec son sujet, après filtres. */
   const lignes = $derived(
     groupes
       .flatMap((g) => g.clarifications.map((c) => ({ g, c })))
       .filter(({ g, c }) => (!sujet || g.sujet === sujet) && (!etat || etatDe(c) === etat)),
   );
 
+  /** Supprime une ou plusieurs clarifications après confirmation, puis relit le projet ; Ctrl+Z les rend. */
   async function supprimer(ids: string[], quoi: string) {
     if (!confirm(`Supprimer ${quoi} et ses pistes ? (Ctrl+Z pour annuler)`)) return;
     try {

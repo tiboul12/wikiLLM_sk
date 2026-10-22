@@ -18,6 +18,7 @@ export const reception = $state({
   erreur: "",
 });
 
+/** État de la réception lu sur le serveur. */
 async function lireEtat(): Promise<EtatReception> {
   const r = await fetch("/api/reception/etat");
   if (!r.ok) throw new Error(String(r.status));
@@ -73,6 +74,7 @@ export function versionsCitees(): string[] {
   return [...v].sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
 }
 
+/** Teintes (HSL) des versions publiées, attribuées dans l'ordre des versions citées par les remarques, assez éloignées pour se distinguer. */
 const TEINTES = [150, 210, 280, 30, 330, 90, 190, 250, 0, 120];
 /**
  * Couleur d'une correction (REC-082) : une teinte par version publiée ; « poussé, pas encore publié » en

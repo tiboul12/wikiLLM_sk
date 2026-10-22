@@ -99,6 +99,7 @@ impl Terminal {
         }))
     }
 
+    /// Le shell tourne encore ; sinon le prochain client en relance un.
     fn vivant(&self) -> bool {
         matches!(
             self.enfant
@@ -109,6 +110,7 @@ impl Terminal {
         )
     }
 
+    /// Envoie des octets au shell (frappes de l'utilisateur, commande ou consigne de l'agent).
     fn ecrire(&self, octets: &[u8]) -> Result<()> {
         let mut e = self.ecrivain.lock().unwrap_or_else(|x| x.into_inner());
         e.write_all(octets)?;
@@ -135,6 +137,7 @@ impl Terminal {
         shell.is_some() && premier_plan == shell
     }
 
+    /// Ajuste la taille du pseudo-terminal à l'écran, bornée pour qu'un client fautif ne le rende pas inutilisable.
     fn redimensionner(&self, cols: u16, rows: u16) {
         let _ = self
             .maitre
@@ -174,6 +177,7 @@ fn obtenir(e: &Partage) -> Result<Arc<Terminal>> {
     Ok(x)
 }
 
+/// WebSocket du terminal : relie le client au shell du projet, créé au premier appel puis partagé.
 async fn api_terminal(ws: WebSocketUpgrade, State(e): State<Partage>) -> Response {
     match obtenir(&e) {
         Ok(t) => ws.on_upgrade(move |s| relier(s, t)),
@@ -226,12 +230,14 @@ async fn relier(socket: WebSocket, t: Arc<Terminal>) {
     envoi.abort();
 }
 
+/// Message de redimensionnement envoyé par le client.
 #[derive(Deserialize)]
 struct Taille {
     cols: u16,
     rows: u16,
 }
 
+/// Corps d'un envoi au terminal depuis un bouton de l'interface (traiter la réception, lancer l'agent).
 #[derive(Deserialize)]
 struct Envoi {
     texte: String,

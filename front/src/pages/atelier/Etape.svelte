@@ -29,16 +29,22 @@
   import EnBref from "../../composants/atelier/EnBref.svelte";
 
   let { etape }: { etape: string } = $props();
+  /** Rang de l'étape dans le parcours affiché ; -1 si elle n'y est pas. */
   const index = $derived(atelier.etat?.etapes.findIndex((e) => e.fiche.id === etape) ?? -1);
+  /** Étape affichée : fiche, état, mode, lots et sélections. */
   const e = $derived(atelier.etat?.etapes[index]);
+  /** Étape suivante du parcours, pour le lien de fin de page. */
   const suivante = $derived(atelier.etat?.etapes[index + 1]);
+  /** Erreur du dernier pilotage. */
   let erreur = $state("");
 
+  /** Leviers SCAMPER : lettre enregistrée dans le champ `levier` et nom de la colonne. */
   const SCAMPER: [string, string][] = [
     ["S", "Substituer"], ["C", "Combiner"], ["A", "Adapter"], ["M", "Modifier"],
     ["P", "Autre usage"], ["E", "Éliminer"], ["R", "Renverser"],
   ];
 
+  /** Termine, rouvre ou saute l'étape, ou change son mode. */
   async function piloter(action: string, mode?: string) {
     erreur = "";
     try {
@@ -55,9 +61,11 @@
     if (sel) return e.selections[sel.id] ?? [];
     return deType(se.pour_chaque).filter((a) => a.statut !== "ecarte").map((a) => a.id);
   }
+  /** Titre d'un artefact par identifiant. */
   const titre = (id: string) => atelier.etat?.artefacts.find((a) => a.id === id)?.titre ?? "";
   /** Sous-étapes rendues par un écran dédié qui en regroupe plusieurs. */
   const absorbee = (se: SousEtape) => etape === "free-writing" && se.id === "recolte";
+  /** Qui agit dans chaque genre de sous-étape, rappelé à côté de son titre. */
   const GENRES: Record<string, string> = { saisie: "à toi", propositions: "le LLM propose", selection: "choix", synthese: "rapport" };
 </script>
 

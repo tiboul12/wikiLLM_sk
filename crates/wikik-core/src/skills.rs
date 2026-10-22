@@ -118,6 +118,7 @@ pub fn structure_de(genre: &str) -> Option<&'static str> {
         .map(|d| d.nom)
 }
 
+/// Définition d'un skill livré par nom ; un nom inconnu est refusé (on n'écrit pas de skill arbitraire par l'API).
 fn definition(nom: &str) -> Result<&'static Definition> {
     match SKILLS.iter().find(|d| d.nom == nom) {
         Some(d) => Ok(d),
@@ -156,11 +157,13 @@ pub fn corps(racine: &Path, config: &Config, nom: &str) -> String {
     sans_entete(&t).trim().to_string()
 }
 
+/// Frontmatter `---` d'un SKILL.md, délimiteurs compris ; vide s'il n'y en a pas.
 fn entete(t: &str) -> &str {
     let n = t.len() - sans_entete(t).len();
     &t[..n]
 }
 
+/// Texte d'un SKILL.md sans son frontmatter.
 fn sans_entete(t: &str) -> &str {
     if let Some(reste) = t.strip_prefix("---\n")
         && let Some(fin) = reste.find("\n---\n")
@@ -170,6 +173,7 @@ fn sans_entete(t: &str) -> &str {
     t
 }
 
+/// Lecture des anciennes consignes de wikik.toml, pour migrer une consigne personnalisée en skill (ADR-0017).
 mod config {
     use crate::config::{Config, ConfigIa};
 

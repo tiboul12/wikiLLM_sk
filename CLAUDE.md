@@ -16,7 +16,7 @@ wikiK est en **refonte** : la v0 Python (wiki Markdown éditable) devient un bin
 - **Ce qui est reporté après la v1** : `docs/projet/backlog.md`, section « Reporté après la v1 ».
 - **Réflexions d'origine et analyse** : `.doc/reflexion et evolution/` (non versionné).
 - **v0 Python** : retirée du dépôt, consultable au tag `v0-python` (ADR-0007).
-- **Outil à utiliser sur ce dépôt** : `wikik` lui-même (skill `skill/SKILL.md`, lié dans `.claude/skills/wikik`). `make check` avant chaque commit ; `wikik check` doit rester à zéro erreur.
+- **Outil à utiliser sur ce dépôt** : `wikik` lui-même (skill `skill/SKILL.md`, lié dans `.claude/skills/wikik`). `make check` avant chaque commit ; `wikik check` doit rester à zéro erreur et `wikik stats` à 95 % de symboles documentés au moins (100 % le 22/10/2026).
 
 ## Règles
 

@@ -43,11 +43,13 @@ function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
   return { chemin: decodeURIComponent(chemin), params: new URLSearchParams(requete), ancre: decodeURIComponent(ancre) };
 }
 
+/** Coupe au premier séparateur seulement (`a/b/c` → `a`, `b/c`). */
 function splitUne(t: string, sep: string): [string, string?] {
   const i = t.indexOf(sep);
   return i < 0 ? [t] : [t.slice(0, i), t.slice(i + 1)];
 }
 
+/** Route de l'URL courante ; une adresse inconnue tombe sur l'accueil. */
 function analyser(): Route {
   const { chemin, params, ancre } = lireUrl();
   if (chemin === "/produit" || chemin === "/produit/") return { page: "produit" };
@@ -114,6 +116,10 @@ export function adresseCourante(): string {
  */
 export const nouvelOnglet: { ouvrir: ((href: string) => void) | null } = { ouvrir: null };
 
+/**
+ * Adresse d'un clic sur un lien interne de l'application, ou `null` (lien externe, cible ou téléchargement) pour laisser
+ * faire le navigateur ; dans le site statique, seules les adresses `#/` sont internes.
+ */
 const lienInterne = (e: MouseEvent): string | null => {
   const a = (e.target as Element | null)?.closest?.("a");
   const href = a?.getAttribute("href");
@@ -146,7 +152,9 @@ addEventListener("auxclick", (e) => {
   nouvelOnglet.ouvrir(href);
 });
 
+/** Préfixe des adresses : `#` dans le site statique (pas de serveur pour répondre aux chemins), rien sinon. */
 const prefixe = statique ? "#" : "";
+/** Paramètre `?parcours=` d'une adresse de l'atelier ; absent pour le parcours d'origine. */
 const avecParcours = (p?: string) => (p && p !== "PARCOURS" ? `?parcours=${encodeURIComponent(p)}` : "");
 
 /** Parcours de l'atelier désigné par l'URL courante (`PARCOURS` sans paramètre). */

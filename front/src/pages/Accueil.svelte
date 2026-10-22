@@ -9,11 +9,17 @@
   import Icone from "../composants/Icone.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
+  /** Part des symboles documentés, pour la tuile du code. */
   const taux = $derived(projet && projet.symboles ? Math.round((100 * projet.documentes) / projet.symboles) : 0);
+  /** Nombre de documents d'une zone, et d'un genre si donné. */
   const docs = (zone: string, genre?: string) => (projet?.documents ?? []).filter((d) => d.zone === zone && (!genre || d.genre === genre)).length;
+  /** Étapes faites ou sautées du parcours affiché. */
   const etapesFaites = $derived(atelier.etat?.etapes.filter((e) => e.etat === "faite" || e.etat === "sautee").length ?? 0);
+  /** Titre de l'étape en cours, s'il y en a une. */
   const enCours = $derived(atelier.etat?.etapes.find((e) => e.etat === "en_cours")?.fiche.titre);
+  /** Remarques ouvertes de la réception en cours. */
   const ouvertes = $derived(reception.etat ? actuelles().filter((r) => r.statut === "ouverte").length : 0);
+  /** Pages visibles de la carte, hors « Général ». */
   const pages = $derived(reception.etat?.pages.filter((p) => !p.masque && p.cle !== "general").length ?? 0);
 </script>
 

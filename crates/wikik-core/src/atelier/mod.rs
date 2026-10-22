@@ -97,6 +97,7 @@ struct Clar {
     chemin: String,
 }
 
+/// Clarifications du projet, par identifiant, frontmatter décodé.
 fn clarifications(index: &Index) -> Result<Vec<Clar>> {
     let mut st = index.conn.prepare(
         "SELECT id, chemin, frontmatter FROM documents WHERE genre = 'clarification' ORDER BY id",
@@ -122,6 +123,7 @@ fn clarifications(index: &Index) -> Result<Vec<Clar>> {
     Ok(v)
 }
 
+/// Clarification par identifiant ; erreur claire si elle n'existe pas.
 fn clarification(index: &Index, id: &str) -> Result<Clar> {
     clarifications(index)?
         .into_iter()

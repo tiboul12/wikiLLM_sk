@@ -103,6 +103,7 @@ const METHODES_COURANTES: &[&str] = &[
     "write",
 ];
 
+/// Symbole tel que la résolution le voit : nom, genre, type parent et chemin de module pour comparer les suffixes.
 struct Sym {
     id: String,
     fichier: String,
@@ -125,6 +126,7 @@ fn sans_extension(fichier: &str) -> String {
 /// Arêtes à écrire, dédoublonnées : (source, cible, genre) → (confiance, ligne).
 type Aretes = BTreeMap<(String, String, String), (String, Option<i64>)>;
 
+/// Ajoute une arête, ou fusionne avec celle qui existe : une confiance « certain » l'emporte, la ligne la plus haute est gardée.
 fn ajouter(
     aretes: &mut Aretes,
     source: &str,
@@ -167,6 +169,7 @@ pub fn module_du_fichier(chemin: &str) -> Vec<String> {
     segs
 }
 
+/// Segments d'un chemin Rust (`a::b::c`), sans segment vide.
 fn segments_chemin(chemin: &str) -> Vec<String> {
     chemin
         .split("::")
@@ -175,6 +178,7 @@ fn segments_chemin(chemin: &str) -> Vec<String> {
         .collect()
 }
 
+/// Le chemin se termine par ces segments (`crate::a::f` se termine par `a::f`).
 fn se_termine_par(segs: &[String], suffixe: &[String]) -> bool {
     suffixe.len() <= segs.len() && segs[segs.len() - suffixe.len()..] == *suffixe
 }
@@ -350,6 +354,8 @@ struct Contexte<'a, 'b> {
     crates: &'a HashMap<String, String>,
 }
 
+/// Cibles possibles d'un appel brut, avec leur confiance : appel direct (même fichier, puis imports), chemin
+/// (`module::f`, `Type::methode`), méthode (`self.f` dans le même type, sinon probable par le nom).
 fn resoudre(
     src: &Sym,
     forme: &str,
@@ -536,6 +542,7 @@ fn du_module<'a>(module: &str, nom: &str, par_nom: &HashMap<&str, Vec<&'a Sym>>)
     })
 }
 
+/// Symboles dont le chemin se termine par ces segments, cherchés parmi ceux qui portent le dernier nom.
 fn par_suffixe<'a>(segs: &[String], par_nom: &HashMap<&str, Vec<&'a Sym>>) -> Vec<&'a Sym> {
     let Some(dernier) = segs.last() else {
         return vec![];
@@ -548,6 +555,8 @@ fn par_suffixe<'a>(segs: &[String], par_nom: &HashMap<&str, Vec<&'a Sym>>) -> Ve
     })
 }
 
+/// Cible d'un lien de document : identifiant exact, puis sans casse, puis ADR normalisé (`12` ou `adr-12` → `ADR-0012`), puis
+/// chemin de `.md` unique, enfin symbole ou fichier de code ; `None` si rien ne correspond (lien cassé pour `check`).
 fn resoudre_lien(
     brute: &str,
     docs: &[(String, String)],

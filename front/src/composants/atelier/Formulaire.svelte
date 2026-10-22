@@ -1,5 +1,6 @@
 <script lang="ts">
   // Correction d'une proposition avant de la garder : un champ par propriété du schéma de la fiche.
+  /** Sous-ensemble de JSON Schema que portent les fiches : assez pour choisir le champ de saisie de chaque propriété. */
   type Schema = { type?: string; enum?: string[]; properties?: Record<string, Schema>; items?: Schema; required?: string[] };
 
   let {
@@ -10,9 +11,9 @@
   }: { schema: Schema; valeur: Record<string, unknown>; valider: (v: Record<string, unknown>) => void; annuler: () => void } = $props();
 
   // svelte-ignore state_referenced_locally
+  /** Propriétés du schéma, dans l'ordre de la fiche : un champ chacune. */
   const proprietes = Object.entries(schema.properties ?? {});
-  // Brouillon : textes tels quels, listes de textes séparées par des virgules, le reste en JSON.
-  // svelte-ignore state_referenced_locally
+  /** Brouillon de chaque champ en texte : textes tels quels, listes de textes séparées par des virgules, le reste en JSON. */
   let brouillon = $state<Record<string, string>>(
     Object.fromEntries(
       proprietes.map(([k, s]) => {
@@ -23,8 +24,10 @@
       }),
     ),
   );
+  /** JSON invalide dans un champ : la proposition n'est pas envoyée. */
   let erreur = $state("");
 
+  /** Reconvertit le brouillon selon le schéma et le rend ; les champs hors schéma de la proposition sont gardés. */
   function envoyer(e: SubmitEvent) {
     e.preventDefault();
     const sortie: Record<string, unknown> = { ...valeur };
@@ -42,6 +45,7 @@
     }
     valider(sortie);
   }
+  /** Hauteur d'une zone de texte selon la longueur du contenu, de 1 à 12 lignes. */
   const lignes = (t: string) => Math.min(12, Math.max(1, Math.ceil(t.length / 70) + (t.match(/\n/g)?.length ?? 0)));
 </script>
 

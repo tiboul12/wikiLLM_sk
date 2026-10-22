@@ -9,6 +9,7 @@ use crate::config::Config;
 use anyhow::{Result, bail};
 use std::path::Path;
 
+/// Gabarits des documents copiés dans `templates/` par `wikik init` (n'écrase rien).
 const GABARITS: &[(&str, &str)] = &[
     ("adr.md", include_str!("../../../templates/adr.md")),
     (
@@ -32,6 +33,7 @@ const GABARITS: &[(&str, &str)] = &[
     ("spec.md", include_str!("../../../templates/spec.md")),
 ];
 
+/// `wikik.toml` écrit par `wikik init` : toutes les clés commentées avec leur valeur par défaut.
 const CONFIG: &str = r#"# Configuration wikik (toutes les clés sont optionnelles).
 [index]
 # Motifs exclus de l'index, en plus du .gitignore.

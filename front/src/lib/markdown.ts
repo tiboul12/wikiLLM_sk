@@ -26,6 +26,7 @@ hljs.registerAliases(["toml"], { languageName: "ini" });
 hljs.registerAliases(["sh", "shell", "console"], { languageName: "bash" });
 hljs.registerAliases(["yml"], { languageName: "yaml" });
 
+/** Échappe un texte pour l'insérer dans du HTML. */
 const echapper = (t: string) =>
   t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -48,10 +49,12 @@ export function ancre(texte: string): string {
 /** Cible d'un lien [[brute]] : URL interne, ou null si le lien est cassé. */
 export type Resolveur = (brute: string) => string | null;
 
+/** Jeton marked d'un lien `[[cible|libellé#ancre]]`. */
 type JetonLien = { type: "lienWiki"; raw: string; cible: string; libelle?: string; ancre?: string };
 
 /** Début possible d'un identifiant de document dans du texte (`EF-140`, `PLAN-v4`, `REC-001.2`). */
 const ID_DEBUT = /\b[A-Z][A-Z0-9]*-[A-Za-z0-9]/;
+/** Identifiant de document complet en tête d'un texte, sous-numéro compris (`REC-001.2`). */
 const ID = /^[A-Z][A-Z0-9]*(?:-[A-Za-z0-9]+)+(?:\.\d+)?/;
 
 /**

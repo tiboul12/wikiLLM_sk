@@ -3,6 +3,7 @@
 use std::path::Path;
 use wikik_core::{Index, check, query};
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {
@@ -15,6 +16,7 @@ fn copier(de: &Path, vers: &Path) {
     }
 }
 
+/// Index d'une copie de la fixture `atelier-mini`.
 fn fixture() -> (tempfile::TempDir, Index) {
     let d = tempfile::tempdir().unwrap();
     copier(

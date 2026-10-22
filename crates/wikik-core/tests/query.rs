@@ -3,6 +3,7 @@
 use std::path::Path;
 use wikik_core::{Index, query};
 
+/// Index d'une copie de la fixture `rust-mini`, mis à jour.
 fn index_fixture() -> (tempfile::TempDir, Index) {
     let dest = tempfile::tempdir().unwrap();
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/rust-mini");
@@ -12,6 +13,7 @@ fn index_fixture() -> (tempfile::TempDir, Index) {
     (dest, i)
 }
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {

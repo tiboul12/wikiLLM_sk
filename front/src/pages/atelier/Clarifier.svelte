@@ -6,6 +6,7 @@
   import { aller, url } from "../../lib/routeur.svelte";
 
   let { sujet }: { sujet: string } = $props();
+  /** Erreur de création de la clarification ; sinon la page est aussitôt remplacée par la clarification. */
   let erreur = $state("");
   // svelte-ignore state_referenced_locally
   ecrire<[string, string]>("rappel", { sujet })

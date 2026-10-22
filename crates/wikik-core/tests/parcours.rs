@@ -47,6 +47,7 @@ fn garder_dans(
     ids
 }
 
+/// Contenu d'un fichier produit ; panique avec son chemin s'il manque.
 fn lire(d: &std::path::Path, relatif: &str) -> String {
     std::fs::read_to_string(d.join(relatif)).unwrap_or_else(|_| panic!("{relatif} absent"))
 }
@@ -248,6 +249,7 @@ fn parcours_complet_factice() {
     assert!(p::decider(&i, p::DEFAUT, "bilan", "besoins", None, 0, "garder", None).is_err());
 }
 
+/// Titre d'un frontmatter écrit en chaîne JSON (`titre: "…"`), décodé.
 fn json_titre(t: &str) -> String {
     t.lines()
         .find_map(|l| l.strip_prefix("titre: "))

@@ -67,10 +67,12 @@ pub trait Fournisseur: Send + Sync {
 pub struct Factice;
 
 impl Fournisseur for Factice {
+    /// Nom affiché du fournisseur factice.
     fn nom(&self) -> String {
         "factice".into()
     }
 
+    /// Rend l'exemple de la fiche comme réponse, sans appel : de quoi parcourir l'atelier et lancer les tests sans LLM.
     fn proposer(&self, d: &Demande) -> Result<Reponse> {
         let elements = d
             .exemple
@@ -140,6 +142,9 @@ impl Cli {
         )
     }
 
+    /// Un appel au programme du connecteur : consigne envoyée en argument ou sur l'entrée, sortie lue selon le connecteur.
+    /// Le programme a son propre groupe de processus pour qu'une annulation arrête aussi ce qu'il a lancé (serveur MCP, shell) ;
+    /// rend le JSON trouvé dans la réponse (ou rien) et la consommation de quota si le connecteur la donne.
     fn un_appel(&self, d: &Demande, depart: u64) -> Result<(Option<Value>, Option<Consommation>)> {
         let consigne = self.consigne_complete(d.consigne);
         let appel = connecteurs::preparer(
@@ -250,6 +255,7 @@ pub fn analyser_flux(
 }
 
 impl Fournisseur for Cli {
+    /// Nom affiché : la commande pour un CLI libre, sinon le connecteur et son modèle (« claude · haiku »).
     fn nom(&self) -> String {
         let c = self.config.connecteur();
         match (c.as_str(), self.config.modele.trim()) {
@@ -259,6 +265,8 @@ impl Fournisseur for Cli {
         }
     }
 
+    /// Appelle le LLM, avec une relance si la réponse manque ou ne respecte pas le schéma (SPEC-19 R4) ;
+    /// le jeton de la demande (pris à l'arrivée de la requête) permet d'annuler même un appel pas encore lancé.
     fn proposer(&self, d: &Demande) -> Result<Reponse> {
         let debut = Instant::now();
         let depart = d
@@ -290,10 +298,12 @@ impl Fournisseur for Cli {
         bail!("le LLM n'a pas rendu une réponse valide après une relance : {derniere}")
     }
 
+    /// Annule les appels en cours et ceux déjà demandés : leur jeton ne correspond plus.
     fn annuler(&self) {
         self.annulations.fetch_add(1, Ordering::SeqCst);
     }
 
+    /// Jeton d'annulation courant, à prendre au début d'une requête.
     fn jeton(&self) -> u64 {
         self.annulations.load(Ordering::SeqCst)
     }

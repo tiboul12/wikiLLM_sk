@@ -7,14 +7,17 @@ use std::path::Path;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+/// Serveur wikik lancé pour un test : processus et port ; arrêté quand il sort de portée.
 struct Serveur(Child, u16);
 
 impl Drop for Serveur {
+    /// Tue le serveur, même si le test a échoué.
     fn drop(&mut self) {
         let _ = self.0.kill();
     }
 }
 
+/// Lance `wikik --factice` au premier plan sur un port libre de la copie de test et attend qu'il réponde (20 s au plus).
 fn demarrer(racine: &Path) -> Serveur {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()

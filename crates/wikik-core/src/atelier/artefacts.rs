@@ -28,6 +28,7 @@ pub struct TypeArtefact {
     pub chiffres: usize,
 }
 
+/// Type d'artefact numéroté (`IDEE-001`…) rangé dans un dossier de sa zone.
 const fn t(
     nom: &'static str,
     prefixe: &'static str,
@@ -44,6 +45,7 @@ const fn t(
     }
 }
 
+/// Type d'artefact unique (un seul fichier, comme le pitch), rangé dans le dossier de l'atelier.
 const fn unique(nom: &'static str, prefixe: &'static str, fichier: &'static str) -> TypeArtefact {
     TypeArtefact {
         nom,
@@ -82,6 +84,7 @@ pub fn type_de(nom: &str) -> Result<&'static TypeArtefact> {
         .with_context(|| format!("type d'artefact inconnu : {nom}"))
 }
 
+/// Dossier de la zone d'un artefact (atelier ou projet), d'après wikik.toml.
 fn dossier_zone(racine: &Path, config: &Config, zone: Zone) -> PathBuf {
     racine.join(match zone {
         Zone::Atelier => config.atelier.dossier.trim_end_matches('/'),

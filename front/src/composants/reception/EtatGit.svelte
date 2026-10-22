@@ -4,7 +4,9 @@
   import { git, couleurCommit } from "../../lib/reception.svelte";
 
   let { commit }: { commit: string } = $props();
+  /** Couleur et libellé de l'état du commit (publié, poussé, pas poussé, introuvable). */
   const etat = $derived(couleurCommit(commit));
+  /** Détail git du commit (sujet, version), chargé avec l'état de la réception. */
   const e = $derived(git.commits[commit]);
 </script>
 

@@ -6,11 +6,17 @@
   import { sourceDocument, ecrireDocument, signaler } from "../../lib/edition.svelte";
 
   let { id, fermer }: { id: string; fermer?: () => void } = $props();
+  /** Texte complet du document, dans lequel le bloc Mermaid est remplacé à l'enregistrement. */
   let source = $state("");
+  /** Code Mermaid en cours d'édition ; une carte mentale minimale si le document n'a pas encore de diagramme. */
   let code = $state("");
+  /** Code tel qu'il est dans le document. */
   let origine = $state("");
+  /** Dernier dessin réussi : il reste affiché tant que le code saisi est invalide. */
   let svg = $state("");
+  /** Erreur de lecture, d'enregistrement ou de syntaxe du diagramme (première ligne seulement). */
   let erreur = $state("");
+  /** Premier bloc ```mermaid du document : c'est lui qu'on édite. */
   const BLOC = /```mermaid\n([\s\S]*?)```/;
 
   onMount(async () => {
@@ -22,7 +28,9 @@
     }
   });
 
+  /** Compteur d'identifiants de rendu : Mermaid refuse de réutiliser un identifiant. */
   let n = 0;
+  /** Délai de 300 ms avant de redessiner, pour ne pas relancer Mermaid à chaque touche. */
   let minuterie: ReturnType<typeof setTimeout> | undefined;
   $effect(() => {
     const c = code;
@@ -41,6 +49,7 @@
     }, 300);
   });
 
+  /** Remplace le bloc dans le document, ou l'ajoute en fin s'il n'y en avait pas, puis ferme l'éditeur ; Ctrl+Z annule. */
   async function enregistrer() {
     const bloc = "```mermaid\n" + code.trimEnd() + "\n```";
     const texte = BLOC.test(source) ? source.replace(BLOC, bloc) : `${source.trimEnd()}\n\n${bloc}\n`;

@@ -9,14 +9,17 @@ use std::path::Path;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+/// Serveur wikik lancé pour un test : processus et port ; arrêté quand il sort de portée.
 struct Serveur(Child, u16);
 
 impl Drop for Serveur {
+    /// Tue le serveur, même si le test a échoué.
     fn drop(&mut self) {
         let _ = self.0.kill();
     }
 }
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {
@@ -29,6 +32,7 @@ fn copier(de: &Path, vers: &Path) {
     }
 }
 
+/// Lance `wikik --factice` au premier plan sur un port libre de la copie de test et attend qu'il réponde (20 s au plus).
 fn demarrer(racine: &Path) -> Serveur {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
@@ -84,6 +88,7 @@ fn http(port: u16, methode: &str, chemin: &str, corps: Option<&str>) -> (u16, St
     (code, entetes, corps)
 }
 
+/// Requête HTTP dont le corps est décodé en JSON (`null` s'il n'en est pas).
 fn json(port: u16, methode: &str, chemin: &str, corps: Option<&str>) -> (u16, Value) {
     let (c, _, b) = http(port, methode, chemin, corps);
     (c, serde_json::from_slice(&b).unwrap_or(Value::Null))

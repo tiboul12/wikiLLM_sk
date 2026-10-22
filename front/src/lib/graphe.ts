@@ -10,7 +10,9 @@ import type { Graphe } from "../types/Graphe";
 /** Position de chaque nœud, par identifiant. */
 export type Positions = Record<string, { x: number; y: number }>;
 
+/** Graphe global de la session : une seule requête, partagée par tous les onglets de cette fenêtre. */
 let global: Promise<Graphe> | null = null;
+/** Dispositions déjà calculées, par signature de graphe : un même graphe se redessine au même endroit. */
 const dispositions = new Map<string, Positions>();
 
 /** Graphe global, chargé au premier appel (ou rechargé avec `forcer`). */
@@ -100,7 +102,9 @@ export function disposer(g: Graphe): Positions {
   return pos;
 }
 
+/** Clé de stockage de la dernière disposition du graphe global. */
 const CLE = "wikik.graphe";
+/** Disposition gardée par ce navigateur, si elle correspond à ce graphe (même signature). */
 function lire(sig: string): Positions | null {
   try {
     const v = JSON.parse(localStorage.getItem(CLE) ?? "null");
@@ -109,6 +113,7 @@ function lire(sig: string): Positions | null {
     return null;
   }
 }
+/** Garde la disposition du graphe pour la prochaine ouverture ; une seule est gardée, la plus récente. */
 function garder(sig: string, pos: Positions) {
   try {
     localStorage.setItem(CLE, JSON.stringify({ sig, pos }));

@@ -19,6 +19,7 @@ struct Outil {
     parametres: &'static [(&'static str, &'static str, bool)],
 }
 
+/// Outils exposés par le serveur MCP : nom, description lue par l'agent pour choisir l'outil, paramètres.
 const OUTILS: &[Outil] = &[
     Outil {
         nom: "carte",
@@ -184,6 +185,7 @@ pub fn servir(racine: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Réponse d'erreur JSON-RPC.
 fn erreur(id: Value, code: i64, message: &str) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
 }
@@ -239,6 +241,7 @@ fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
     id.map(|id| json!({ "jsonrpc": "2.0", "id": id, "result": resultat }))
 }
 
+/// Schéma JSON des paramètres d'un outil : booléen pour `code`, entier pour `profondeur`, texte sinon.
 fn schema(o: &Outil) -> Value {
     let mut proprietes = serde_json::Map::new();
     let mut requis = vec![];
@@ -263,6 +266,7 @@ fn schema(o: &Outil) -> Value {
     })
 }
 
+/// Paramètre texte obligatoire d'un appel d'outil ; erreur claire s'il manque.
 fn texte(args: &Value, cle: &str) -> Result<String> {
     args.get(cle)
         .and_then(Value::as_str)

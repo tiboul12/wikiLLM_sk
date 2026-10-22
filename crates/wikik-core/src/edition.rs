@@ -73,6 +73,7 @@ fn dossier_dessins(index: &Index) -> PathBuf {
         .join("dessins")
 }
 
+/// Nom de dessin sûr : lettres, chiffres, `-` et `_`, 80 caractères au plus ; refuse tout ce qui sortirait du dossier des dessins.
 fn nom_dessin(nom: &str) -> Result<&str> {
     let ok = !nom.is_empty()
         && nom.len() <= 80

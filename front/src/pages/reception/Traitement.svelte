@@ -9,22 +9,29 @@
   import CarteRemarque from "../../composants/reception/CarteRemarque.svelte";
   import EnvoiAgent from "../../composants/reception/EnvoiAgent.svelte";
 
+  /** Filtre de statut (ou de validation) ; les remarques ouvertes par défaut. */
   let statut = $state("ouverte");
   chargerGit();
-  // Filtres de validation, en plus des statuts.
+  /** Filtres de validation (EF-165), en plus des statuts : à valider, validées. */
   const FILTRES: Record<string, (r: { statut: string; validation: string | null }) => boolean> = {
     a_valider: (r) => r.statut === "traitee" && r.validation !== "validee",
     validee: (r) => r.validation === "validee",
   };
+  /** Gravité filtrée ; vide pour toutes. */
   let gravite = $state("");
+  /** Page filtrée ; vide pour toutes. */
   let page = $state("");
+  /** Rang de gravité : bloquant d'abord. */
   const rang = (g: string) => ["bloquant", "genant", "detail"].indexOf(g);
+  /** Remarques filtrées, de la plus grave à la moins grave puis par identifiant. */
   const liste = $derived(
     actuelles()
       .filter((r) => (!statut || (FILTRES[statut] ? FILTRES[statut](r) : r.statut === statut)) && (!gravite || r.gravite === gravite) && (!page || r.page === page))
       .sort((a, b) => rang(a.gravite) - rang(b.gravite) || a.id.localeCompare(b.id)),
   );
+  /** Pages qui ont des remarques, pour le filtre (clé et nom). */
   const pagesAvecRemarques = $derived([...new Map(actuelles().map((r) => [r.page, r.nom_page])).entries()]);
+  /** Nombre de remarques d'un statut ou d'un filtre de validation, affiché sur son bouton. */
   const compte = (s: string) => actuelles().filter((r) => (FILTRES[s] ? FILTRES[s](r) : r.statut === s)).length;
 </script>
 

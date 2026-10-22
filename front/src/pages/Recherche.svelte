@@ -12,23 +12,35 @@
 
   let { q }: { q: string } = $props();
   // svelte-ignore state_referenced_locally
+  /** Texte du champ, initialisé avec la recherche de l'adresse. */
   let saisie = $state(q);
+  /** Résultats plein texte ; `null` tant qu'aucune recherche n'a été faite. */
   let resultats = $state<Resultat[] | null>(null);
   // svelte-ignore state_referenced_locally
   if (q) api.cherche(q).then((r) => (resultats = r)).catch(() => (resultats = []));
 
+  /** Élément rendu par le LLM : identifiant, chemin ou symbole, et pourquoi il répond. */
   type ReponseIa = { cible: string; raison: string };
+  /** Réponse du LLM ; `null` tant qu'il n'a pas été interrogé. */
   let ia = $state<ReponseIa[] | null>(null);
+  /** Erreur de l'appel au LLM (non configuré, annulé, réponse illisible). */
   let iaErreur = $state("");
+  /** Appel au LLM en cours. */
   let iaEnCours = $state(false);
 
+  /** Lien d'un résultat : le symbole dans sa page de fichier, ou le document. */
   const lien = (r: Resultat) => (r.fichier ? url.fichier(r.fichier, r.titre) : url.document(r.cle));
 
+  /** Relance la recherche via l'adresse, pour qu'elle reste dans l'historique et se partage. */
   function chercher(e: SubmitEvent) {
     e.preventDefault();
     if (saisie.trim()) aller(url.recherche(saisie.trim()));
   }
 
+  /**
+   * Pose la question au LLM du projet. L'appel compte dans `atelier.occupe` pour afficher le bandeau d'annulation,
+   * comme les appels de l'atelier.
+   */
   async function demanderIa() {
     const question = saisie.trim();
     if (!question) return;

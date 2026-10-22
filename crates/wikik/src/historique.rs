@@ -21,15 +21,18 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/git/diff", get(api_diff))
 }
 
+/// Dépôt git du projet ; erreur lisible si le projet n'en est pas un.
 fn depot(i: &Index) -> Result<Depot> {
     Depot::trouver(&i.racine).context("le projet n'est pas dans un dépôt git")
 }
 
+/// Paramètre `?limite=` de l'historique.
 #[derive(Deserialize)]
 struct ParamHistorique {
     limite: Option<usize>,
 }
 
+/// Commits (400 par défaut, 5 000 au plus), références et situation de la branche.
 async fn api_historique(State(e): State<Partage>, Query(p): Query<ParamHistorique>) -> Response {
     repondre(e, move |i| {
         Ok(depot(i)?.historique(p.limite.unwrap_or(400).min(5000)))
@@ -37,6 +40,7 @@ async fn api_historique(State(e): State<Partage>, Query(p): Query<ParamHistoriqu
     .await
 }
 
+/// Paramètres d'un commit : hash, et chemin du fichier pour le diff.
 #[derive(Deserialize)]
 struct ParamCommit {
     hash: String,
@@ -44,6 +48,7 @@ struct ParamCommit {
     chemin: String,
 }
 
+/// Message, auteur et fichiers changés d'un commit.
 async fn api_commit(State(e): State<Partage>, Query(p): Query<ParamCommit>) -> Response {
     repondre(e, move |i| {
         depot(i)?
@@ -53,6 +58,7 @@ async fn api_commit(State(e): State<Partage>, Query(p): Query<ParamCommit>) -> R
     .await
 }
 
+/// Diff d'un fichier dans un commit.
 async fn api_diff(State(e): State<Partage>, Query(p): Query<ParamCommit>) -> Response {
     repondre(e, move |i| {
         depot(i)?

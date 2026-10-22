@@ -7,13 +7,16 @@
   import { estFavori, basculerFavori } from "../lib/edition.svelte";
   import { statique } from "../lib/statique";
 
+  /** Barre d'onglets, pour faire défiler l'onglet actif dans la vue. */
   let barre = $state<HTMLElement | null>(null);
   // L'onglet actif reste visible quand la barre défile.
   $effect(() => {
     const i = onglets.actif;
     barre?.querySelectorAll(".onglet")[i]?.scrollIntoView({ block: "nearest", inline: "nearest" });
   });
+  /** Rang de l'onglet en cours de glisser. */
   let glisse = $state<number | null>(null);
+  /** Rang de l'onglet survolé pendant le glisser : l'onglet glissé sera posé à sa place. */
   let cible = $state<number | null>(null);
 </script>
 

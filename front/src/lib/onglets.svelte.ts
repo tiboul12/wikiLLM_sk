@@ -10,8 +10,10 @@ import type { Projet } from "../types/Projet";
 /** Un onglet : l'adresse de sa page et le titre affiché. */
 export type Onglet = { url: string; titre: string };
 
+/** Clé de stockage des onglets dans ce navigateur. */
 const CLE = "wikik.onglets";
 
+/** Onglets gardés par ce navigateur ; liste vide si rien n'est gardé ou lisible (la page courante prend alors un onglet). */
 function lire(): { liste: Onglet[]; actif: number } {
   try {
     const v = JSON.parse(localStorage.getItem(CLE) ?? "null");
@@ -38,6 +40,7 @@ export const detachee = (() => {
 /** Onglets ouverts et onglet actif. Une fenêtre détachée ne les lit ni ne les écrit. */
 export const onglets = $state(detachee ? { liste: [] as Onglet[], actif: 0 } : lire());
 
+/** Garde les onglets ; une fenêtre détachée n'en a pas et n'écrit rien. */
 function garder() {
   if (detachee) return;
   try {
@@ -47,8 +50,10 @@ function garder() {
   }
 }
 
-// Arrivée dans l'application (rechargement, lien collé) : la page rejoint son onglet s'il existe, sinon
-// elle en prend un nouveau ; ensuite, chaque navigation remplace la page de l'onglet actif.
+/**
+ * Arrivée dans l'application (rechargement, lien collé) : la page rejoint son onglet s'il existe, sinon elle en prend un
+ * nouveau ; ensuite, chaque navigation remplace la page de l'onglet actif.
+ */
 let arrivee = true;
 
 /** Suit la page affichée : l'onglet actif prend son adresse et son titre (à chaque changement de route). */
@@ -151,6 +156,7 @@ export function titreDe(route: Route, projet: Projet | null): string {
   }
 }
 
+/** Titre d'onglet des pages sans titre propre, par genre de page. */
 const TITRES: Record<string, string> = {
   accueil: "Accueil",
   produit: "Code",

@@ -2,6 +2,7 @@
 //!
 //! Sert à écrire ou corriger les règles d'extraction d'un langage (SPEC-15) :
 //! `cargo run -p wikik-core --example arbre_ts -- fichier.ts`.
+/// Affiche l'arbre tree-sitter (grammaire TSX) d'un fichier, pour écrire ou corriger l'extraction TypeScript.
 fn main() {
     let chemin = std::env::args().nth(1).unwrap();
     let src = std::fs::read(&chemin).unwrap();

@@ -3,6 +3,7 @@
   import DOMPurify from "dompurify";
 
   let { nom, version = 0 }: { nom: string; version?: number } = $props();
+  /** SVG assaini par DOMPurify (profil SVG) : un dessin modifié à la main ne peut pas injecter de script. */
   let html = $state("");
   $effect(() => {
     version;

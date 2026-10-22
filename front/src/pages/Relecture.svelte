@@ -9,19 +9,27 @@
   import { terminal } from "../lib/terminal.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
+  /** Statuts qui demandent une relecture, proposés dans le filtre. */
   const STATUTS = ["proposé", "brouillon"];
+  /** Documents qui attendent une décision. */
   const docs = $derived(aRelire(projet?.documents ?? []));
+  /** Genres présents parmi eux, proposés dans le filtre. */
   const genres = $derived([...new Set(docs.map((d) => d.genre))].sort());
+  /** Genre filtré ; vide pour tous. */
   let genre = $state("");
+  /** Statut filtré ; vide pour tous. */
   let statut = $state("");
+  /** Version d'un document, tirée de son dossier `majeures/<version>/` ; vide hors d'une majeure. */
   const version = (chemin: string) => /majeures\/([^/]+)\//.exec(chemin)?.[1] ?? "";
+  /** Documents filtrés, rangés par genre puis par identifiant (tri numérique : EF-10 après EF-9). */
   const liste = $derived(
     docs
       .filter((d) => (!genre || d.genre === genre) && (!statut || d.statut === statut))
       .sort((a, b) => a.genre.localeCompare(b.genre) || a.id.localeCompare(b.id, "fr", { numeric: true })),
   );
-  // Statut posé par « Valider » : `accepté` pour une décision, `validé` pour le reste.
+  /** Statut posé par « Valider » : `accepté` pour une décision (ADR), `validé` pour le reste. */
   const statutValide = (g: string) => (g === "adr" ? "accepté" : "validé");
+  /** Valide un document ; une erreur s'affiche dans le bandeau. */
   async function valider(id: string, g: string) {
     try {
       await changerStatut(id, statutValide(g));

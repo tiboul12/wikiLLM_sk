@@ -3,7 +3,9 @@
   // publié », « pas poussé », « introuvable ».
   import { git, versionsCitees, couleurCommit } from "../../lib/reception.svelte";
 
+  /** Versions publiées citées par les remarques, dans l'ordre de leurs teintes. */
   const versions = $derived(versionsCitees());
+  /** Couleur d'une version, prise sur l'un de ses commits pour rester identique à celle des pastilles. */
   const echantillon = (v: string) => {
     const e = Object.values(git.commits).find((x) => x.version === v);
     return e ? couleurCommit(e.commit)?.couleur : "var(--gris)";

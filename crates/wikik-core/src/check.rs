@@ -108,12 +108,14 @@ const MOTS_VIDES: &[&str] = &[
     "set", "is",
 ];
 
+/// Diagnostics trouvés, avec les sévérités réglées dans `[check]` de wikik.toml.
 struct Collecteur<'a> {
     severites: &'a BTreeMap<String, String>,
     diagnostics: Vec<Diagnostic>,
 }
 
 impl Collecteur<'_> {
+    /// Ajoute un diagnostic à la sévérité réglée (ou par défaut) ; un code réglé sur `ignore` n'est pas ajouté.
     fn ajouter(
         &mut self,
         code: &str,
@@ -141,6 +143,7 @@ impl Collecteur<'_> {
     }
 }
 
+/// Symbole lu pour le check : position du bloc, doc et hashs à comparer.
 struct SymDoc {
     id: String,
     fichier: String,
@@ -482,6 +485,7 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
     })
 }
 
+/// Symboles de l'index, tous ou ceux des fichiers donnés (check incrémental d'un commit).
 fn charger_symboles(c: &rusqlite::Connection, fichiers: Option<&[String]>) -> Result<Vec<SymDoc>> {
     // Filtre passé en une seule chaîne `\nf1\nf2\n` pour rester dans une requête préparée.
     let filtre: Option<String> = fichiers.map(|f| format!("\n{}\n", f.join("\n")));
@@ -595,6 +599,9 @@ fn relus_a_jour(index: &Index, symboles: &[SymDoc]) -> Result<HashSet<String>> {
         .collect())
 }
 
+/// Péremption par git (SPEC-04) : pour chaque bloc pas encore relu, compare la date de la doc (blame) à celle du code
+/// qu'elle décrit ; le code changé après la doc la rend périmée. Les fichiers non suivis sont frais par définition ;
+/// les versions anciennes extraites sont gardées dans `.wikik/cache-git`.
 fn perimes_git(
     index: &Index,
     depot: &Depot,

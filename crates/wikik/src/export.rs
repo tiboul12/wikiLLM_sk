@@ -29,10 +29,12 @@ pub fn nom_sur(t: &str) -> String {
     s
 }
 
+/// Chemin dont chaque segment est rendu sûr pour un nom de fichier du site exporté.
 fn chemin_sur(chemin: &str) -> String {
     chemin.split('/').map(nom_sur).collect::<Vec<_>>().join("/")
 }
 
+/// Écrit une donnée JSON du site exporté, dossiers créés au besoin.
 fn ecrire<T: Serialize>(racine: &Path, relatif: &str, valeur: &T) -> Result<()> {
     let chemin = racine.join(relatif);
     std::fs::create_dir_all(chemin.parent().unwrap())?;

@@ -5,8 +5,11 @@
   import { terminal, traiterAvecAgent } from "../../lib/terminal.svelte";
   import { url } from "../../lib/routeur.svelte";
 
+  /** Ce qui a été fait : agent lancé avec le skill, ou skill collé dans l'agent qui tourne. */
   let message = $state("");
+  /** Erreur d'envoi (terminal indisponible, visiteur non propriétaire). */
   let erreur = $state("");
+  /** Envoie le skill de traitement de la réception dans le terminal intégré. */
   async function traiter() {
     message = erreur = "";
     try {

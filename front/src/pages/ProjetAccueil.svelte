@@ -8,7 +8,9 @@
   import { aRelire as aRelireDe } from "../lib/edition.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
+  /** Base des tuiles et des versions majeures : les documents de projet, sans ceux de l'atelier ni de la réception. */
   const docs = $derived((projet?.documents ?? []).filter((d) => d.zone === "projet"));
+  /** Types montrés en tuiles : genre et titre. */
   const TYPES: [string, string][] = [
     ["besoin", "Besoins"],
     ["exigence", "Exigences"],
@@ -16,9 +18,11 @@
     ["adr", "Décisions (ADR)"],
     ["spec", "Specs"],
   ];
+  /** Documents d'un genre. */
   const deType = (g: string) => docs.filter((d) => d.genre === g);
+  /** Documents qui attendent une relecture. */
   const aRelire = $derived(aRelireDe(projet?.documents ?? []));
-  // Versions majeures : documents rangés sous `majeures/<version>/`.
+  /** Versions majeures : documents rangés sous `majeures/<version>/`, de la plus récente à la plus ancienne. */
   const majeures = $derived.by(() => {
     const m = new Map<string, DocumentResume[]>();
     for (const d of docs) {

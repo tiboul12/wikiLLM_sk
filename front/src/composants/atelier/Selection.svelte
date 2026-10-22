@@ -5,10 +5,14 @@
   import { url } from "../../lib/routeur.svelte";
 
   let { etape, se }: { etape: string; se: SousEtape } = $props();
+  /** Artefacts déjà cochés pour cette sous-étape. */
   const choix = $derived(atelier.etat?.etapes.find((e) => e.fiche.id === etape)?.selections[se.id] ?? []);
+  /** Artefacts du type demandé, hors écartés. */
   const candidats = $derived(deType(se.parmi).filter((a) => a.statut !== "ecarte"));
+  /** Erreur d'enregistrement de la sélection. */
   let erreur = $state("");
 
+  /** Coche ou décoche un artefact et enregistre aussitôt la sélection entière. */
   async function basculer(id: string) {
     const ids = choix.includes(id) ? choix.filter((x) => x !== id) : [...choix, id];
     erreur = "";

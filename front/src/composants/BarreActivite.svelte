@@ -12,11 +12,13 @@
   import { statique } from "../lib/statique";
   import { terminal, arreterServeur } from "../lib/terminal.svelte";
 
+  /** Arrête le serveur du projet après confirmation (ADR-0014) ; l'application affiche ensuite comment le relancer. */
   async function arreter() {
     if (confirm("Arrêter le serveur wikik de ce projet ? Il faudra relancer « wikik » dans le projet pour le rouvrir.")) await arreterServeur();
   }
 
   let { active }: { active: Section | null } = $props();
+  /** Adresse de l'accueil de chaque section ; l'atelier rouvre le parcours affiché. */
   const LIENS: Record<Section, () => string> = {
     accueil: url.accueil,
     produit: url.produit,
@@ -26,6 +28,7 @@
     parametres: url.parametres,
     git: () => url.git(),
   };
+  /** Nombre affiché sur l'icône d'une section : remarques ouvertes en Réception, clarifications ouvertes en Design thinking. */
   const badge = (s: Section): number => {
     if (s === "reception") return reception.etat ? actuelles().filter((r) => r.statut === "ouverte").length : 0;
     if (s === "atelier") return atelier.etat?.clarifications.filter((c) => c.frontmatter.etat === "ouverte").length ?? 0;

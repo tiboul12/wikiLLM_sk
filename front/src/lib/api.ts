@@ -24,6 +24,7 @@ export type RapportCheck = {
   resume: { erreurs: number; avertissements: number; infos: number };
 };
 
+/** GET JSON avec paramètres (les vides sont omis) ; une réponse en erreur lève le message `{erreur}` du serveur. */
 async function lire<T>(chemin: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") q.set(k, String(v));

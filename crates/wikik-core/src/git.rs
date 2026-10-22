@@ -111,6 +111,7 @@ pub struct EtatCommit {
 }
 
 impl Depot {
+    /// Lance git dans le dépôt ; `None` si la commande échoue (git absent, commit inconnu), jamais d'erreur bloquante.
     fn git(&self, args: &[&str]) -> Option<String> {
         let s = Command::new("git")
             .arg("-C")
@@ -224,6 +225,7 @@ pub struct DetailCommit {
     pub fichiers: Vec<FichierCommit>,
 }
 
+/// Hash abrégé ou complet plausible, vérifié avant de le passer à git (une valeur venue de l'écran n'y entre pas telle quelle).
 fn hash_valide(h: &str) -> bool {
     (4..=40).contains(&h.len()) && h.chars().all(|c| c.is_ascii_hexdigit())
 }
@@ -377,6 +379,7 @@ impl Depot {
     }
 }
 
+/// Analyse la sortie `git blame --porcelain` : pour chaque ligne, son commit et la date de ce commit.
 fn analyser_porcelain(texte: &str) -> Vec<LigneBlame> {
     let mut lignes = vec![];
     let mut commit = String::new();

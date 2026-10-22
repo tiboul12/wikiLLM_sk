@@ -13,18 +13,24 @@
     erreur = $bindable(""),
   }: { images?: string[]; gardees?: string[]; principal?: boolean; formulaire: HTMLElement | undefined; erreur?: string } = $props();
 
+  /** Aide de capture ouverte (raccourcis, coller, glisser, choisir un fichier). */
   let aide = $state(false);
+  /** Fichier glissé au-dessus de la tuile, pour la surligner. */
   let survol = $state(false);
+  /** Champ de fichier caché, ouvert par « Choisir un fichier ». */
   let fichier = $state<HTMLInputElement | null>(null);
-  // Lecture directe du presse-papiers : seulement en contexte sécurisé (https, localhost).
+  /** Lecture directe du presse-papiers possible : seulement en contexte sécurisé (https, localhost). */
   const lecturePossible = typeof navigator !== "undefined" && !!navigator.clipboard?.read && window.isSecureContext;
+  /** Système de l'utilisateur, pour montrer ses raccourcis de capture. */
   const systeme = /Mac|iPhone|iPad/.test(navigator.platform) ? "mac" : /Win/.test(navigator.platform) ? "windows" : "linux";
+  /** Raccourcis de capture d'écran par système : touches et ce qu'elles capturent. */
   const RACCOURCIS: Record<string, [string, string][]> = {
     windows: [["Win + Maj + S", "zone de l'écran"], ["Impr. écran", "écran entier"]],
     mac: [["Cmd + Ctrl + Maj + 4", "zone, dans le presse-papiers"], ["Cmd + Ctrl + Maj + 3", "écran entier"]],
     linux: [["Maj + Impr. écran", "zone de l'écran"], ["Impr. écran", "écran entier"]],
   };
 
+  /** Ajoute des images en data URL : PNG, JPEG, GIF ou WebP de 10 Mo au plus, les autres sont refusées avec leur nom. */
   function lire(fichiers: Iterable<File>) {
     for (const f of fichiers) {
       if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) {
@@ -42,6 +48,7 @@
     }
   }
 
+  /** « Coller maintenant » : lit les images du presse-papiers sans Ctrl+V ; un refus du navigateur renvoie vers Ctrl+V. */
   async function collerMaintenant() {
     try {
       const elements = await navigator.clipboard.read();

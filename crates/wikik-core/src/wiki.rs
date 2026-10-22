@@ -199,6 +199,7 @@ pub struct Resultat {
     pub fichier: Option<String>,
 }
 
+/// Entier SQLite en `u32` pour les types exportés au front ; une valeur négative ou trop grande donne 0.
 fn u(v: i64) -> u32 {
     u32::try_from(v).unwrap_or(0)
 }
@@ -306,6 +307,7 @@ struct Resolveur {
 }
 
 impl Resolveur {
+    /// Charge de quoi nommer et classer toutes les cibles de liens : symboles, documents, fichiers et catégorie de chaque document.
     fn charger(index: &Index) -> Result<Resolveur> {
         let c = &index.conn;
         let mut st = c.prepare("SELECT id, fichier, nom_qualifie FROM symboles")?;
@@ -411,6 +413,7 @@ impl Resolveur {
         }
     }
 
+    /// Lien vers un symbole, un document ou un fichier, avec le libellé à afficher ; une cible inconnue reste un lien marqué absent.
     fn lien(&self, id: &str, genre: &str, confiance: &str) -> Lien {
         if let Some((fichier, nq)) = self.symboles.get(id) {
             return Lien {
@@ -451,6 +454,7 @@ impl Resolveur {
     }
 }
 
+/// Arêtes d'un nœud des genres demandés, entrantes ou sortantes : (autre bout, genre, confiance).
 fn aretes(
     index: &Index,
     id: &str,
@@ -476,6 +480,7 @@ fn aretes(
     Ok(v)
 }
 
+/// Balise affichée : `@adr`, `@req`, `@topic` deviennent des liens vers chaque cible citée, les autres restent du texte.
 fn balise_vue(res: &Resolveur, nom: String, valeur: String) -> BaliseVue {
     let cibles = match nom.as_str() {
         "adr" | "req" | "topic" => valeur

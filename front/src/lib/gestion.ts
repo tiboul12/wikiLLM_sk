@@ -9,6 +9,7 @@ export type Carte = { titre: string; detail: string; fait: boolean; date: string
 /** Une colonne du tableau. */
 export type Colonne = { nom: string; cartes: Carte[] };
 
+/** Cellules d'une ligne de tableau Markdown ; un `\|` échappé ne coupe pas la cellule. */
 const cellules = (ligne: string) =>
   ligne
     .trim()

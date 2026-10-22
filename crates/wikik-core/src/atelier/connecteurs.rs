@@ -192,6 +192,7 @@ fn adresses_shelley() -> (String, String) {
     (ollama, llama)
 }
 
+/// Description d'un connecteur par identifiant.
 fn description(id: &str) -> Option<DescriptionConnecteur> {
     connecteurs().into_iter().find(|c| c.id == id)
 }
@@ -201,6 +202,8 @@ pub fn avec_mcp(config: &ConfigLlm) -> bool {
     matches!(config.connecteur().as_str(), "claude" | "cli")
 }
 
+/// Commande à lancer : celle de la configuration, sauf si elle est vide ou si c'est `claude` (valeur par défaut héritée)
+/// pour un autre connecteur.
 fn commande(config: &ConfigLlm, defaut: &str) -> String {
     let c = config.commande.trim();
     // `claude` est la commande par défaut de la configuration : elle ne vaut que pour Claude Code.
@@ -211,6 +214,7 @@ fn commande(config: &ConfigLlm, defaut: &str) -> String {
     }
 }
 
+/// Adresse de l'API : celle de la configuration sans `/` final, sinon celle par défaut du connecteur.
 fn url(config: &ConfigLlm, id: &str) -> String {
     let u = config.url.trim().trim_end_matches('/');
     if u.is_empty() {
@@ -350,6 +354,8 @@ pub fn preparer(config: &ConfigLlm, consigne: &str, schema: &Value, mcp: &str) -
     Ok(appel)
 }
 
+/// Appel HTTP par `curl` : corps JSON envoyé sur l'entrée (jamais en argument, visible dans la liste des processus),
+/// délai maximal, et le corps de la réponse gardé même en erreur HTTP pour expliquer l'échec.
 fn curl(adresse: &str, corps: &Value, delai: u64, lecture: Lecture) -> Appel {
     Appel {
         programme: "curl".into(),
@@ -447,6 +453,7 @@ pub fn lire_sortie(lecture: Lecture, sortie: &str) -> (Option<Value>, Option<Str
     }
 }
 
+/// Extrait de réponse coupé à 300 caractères, pour un message d'erreur lisible.
 fn court(t: &str) -> String {
     let t = t.trim();
     if t.chars().count() > 300 {

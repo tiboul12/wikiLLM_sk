@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::path::Path;
 use wikik_core::Index;
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {
@@ -16,6 +17,7 @@ fn copier(de: &Path, vers: &Path) {
     }
 }
 
+/// Copie de la fixture `ts-mini`.
 fn fixture() -> tempfile::TempDir {
     let d = tempfile::tempdir().unwrap();
     copier(
@@ -25,12 +27,14 @@ fn fixture() -> tempfile::TempDir {
     d
 }
 
+/// Indexe le dossier et rend le contenu de l'index en JSON.
 fn dump(racine: &Path) -> Value {
     let mut i = Index::ouvrir(racine).unwrap();
     i.mettre_a_jour().unwrap();
     i.dump_json().unwrap()
 }
 
+/// Symbole du dump par identifiant ; panique s'il manque, avec l'identifiant.
 fn symbole<'a>(d: &'a Value, id: &str) -> &'a Value {
     d["symboles"]
         .as_array()

@@ -10,6 +10,7 @@ import { statique } from "./statique";
 /** `revision` : avance après chaque écriture ; `message` : bandeau bref (« Annulé : … »). */
 export const edition = $state({ revision: 0, message: "", erreur: false });
 
+/** Minuterie qui efface le message bref ; relancée à chaque nouveau message. */
 let minuterie: ReturnType<typeof setTimeout> | undefined;
 /** Montre un message bref en bas de l'écran. */
 export function signaler(message: string, erreur = false) {
@@ -70,6 +71,7 @@ export const VALIDATIONS: Record<string, [string, string]> = {
   echec: ["échec", "ko"],
 };
 
+/** Résumé d'une annulation renvoyé par le serveur ; `null` s'il n'y avait rien à annuler. */
 type Bilan = { libelle: string; fichiers: string[] } | null;
 
 /** Annule (ou rétablit) la dernière écriture faite depuis wikik. */

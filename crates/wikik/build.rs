@@ -1,6 +1,8 @@
 //! Garantit que `front/dist` existe à la compilation : sans Node, le binaire embarque une page
 //! qui explique comment construire le front (`make front`), au lieu d'échouer.
 
+/// Le binaire embarque `front/dist` : sans front compilé, une page d'attente est créée pour que `cargo build`
+/// passe quand même, et elle dit comment compiler le front.
 fn main() {
     let dist = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../front/dist");
     println!("cargo:rerun-if-changed={}", dist.display());

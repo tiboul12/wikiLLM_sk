@@ -38,6 +38,7 @@ pub struct ConfigIa {
 }
 
 impl Default for ConfigIa {
+    /// Consignes par défaut : interroger wikik avant de lire le code, traiter la réception par un plan validé puis lot par lot ; agent `claude`.
     fn default() -> Self {
         Self {
             consigne_lecture: "Interroger wikik avant d'ouvrir des fichiers source : carte en début de session, symbole puis impact avant de modifier du code ; document pour lire un besoin, une exigence ou une décision par son identifiant.".into(),
@@ -55,6 +56,7 @@ pub struct ConfigReception {
 }
 
 impl Default for ConfigReception {
+    /// Cahier de réception rangé dans `docs/reception`.
     fn default() -> Self {
         Self {
             dossier: "docs/reception".into(),
@@ -93,6 +95,7 @@ pub struct ConfigAtelier {
 }
 
 impl Default for ConfigAtelier {
+    /// Atelier rangé dans `docs/atelier`, version `v1`, LLM par défaut.
     fn default() -> Self {
         Self {
             dossier: "docs/atelier".into(),
@@ -150,6 +153,7 @@ impl ConfigLlm {
 }
 
 impl Default for ConfigLlm {
+    /// LLM par défaut : Claude Code en CLI (`claude`), sans modèle ni effort imposés.
     fn default() -> Self {
         let a = |s: &str| s.to_string();
         Self {
@@ -204,6 +208,7 @@ pub struct ConfigIndex {
 }
 
 impl Default for ConfigIndex {
+    /// Langages indexés par défaut : Rust, TypeScript, JavaScript, Svelte ; rien d'exclu en plus du `.gitignore`.
     fn default() -> Self {
         Self {
             exclure: vec![],
@@ -226,6 +231,7 @@ pub struct ConfigProjet {
 }
 
 impl Default for ConfigProjet {
+    /// Zone Projet dans `docs/projet`.
     fn default() -> Self {
         Self {
             dossier: "docs/projet".into(),
@@ -244,6 +250,7 @@ pub struct ConfigCheck {
 }
 
 impl Default for ConfigCheck {
+    /// Doc exigée sur les symboles publics ; sévérités par défaut de chaque diagnostic.
     fn default() -> Self {
         Self {
             seuil_visibilite: "pub".into(),

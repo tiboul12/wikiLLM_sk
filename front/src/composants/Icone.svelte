@@ -2,6 +2,7 @@
   // Icônes de la barre d'activité, en SVG (aucune police ni ressource externe).
   // @relu 2026-10-22 f825c71a
   let { nom, taille = 22 }: { nom: string; taille?: number } = $props();
+  /** Tracé SVG (attribut `d`, en traits sur 24 × 24) de chaque icône, par nom. */
   const CHEMINS: Record<string, string> = {
     accueil: "M3 10.5 12 3l9 7.5M5 9v11h5v-6h4v6h5V9",
     produit: "M8 6 2 12l6 6M16 6l6 6-6 6M14 4l-4 16",

@@ -25,6 +25,7 @@ pub const DOSSIER: &str = ".wikik";
 /// Fichier déposé par `wikik export` à la racine du site : l'indexation ignore ce dossier.
 pub const MARQUEUR_EXPORT: &str = ".wikik-export";
 
+/// Schéma SQLite de l'index. Changer une table oblige à changer [`crate::SCHEMA`] : l'index existant est alors recréé.
 const SCHEMA_SQL: &str = r#"
 CREATE TABLE meta (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL);
 CREATE TABLE etat (chemin TEXT PRIMARY KEY, taille INTEGER NOT NULL, mtime INTEGER NOT NULL, hash TEXT NOT NULL);
@@ -84,6 +85,7 @@ struct Candidat {
     genre: Genre,
 }
 
+/// Genre d'un fichier candidat : code (rang du langage qui l'extrait) ou document de projet.
 #[derive(Clone, Copy, PartialEq)]
 enum Genre {
     Code(usize),
@@ -270,6 +272,8 @@ impl Index {
         Ok(marcheur)
     }
 
+    /// Fichiers à indexer (code des langages actifs, `.md` des zones de documents), triés, et les crates locales tirées
+    /// des `Cargo.toml`. `.d.ts` et `.min.js` sont sautés : rien à documenter.
     fn lister(&self, langages: &[Box<dyn Langage>]) -> Result<(Vec<Candidat>, String)> {
         let marcheur = self.marcheur()?;
         let zones: Vec<String> = self
@@ -446,6 +450,7 @@ fn crates_locales(manifestes: &[(String, PathBuf)]) -> String {
     Value::Array(liste).to_string()
 }
 
+/// Remplace un fichier de code dans l'index : ligne du fichier, symboles, balises, appels et imports.
 fn ecrire_fichier(
     tx: &rusqlite::Transaction,
     chemin: &str,
@@ -516,6 +521,7 @@ fn ecrire_fichier(
     Ok(())
 }
 
+/// Remplace un document dans l'index ; un identifiant déjà pris garde son chemin comme identifiant, `check` signale le doublon.
 fn ecrire_document(tx: &rusqlite::Transaction, d: &Document) -> Result<()> {
     tx.execute(
         "DELETE FROM liens_doc WHERE source IN (SELECT id FROM documents WHERE chemin = ?1)",
@@ -561,6 +567,7 @@ fn ecrire_document(tx: &rusqlite::Transaction, d: &Document) -> Result<()> {
     Ok(())
 }
 
+/// Reconstruit la table de recherche plein texte à partir des symboles et des documents.
 fn reconstruire_recherche(tx: &rusqlite::Transaction) -> Result<()> {
     tx.execute("DELETE FROM recherche", [])?;
     tx.execute(

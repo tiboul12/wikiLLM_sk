@@ -24,6 +24,7 @@ export const atelier = $state({
   erreur: "",
 });
 
+/** État du parcours affiché, lu sur le serveur. */
 async function lireEtat(): Promise<EtatAtelier> {
   const r = await fetch(`/api/atelier/etat?parcours=${encodeURIComponent(atelier.parcours)}`);
   if (!r.ok) throw new Error(String(r.status));
