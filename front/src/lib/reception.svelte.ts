@@ -7,6 +7,7 @@ import type { Remarque } from "../types/Remarque";
 import type { Page } from "../types/Page";
 import { statique } from "./statique";
 import { adapterHote } from "./atelier.svelte";
+import { url } from "./routeur.svelte";
 
 /** État partagé : `actif` quand le serveur sert le cahier, `etat` (null sinon), `occupe` pendant un appel au LLM. */
 export const reception = $state({
@@ -32,6 +33,17 @@ export async function detecterReception(): Promise<boolean> {
     reception.actif = false;
   }
   return reception.actif;
+}
+
+/**
+ * Lien vers la carte de réception de l'écran dont la route est `t` (`/clarifications`), ou null : une
+ * piste ou une source qui cite un écran de l'application en obtient le lien (REC-071).
+ */
+export function lienRoute(t: string): string | null {
+  const r = t.trim();
+  if (!r.startsWith("/") || !reception.etat) return null;
+  const p = reception.etat.pages.find((x) => x.route === r) ?? reception.etat.pages.find((x) => x.route && r.startsWith(x.route.replace(/[:<[{].*$/, "")) && x.route.length > 1);
+  return p ? url.pageReception(p.cle) : null;
 }
 
 /** Relit l'état du cahier (après une écriture faite ailleurs, ou Ctrl+Z). */

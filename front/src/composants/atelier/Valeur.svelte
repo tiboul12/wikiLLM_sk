@@ -1,7 +1,13 @@
 <script lang="ts">
-  // Affichage lisible d'une valeur de proposition : texte, liste de pastilles (identifiants liés), objet en champs.
+  // Affichage lisible d'une valeur de proposition : texte (identifiants, chemins, symboles et routes d'écran
+  // cités deviennent des liens, REC-071), liste de pastilles liées, objet en champs.
   import Valeur from "./Valeur.svelte";
   import { url } from "../../lib/routeur.svelte";
+  import { autoLien } from "../../lib/connus.svelte";
+  import { lienRoute } from "../../lib/reception.svelte";
+  import { rendre } from "../../lib/markdown";
+
+  const lien = (t: string) => autoLien(t) ?? lienRoute(t);
 
   let { v, cle = "", ordre = [] }: { v: unknown; cle?: string; ordre?: string[] } = $props();
   const HORIZONS: [string, string][] = [["maintenant", "Maintenant"], ["ensuite", "Ensuite"], ["plus_tard", "Plus tard"]];
@@ -33,7 +39,7 @@
 {#if Array.isArray(v)}
   {#if v.every((x) => typeof x === "string")}
     <span class="pastilles">
-      {#each v as x}{#if estId(String(x))}<a class="pastille" href={url.document(String(x))}>{x}</a>{:else}<span class="pastille">{x}</span>{/if}{/each}
+      {#each v as x}{@const h = lien(String(x)) ?? (estId(String(x)) ? url.document(String(x)) : null)}{#if h}<a class="pastille" href={h}>{x}</a>{:else}<span class="pastille">{x}</span>{/if}{/each}
       {#if !v.length}<span class="discret">—</span>{/if}
     </span>
   {:else}
@@ -54,6 +60,9 @@
   </dl>
 {:else if typeof v === "string" && estId(v) && cle !== "titre"}
   <a class="pastille" href={url.document(v)}>{v}</a>
+{:else if typeof v === "string" && v.length > 0}
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+  <span class="texte-lie">{@html rendre(v, lien, undefined, undefined, lien).replace(/^<p>|<\/p>\n?$/g, "")}</span>
 {:else}
   <span class="texte-libre">{v === "" || v == null ? "—" : String(v)}</span>
 {/if}

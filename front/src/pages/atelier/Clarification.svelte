@@ -1,7 +1,8 @@
 <script lang="ts">
   // Clarification d'un sujet (SPEC-21 R4, EF-144) : le sujet, la question, les pistes que le LLM propose en
   // lisant le projet par MCP (demandées d'office à l'ouverture) ; garder, corriger ou rejeter fait la
-  // réponse ; « Clarifié » la clôt avec les pistes gardées. Se reprend, se rouvre, se supprime.
+  // réponse ; « Clarifié » la clôt avec les pistes gardées. Se reprend, se rouvre, se supprime. Une question
+  // jugée hors sujet par le LLM est signalée en tête (EF-162).
   import { atelier, artefact, champ, ecrire } from "../../lib/atelier.svelte";
   import { aller, url } from "../../lib/routeur.svelte";
   import Propositions from "../../composants/atelier/Propositions.svelte";
@@ -12,6 +13,8 @@
   const lot = $derived(atelier.etat?.lots_clarification.find((l) => l.cible === id));
   const gardees = $derived(((c?.frontmatter.pistes as { piste: string }[] | undefined) ?? []).map((p) => p.piste));
   const close = $derived(champ(c, "etat") === "close");
+  // Le LLM juge d'abord la question (REC-064) : hors sujet, il le dit en tête de ses pistes.
+  const horsSujet = $derived(lot?.elements.map((p) => String((p.donnees as Record<string, unknown>).hors_sujet ?? "")).find((t) => t.trim()) ?? "");
   const sujet = $derived(champ(c, "sujet"));
   let erreur = $state("");
 
@@ -47,6 +50,9 @@
 
   <h2>Pistes</h2>
   <p class="discret">Le LLM lit le sujet, ses sources et le projet. Garde, corrige ou rejette : les pistes gardées font la réponse.</p>
+  {#if horsSujet}
+    <div class="hors-sujet" role="note"><strong>Question hors sujet</strong> selon le LLM : {horsSujet}</div>
+  {/if}
   {#if se}<Propositions etape="clarification" {se} cible={id} mode="express" />{/if}
 
   <h2>Réponse</h2>
@@ -65,3 +71,14 @@
   </div>
   {#if erreur}<p class="erreur">{erreur}</p>{/if}
 {/if}
+
+<style>
+  .hors-sujet {
+    padding: 10px 14px;
+    margin: 8px 0 12px;
+    border: 1px solid var(--orange);
+    border-radius: var(--rayon);
+    background: var(--orange-fond);
+    color: var(--texte);
+  }
+</style>

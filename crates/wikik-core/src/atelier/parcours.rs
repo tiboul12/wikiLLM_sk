@@ -101,13 +101,17 @@ pub struct EtatAtelier {
     pub tous_parcours: Vec<ResumeParcours>,
 }
 
-/// Un parcours du projet, pour la liste du volet et de l'accueil.
+/// Un parcours du projet, pour la liste du volet et de l'accueil : un atelier, une session (EF-161).
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct ResumeParcours {
     pub id: String,
+    /// Numéro de session : 1 pour le parcours par défaut, n pour `PARCOURS-n`.
+    pub numero: u32,
     pub titre: String,
     pub version: String,
+    /// `a_faire`, `en_cours`, `termine` ou `archive` : posé à la main, sinon déduit des étapes.
+    pub statut: String,
     /// Étapes faites ou sautées, et nombre d'étapes.
     pub faites: u32,
     pub total: u32,
@@ -228,6 +232,7 @@ fn version_de(index: &Index, p: &Map<String, Value>) -> String {
 }
 
 /// Les parcours du projet : le parcours par défaut, puis `PARCOURS-2`, `PARCOURS-3`… dans l'ordre.
+/// @relu 2026-10-22 cfbbc126
 pub fn lister_parcours(index: &Index) -> Result<Vec<ResumeParcours>> {
     let mut ids = vec![DEFAUT.to_string()];
     let mut numeros: Vec<u32> = std::fs::read_dir(index.racine.join(dossier_atelier(index)))
@@ -265,13 +270,29 @@ pub fn lister_parcours(index: &Index) -> Result<Vec<ResumeParcours>> {
                     })
                     .count() as u32
             });
+            let commencees = p
+                .get("etapes")
+                .and_then(Value::as_object)
+                .map_or(0, |e| e.len());
+            let statut = match p.get("session").and_then(Value::as_str) {
+                Some(s) if !s.is_empty() => s.to_string(),
+                _ if faites >= total => "termine".into(),
+                _ if commencees > 0 => "en_cours".into(),
+                _ => "a_faire".into(),
+            };
             ResumeParcours {
+                numero: numero(&id)
+                    .ok()
+                    .flatten()
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(1),
                 titre: p
                     .get("titre")
                     .and_then(Value::as_str)
                     .unwrap_or("Parcours de l'atelier")
                     .to_string(),
                 version: version_de(index, &p),
+                statut,
                 faites,
                 total,
                 id,
@@ -306,6 +327,38 @@ pub fn creer_parcours(index: &Index, titre: &str, version: &str) -> Result<Strin
     }
     sauver_parcours(index, &pid, &p)?;
     Ok(pid)
+}
+
+/// Modifie le titre, la version documentée et le statut de session d'un atelier (REC-073) ; un statut vide
+/// revient au statut déduit des étapes.
+/// @req EF-161
+pub fn modifier_parcours(
+    index: &Index,
+    pid: &str,
+    titre: &str,
+    version: &str,
+    statut: &str,
+) -> Result<()> {
+    verifier_parcours(index, pid)?;
+    if titre.trim().is_empty() {
+        bail!("donne un titre à l'atelier");
+    }
+    if !matches!(statut, "" | "a_faire" | "en_cours" | "termine" | "archive") {
+        bail!("statut inconnu : {statut} (a_faire, en_cours, termine, archive)");
+    }
+    let mut p = charger_parcours(index, pid);
+    p.insert("titre".into(), json!(titre.trim()));
+    if version.trim().is_empty() {
+        p.remove("version");
+    } else {
+        p.insert("version".into(), json!(version.trim()));
+    }
+    if statut.is_empty() {
+        p.remove("session");
+    } else {
+        p.insert("session".into(), json!(statut));
+    }
+    sauver_parcours(index, pid, &p)
 }
 
 fn sauver_parcours(index: &Index, pid: &str, p: &Map<String, Value>) -> Result<()> {
@@ -425,14 +478,26 @@ fn documents(index: &Index) -> Result<Vec<Doc>> {
 
 /// Documents d'un parcours : ceux qui portent son identifiant, ou aucun pour le parcours par défaut
 /// (besoins et exigences écrits à la main compris, comme avant la v7).
+/// Documents d'un parcours : ceux qui le nomment (`parcours`), et pour le parcours par défaut ceux que
+/// l'atelier a produits (dans son dossier, ou portant la `technique` qui les a faits).
+///
+/// @pitfall Sans ce filtre, le parcours par défaut prenait tous les documents sans champ `parcours` :
+/// les besoins et exigences écrits à la main dans `docs/projet/` remplissaient le bilan d'un atelier
+/// encore vide (REC-076).
+/// @req EF-163
 fn documents_de(index: &Index, pid: &str) -> Result<Vec<Doc>> {
+    let dossier = format!("{}/", dossier_atelier(index));
     Ok(documents(index)?
         .into_iter()
         .filter(|d| {
-            d.fm.get("parcours")
-                .and_then(Value::as_str)
-                .unwrap_or(DEFAUT)
-                == pid
+            let nomme = d.fm.get("parcours").and_then(Value::as_str);
+            match nomme {
+                Some(p) => p == pid,
+                None => {
+                    pid == DEFAUT
+                        && (d.chemin.starts_with(&dossier) || d.fm.get("technique").is_some())
+                }
+            }
         })
         .collect())
 }
@@ -730,7 +795,7 @@ fn verifier_cible<'d>(
 
 /// Construit la demande au LLM pour une sous-étape d'un parcours (sous verrou ; l'appel se fait ensuite
 /// sans). Une clarification, hors parcours, peut viser un document de n'importe quel parcours.
-/// @relu 2026-10-22 d6d347e5
+/// @relu 2026-10-22 3804c376
 pub fn preparer(
     index: &Index,
     pid: &str,
@@ -776,6 +841,13 @@ pub fn preparer(
         "Méthode de lecture du wiki (skill wikik-lecture) :\n{}\n\n",
         crate::skills::corps(&index.racine, &index.config, "wikik-lecture")
     ));
+    // La clarification suit son skill (EF-162) : juger la question avant de proposer des pistes.
+    if fiche.id == "clarification" {
+        c.push_str(&format!(
+            "Méthode de clarification (skill wikik-clarification) :\n{}\n\n",
+            crate::skills::corps(&index.racine, &index.config, "wikik-clarification")
+        ));
+    }
     if let Some(pt) = pitch {
         c.push_str(&format!(
             "Projet : {} — {}\n",

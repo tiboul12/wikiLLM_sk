@@ -23,11 +23,16 @@ use wikik_core::atelier::fournisseur::{Demande, Fournisseur};
 use wikik_core::atelier::parcours;
 
 /// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel, parcours,
-/// clarifications), la recherche assistée par IA (EF-152) et l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
+/// clarifications, modification d'un atelier : EF-161), la recherche assistée par IA (EF-152) et
+/// l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/atelier/etat", get(api_etat))
         .route("/api/atelier/parcours", post(api_parcours))
+        .route(
+            "/api/atelier/parcours/modifier",
+            post(api_modifier_parcours),
+        )
         .route("/api/atelier/clarification", post(api_clarification))
         .route("/api/llm/annuler", post(api_annuler))
         .route("/api/atelier/piloter", post(api_piloter))
@@ -118,6 +123,27 @@ struct NouveauParcours {
 async fn api_parcours(State(e): State<Partage>, Json(p): Json<NouveauParcours>) -> Response {
     ecrire(e, move |i| {
         parcours::creer_parcours(i, &p.titre, &p.version)
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+struct ModificationParcours {
+    parcours: String,
+    titre: String,
+    #[serde(default)]
+    version: String,
+    #[serde(default)]
+    statut: String,
+}
+
+/// Titre, version et statut de session d'un atelier (EF-161).
+async fn api_modifier_parcours(
+    State(e): State<Partage>,
+    Json(p): Json<ModificationParcours>,
+) -> Response {
+    ecrire(e, move |i| {
+        parcours::modifier_parcours(i, &p.parcours, &p.titre, &p.version, &p.statut)
     })
     .await
 }

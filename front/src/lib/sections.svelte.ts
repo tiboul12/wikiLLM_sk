@@ -32,7 +32,7 @@ export const NOMS: Record<Section, string> = {
 };
 
 /** Section d'une page ; `null` pour une page commune à toutes (recherche) ; le graphe est dans Code.
- * @relu 2026-10-22 fa82f7b1
+ * @relu 2026-10-22 86babdae
  */
 export function sectionDe(route: Route, projet: Projet | null): Section | null {
   switch (route.page) {
@@ -45,15 +45,17 @@ export function sectionDe(route: Route, projet: Projet | null): Section | null {
     case "projet":
     case "relecture":
     case "cascade":
+      return "projet";
     case "clarification":
     case "clarifier":
     case "clarifications":
-      return "projet";
+      return "atelier";
     case "document": {
       const zone = projet?.documents.find((d) => d.id === route.id)?.zone;
       const genre = projet?.documents.find((d) => d.id === route.id)?.genre;
-      // Les clarifications vivent dans docs/atelier/ mais se lisent dans Projet (REC-024.2).
-      return zone === "atelier" && genre !== "clarification" ? "atelier" : zone === "reception" ? "reception" : "projet";
+      // Les clarifications font partie du Design thinking (REC-072, REC-074).
+      void genre;
+      return zone === "atelier" ? "atelier" : zone === "reception" ? "reception" : "projet";
     }
     case "atelier":
     case "etape":

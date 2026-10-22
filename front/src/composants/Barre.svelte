@@ -1,10 +1,10 @@
 <script lang="ts">
-  // Panneau latéral de la section active (EF-131, EF-140) : arbre des fichiers (Code), documents par
-  // type (Projet) : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), les plans,
-  // les clarifications par sujet, puis un groupe par type avec ⚙ (skill de structure) et, en orange, ce
-  // qui attend une relecture, compté jusqu'à l'accordéon ; les besoins en cascade avec leurs exigences et
-  // leurs tests (EF-160) ; parcours avec leurs étapes et
-  // « + » pour en ajouter, artefacts (Design thinking), arborescence des pages et remarques (Réception).
+  // Panneau latéral de la section active (EF-131, EF-140). Code : l'arbre des fichiers et le graphe.
+  // Projet : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), les plans, puis un
+  // groupe par type avec ⚙ (skill de structure) et, en orange, ce qui attend une relecture, compté jusqu'à
+  // l'accordéon ; les besoins en cascade avec leurs exigences et leurs tests (EF-160). Design thinking :
+  // les ateliers (numéro, statut, étapes, « + ») puis, à part, les clarifications par sujet (EF-161) et
+  // les artefacts. Réception : l'arborescence des pages et les remarques.
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
   // déplie, centré.
@@ -13,7 +13,7 @@
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
   import { NOMS, type Section } from "../lib/sections.svelte";
-  import { atelier, ETATS, ecrire, sujets } from "../lib/atelier.svelte";
+  import { atelier, ETATS, ecrire, sujets, STATUTS_ATELIER } from "../lib/atelier.svelte";
   import { aller } from "../lib/routeur.svelte";
   import { reception, remarquesDe, arbrePages, visible, type Noeud } from "../lib/reception.svelte";
   import { statique } from "../lib/statique";
@@ -160,7 +160,7 @@
 </script>
 
 {#snippet clarifications()}
-  {#if section === "projet" && atelier.etat}
+  {#if section === "atelier" && atelier.etat}
     <details class="arbre">
       <summary><a class="lien-groupe" href={url.clarifications()} title="Tableau de bord des clarifications">Clarifications</a> <small>{atelier.etat.clarifications.length}</small></summary>
       <ul>
@@ -269,12 +269,12 @@
     {#if section === "atelier" && atelier.etat}
       <details class="arbre">
         <summary>
-          Parcours <small>{atelier.etat.tous_parcours.length}</small>
-          <button class="ajouter" title="Nouveau parcours" aria-label="Nouveau parcours" onclick={(e) => { e.preventDefault(); ajout = !ajout; }}>＋</button>
+          Ateliers <small>{atelier.etat.tous_parcours.length}</small>
+          <button class="ajouter" title="Nouvel atelier (une session)" aria-label="Nouvel atelier" onclick={(e) => { e.preventDefault(); ajout = !ajout; }}>＋</button>
         </summary>
         {#if ajout}
           <form class="ajout-parcours" onsubmit={creerParcours}>
-            <input bind:value={titreParcours} placeholder="Titre du parcours" aria-label="Titre du parcours" />
+            <input bind:value={titreParcours} placeholder="Titre de l'atelier" aria-label="Titre de l'atelier" />
             <input bind:value={versionParcours} placeholder="Version (v2…)" aria-label="Version majeure documentée" />
             <button class="principal" type="submit" disabled={!titreParcours.trim()}>Créer</button>
             {#if erreurParcours}<p class="erreur">{erreurParcours}</p>{/if}
@@ -284,8 +284,8 @@
           {#each atelier.etat.tous_parcours as pc (pc.id)}
             {@const courant = pc.id === atelier.parcours}
             <li>
-              <a href={url.atelier(pc.id)} class:actif={courant && routeur.route.page === "atelier"} title="{pc.id} · version {pc.version}">
-                {pc.titre} <span class="compteur">{pc.faites}/{pc.total}</span>
+              <a href={url.atelier(pc.id)} class:actif={courant && routeur.route.page === "atelier"} title="Atelier n° {pc.numero} · {pc.id} · version {pc.version} · {STATUTS_ATELIER[pc.statut] ?? pc.statut}">
+                <span class="id">n° {pc.numero}</span> {pc.titre} <span class="statut-atelier statut-{pc.statut}" title={STATUTS_ATELIER[pc.statut] ?? pc.statut}></span> <span class="compteur">{pc.faites}/{pc.total}</span>
               </a>
               {#if courant}
                 <ul>
@@ -305,6 +305,8 @@
       </details>
     {/if}
 
+    {#if section === "atelier"}{@render clarifications()}{/if}
+
     {#if section === "reception" && reception.etat}
       <ul class="liens-section">
         <li><a href={url.traitement()} class:actif={actif(url.traitement())}>Traitement des remarques</a></li>
@@ -315,7 +317,6 @@
       </details>
     {/if}
     {#if section === "projet" && !groupes.some(([nom]) => nom === "Gestion")}{@render gestion([])}{/if}
-    {#if !groupes.some(([nom]) => nom === "Plans" || nom === "Gestion")}{@render clarifications()}{/if}
     {#each groupes as [nom, g]}
       {#if nom === "Gestion" && section === "projet"}
         {@render gestion(g.docs)}
@@ -358,7 +359,6 @@
         </ul>
       </details>
       {/if}
-      {#if nom === "Plans" || (nom === "Gestion" && !groupes.some(([n]) => n === "Plans"))}{@render clarifications()}{/if}
     {:else}
       {#if section === "projet"}<p class="discret">Aucun document : <code>wikik nouveau besoin "…"</code>, ou le Design thinking.</p>{/if}
     {/each}

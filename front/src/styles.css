@@ -645,3 +645,9 @@ a.reprendre { margin-left: auto; }
 .barre .favori a { flex: 1; min-width: 0; }
 .barre .favori .retirer { border: none; background: none; color: var(--texte-2); cursor: pointer; opacity: 0; padding: 0 6px; }
 .barre .favori:hover .retirer { opacity: 1; }
+
+/* Statut de session d'un atelier (EF-161) : une pastille de couleur. */
+.statut-atelier { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--gris); vertical-align: middle; }
+.statut-atelier.statut-en_cours { background: var(--orange); }
+.statut-atelier.statut-termine { background: var(--vert); }
+.statut-atelier.statut-archive { background: var(--bord-fort); }

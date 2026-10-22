@@ -112,6 +112,9 @@ export function adapterHote(adresse: string): string {
   }
 }
 
+/** Statut de session d'un atelier (EF-161). */
+export const STATUTS_ATELIER: Record<string, string> = { a_faire: "à faire", en_cours: "en cours", termine: "terminé", archive: "archivé" };
+
 /** Artefacts d'un type, dans l'ordre des identifiants. */
 export function deType(genre: string | null | undefined): ArtefactResume[] {
   return (atelier.etat?.artefacts ?? []).filter((a) => a.type === genre);
