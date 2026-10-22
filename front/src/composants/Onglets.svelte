@@ -2,6 +2,7 @@
   // Barre d'onglets au-dessus du contenu (EF-151) : un clic affiche l'onglet, × ou clic du milieu le ferme,
   // l'icône ↗ le détache dans une fenêtre ; ☆ met la page en favori (EF-157) ; on les réordonne en les
   // glissant.
+  // @relu 2026-10-22 27037316
   import { onglets, activer, fermer, deplacer, detacher } from "../lib/onglets.svelte";
   import { estFavori, basculerFavori } from "../lib/edition.svelte";
   import { statique } from "../lib/statique";
