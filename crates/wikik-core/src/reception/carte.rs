@@ -801,7 +801,7 @@ fn ecrire_avec(
     }
     let chemin = index.racine.join(chemin_carte(index));
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(chemin, crate::atelier::artefacts::formater(&fm, &corps))?;
+    crate::journal::ecrire(chemin, crate::atelier::artefacts::formater(&fm, &corps))?;
     Ok(())
 }
 

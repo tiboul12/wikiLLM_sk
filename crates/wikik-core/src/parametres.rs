@@ -55,6 +55,7 @@ impl Parametres {
 /// Écrit les paramètres dans `<racine>/wikik.toml` (créé au besoin) et renvoie la configuration relue.
 /// Le fichier n'est remplacé que si la nouvelle configuration se charge. Une consigne d'avant la v8
 /// (`[ia] consigne_lecture`, `consigne_traitement`) passe dans son skill et quitte le fichier.
+/// @relu 2026-10-22 1d700fc5
 pub fn ecrire(racine: &Path, p: &Parametres) -> Result<Config> {
     let connus = crate::atelier::connecteurs::connecteurs();
     if !connus.iter().any(|c| c.id == p.connecteur) {
@@ -96,7 +97,7 @@ pub fn ecrire(racine: &Path, p: &Parametres) -> Result<Config> {
     nettoyer(&mut doc);
     let texte = doc.to_string();
     let config: Config = toml::from_str(&texte).context("paramètres refusés")?;
-    std::fs::write(&chemin, texte)?;
+    crate::journal::ecrire(&chemin, texte)?;
     Ok(config)
 }
 

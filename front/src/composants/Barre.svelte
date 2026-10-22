@@ -1,6 +1,8 @@
 <script lang="ts">
-  // Panneau latéral de la section active (EF-131, EF-140) : arbre des fichiers (Produit), documents par
-  // type, la gestion en tête puis les clarifications par sujet (Projet), parcours avec leurs étapes et
+  // Panneau latéral de la section active (EF-131, EF-140) : arbre des fichiers (Code), documents par
+  // type (Projet) : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), les plans,
+  // les clarifications par sujet, puis un groupe par type avec ⚙ (skill de structure) et, en orange, ce
+  // qui attend une relecture, compté jusqu'à l'accordéon ; parcours avec leurs étapes et
   // « + » pour en ajouter, artefacts (Design thinking), arborescence des pages et remarques (Réception).
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
@@ -13,16 +15,19 @@
   import { atelier, ETATS, ecrire, sujets } from "../lib/atelier.svelte";
   import { aller } from "../lib/routeur.svelte";
   import { reception, remarquesDe, arbrePages, visible, type Noeud } from "../lib/reception.svelte";
+  import { statique } from "../lib/statique";
   import { tick } from "svelte";
+  import { api } from "../lib/api";
+  import { aRelire as aRelireDe, tachesBacklog, favoris, basculerFavori, edition } from "../lib/edition.svelte";
 
   let { projet, section }: { projet: Projet; section: Section } = $props();
   // Parcours et clarifications ont leur arbre : ils ne sont pas répétés dans les groupes de documents.
   const docsDe = (zone: string) => projet.documents.filter((d) => d.zone === zone && (zone !== "atelier" || !["parcours", "clarification"].includes(d.genre)));
 
-  // La gestion (backlog, plans) vient en tête du volet Projet (REC-017.2).
+  // La gestion vient en tête du volet Projet (REC-017.2, REC-051) ; les plans ont leur groupe.
   const ORDRE: Record<string, [number, string]> = {
-    backlog: [-1, "Gestion"],
-    plan: [-1, "Gestion"],
+    backlog: [-2, "Gestion"],
+    plan: [-1, "Plans"],
     "bdr-analyse": [1, "BDR"],
     "bdr-definition": [1, "BDR"],
     "cahier-des-charges": [2, "Cahier des charges"],
@@ -73,7 +78,34 @@
   const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception };
   const titreDoc = (id: string) => projet.documents.find((d) => d.id === id)?.titre ?? "";
   const groupesClar = $derived(atelier.etat ? sujets(titreDoc) : []);
-  const aRelire = $derived(projet.documents.filter((d) => d.zone === "projet" && (d.statut === "proposé" || d.statut === "brouillon")));
+  const aRelire = $derived(aRelireDe(projet.documents));
+  const ouvertes = $derived(atelier.etat?.clarifications.filter((c) => c.frontmatter.etat === "ouverte").length ?? 0);
+
+  // Tâches du backlog à la charge de l'utilisateur (REC-048), relues avec le projet.
+  const backlog = $derived(projet.documents.find((d) => d.genre === "backlog"));
+  let taches = $state<string[]>([]);
+  $effect(() => {
+    edition.revision;
+    if (section !== "projet" || !backlog) return;
+    api
+      .document(backlog.id)
+      .then((d) => (taches = tachesBacklog(d.corps)))
+      .catch(() => (taches = []));
+  });
+  const enAttente = $derived(taches.length + aRelire.length + ouvertes);
+
+  // ⚙ d'un groupe : le skill qui dit comment ses documents sont structurés (REC-054).
+  const SKILL_DE: Record<string, string> = {
+    BDR: "wikik-structure-bdr",
+    "Cahier des charges": "wikik-structure-cahier-des-charges",
+    Besoins: "wikik-structure-besoin",
+    Exigences: "wikik-structure-exigence",
+    "Exigences non fonctionnelles": "wikik-structure-exigence",
+    "Décisions (ADR)": "wikik-structure-adr",
+    Specs: "wikik-structure-spec",
+    Tests: "wikik-structure-test",
+  };
+  const aRelireIds = $derived(new Set(aRelire.map((d) => d.id)));
 
   // « + » du groupe Parcours (REC-039) : titre et version du nouveau parcours.
   let ajout = $state(false);
@@ -149,6 +181,40 @@
       </ul>
     </details>
   {/if}
+{/snippet}
+
+{#snippet gestion(docs: DocumentResume[])}
+  <details class="arbre">
+    <summary>Gestion {#if enAttente}<span class="compteur faible" title="{enAttente} élément(s) attendent ta décision">{enAttente}</span>{/if}</summary>
+    <ul>
+      {#each docs as d (d.id)}
+        {@const href = url.document(d.id)}
+        <li><a {href} class:actif={actif(href)} title={d.titre}><span class="id">{d.id}</span> {d.titre === d.id ? "" : d.titre}{#if d.genre === "backlog" && taches.length}<span class="compteur faible" title="tâches à ta charge">{taches.length}</span>{/if}</a></li>
+      {/each}
+      <li>
+        <details class="sous-groupe">
+          <summary>À traiter {#if enAttente}<span class="compteur faible">{enAttente}</span>{/if}</summary>
+          <ul>
+            {#if backlog}<li><a href={url.document(backlog.id)} title={taches.join("\n")}>Tâches du backlog à ta charge <span class="compteur" class:faible={taches.length > 0}>{taches.length}</span></a></li>{/if}
+            <li><a href={url.relecture()} class:actif={actif(url.relecture())}>Documents à relire <span class="compteur" class:faible={aRelire.length > 0}>{aRelire.length}</span></a></li>
+            {#if atelier.etat}<li><a href={url.clarifications()}>Clarifications ouvertes <span class="compteur" class:faible={ouvertes > 0}>{ouvertes}</span></a></li>{/if}
+          </ul>
+        </details>
+      </li>
+      <li>
+        <details class="sous-groupe">
+          <summary>Favoris <small>{favoris.liste.length}</small></summary>
+          <ul>
+            {#each favoris.liste as f (f.url)}
+              <li class="favori"><a href={f.url} class:actif={actif(f.url)} title={f.titre}>★ {f.titre}</a><button class="retirer" title="Retirer des favoris" aria-label="Retirer des favoris" onclick={() => basculerFavori(f.url, f.titre)}>×</button></li>
+            {:else}
+              <li class="discret">Aucun : ☆ sur l'onglet d'une page pour l'ajouter.</li>
+            {/each}
+          </ul>
+        </details>
+      </li>
+    </ul>
+  </details>
 {/snippet}
 
 {#snippet branche(noeuds: Noeud[])}
@@ -246,28 +312,33 @@
         {@render branche(arbre)}
       </details>
     {/if}
-    {#if section === "projet"}
-      {@const n = aRelire.length}
-      <ul class="liens-section">
-        <li><a href={url.relecture()} class:actif={actif(url.relecture())}>À relire {#if n}<span class="compteur faible">{n}</span>{/if}</a></li>
-      </ul>
-    {/if}
-    {#if !groupes.some(([nom]) => nom === "Gestion")}{@render clarifications()}{/if}
+    {#if section === "projet" && !groupes.some(([nom]) => nom === "Gestion")}{@render gestion([])}{/if}
+    {#if !groupes.some(([nom]) => nom === "Plans" || nom === "Gestion")}{@render clarifications()}{/if}
     {#each groupes as [nom, g]}
+      {#if nom === "Gestion" && section === "projet"}
+        {@render gestion(g.docs)}
+      {:else}
+      {@const attente = g.docs.filter((d) => aRelireIds.has(d.id)).length}
       <details>
-        <summary>{nom} <small>{g.docs.length}</small></summary>
+        <summary>
+          {nom} <small>{g.docs.length}</small>
+          {#if attente}<span class="compteur faible" title="{attente} à relire">{attente}</span>{/if}
+          {#if section === "projet" && SKILL_DE[nom] && !statique}<a class="reglage" href={url.parametres() + "#skill-" + SKILL_DE[nom]} title="Comment sont structurés ces documents (skill {SKILL_DE[nom]})" aria-label="Structure de la section">⚙</a>{/if}
+        </summary>
         <ul>
           {#each g.docs as d}
             {@const href = url.document(d.id)}
             <li>
               <a {href} class:actif={actif(href)} title={d.titre}>
                 <span class="id">{d.id}</span> {d.titre === d.id ? "" : d.titre}
+                {#if aRelireIds.has(d.id)}<span class="compteur faible" title="à relire">●</span>{/if}
               </a>
             </li>
           {/each}
         </ul>
       </details>
-      {#if nom === "Gestion"}{@render clarifications()}{/if}
+      {/if}
+      {#if nom === "Plans" || (nom === "Gestion" && !groupes.some(([n]) => n === "Plans"))}{@render clarifications()}{/if}
     {:else}
       {#if section === "projet"}<p class="discret">Aucun document : <code>wikik nouveau besoin "…"</code>, ou le Design thinking.</p>{/if}
     {/each}

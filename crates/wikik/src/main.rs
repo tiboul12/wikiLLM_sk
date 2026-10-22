@@ -9,6 +9,7 @@ use wikik_core::Index;
 mod acces;
 mod atelier;
 mod detache;
+mod edition;
 mod export;
 mod mcp;
 mod parametres;

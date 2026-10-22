@@ -161,14 +161,15 @@ pub fn rouvrir(index: &Index, id: &str) -> Result<()> {
 }
 
 /// Supprime une clarification (REC-032) : son fichier et ses propositions en attente.
+/// @relu 2026-10-22 d7754c38
 pub fn supprimer(index: &Index, id: &str) -> Result<()> {
     let c = clarification(index, id)?;
-    std::fs::remove_file(index.racine.join(&c.chemin))?;
+    crate::journal::supprimer(index.racine.join(&c.chemin))?;
     let lot = parcours::travail(&index.racine)
         .join("propositions")
         .join(format!("clarification__reponse__{id}.json"));
     if lot.exists() {
-        std::fs::remove_file(lot)?;
+        crate::journal::supprimer(lot)?;
     }
     Ok(())
 }

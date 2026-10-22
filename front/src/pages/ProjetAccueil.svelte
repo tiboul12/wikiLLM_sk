@@ -1,9 +1,11 @@
 <script lang="ts">
   // Accueil de la section Projet (EF-131, EF-142) : les documents par type, ceux qui attendent une
   // relecture (la tuile mène à la liste complète), et les versions majeures (BDR, cahier des charges, plan).
+  // @relu 2026-10-22 8c040df4
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { url } from "../lib/routeur.svelte";
+  import { aRelire as aRelireDe } from "../lib/edition.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
   const docs = $derived((projet?.documents ?? []).filter((d) => d.zone === "projet"));
@@ -15,7 +17,7 @@
     ["spec", "Specs"],
   ];
   const deType = (g: string) => docs.filter((d) => d.genre === g);
-  const aRelire = $derived(docs.filter((d) => d.statut === "proposé" || d.statut === "brouillon"));
+  const aRelire = $derived(aRelireDe(projet?.documents ?? []));
   // Versions majeures : documents rangés sous `majeures/<version>/`.
   const majeures = $derived.by(() => {
     const m = new Map<string, DocumentResume[]>();
@@ -37,7 +39,7 @@
   {#each TYPES as [g, nom]}
     <div class="tuile"><span class="valeur">{deType(g).length}</span><span class="nom">{nom}</span></div>
   {/each}
-  <a class="tuile lien-tuile" class:alerte={aRelire.length > 0} href={url.relecture()}><span class="valeur">{aRelire.length}</span><span class="nom">à relire (proposé) →</span></a>
+  <a class="tuile lien-tuile" class:alerte={aRelire.length > 0} href={url.relecture()}><span class="valeur">{aRelire.length}</span><span class="nom">à relire →</span></a>
 </div>
 
 {#if majeures.length}

@@ -34,6 +34,11 @@ export async function detecterReception(): Promise<boolean> {
   return reception.actif;
 }
 
+/** Relit l'état du cahier (après une écriture faite ailleurs, ou Ctrl+Z). */
+export async function recharger() {
+  reception.etat = await lireEtat();
+}
+
 /** POST JSON vers une route du cahier, puis rechargement de l'état ; l'erreur du serveur est levée. */
 export async function ecrireReception<T = unknown>(route: string, corps: unknown = {}): Promise<T> {
   reception.erreur = "";

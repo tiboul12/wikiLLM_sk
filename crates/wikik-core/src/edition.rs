@@ -1,0 +1,111 @@
+//! Édition des documents dans le navigateur (ADR-0016, EF-158) : lire le fichier tel quel, le remplacer en
+//! entier (frontmatter et corps), ou changer son statut (« Valider » de la relecture) sans toucher au reste.
+//! Seuls les documents de l'index, sous une zone de documents et en `.md`, s'écrivent ; chaque écriture
+//! passe par le journal d'annulation.
+//!
+//! @req EF-158
+//! @adr 16
+
+use crate::index::Index;
+use anyhow::{Context, Result, bail};
+use rusqlite::OptionalExtension;
+use std::path::PathBuf;
+
+/// Chemin (relatif) d'un document de l'index, vérifié : dans une zone de documents, en `.md`.
+fn chemin(index: &Index, id: &str) -> Result<(String, PathBuf)> {
+    let rel: String = index
+        .conn
+        .query_row("SELECT chemin FROM documents WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })
+        .optional()?
+        .with_context(|| format!("document inconnu : {id}"))?;
+    let zones = index.config.zones_documents();
+    if !rel.ends_with(".md")
+        || rel.contains("..")
+        || !zones.iter().any(|z| rel.starts_with(&format!("{z}/")))
+    {
+        bail!("{rel} n'est pas un document modifiable");
+    }
+    Ok((rel.clone(), index.racine.join(rel)))
+}
+
+/// Texte complet du document (frontmatter compris) et son chemin relatif.
+pub fn source(index: &Index, id: &str) -> Result<(String, String)> {
+    let (rel, abs) = chemin(index, id)?;
+    Ok((rel, std::fs::read_to_string(abs)?))
+}
+
+/// Remplace le document par `texte`. Le frontmatter doit rester lisible et garder son `id`.
+pub fn ecrire(index: &Index, id: &str, texte: &str) -> Result<String> {
+    let (rel, abs) = chemin(index, id)?;
+    if let Some(fm) = frontmatter(texte) {
+        let v: serde_yaml_ng::Value =
+            serde_yaml_ng::from_str(fm).context("frontmatter illisible")?;
+        let garde = v.get("id").and_then(|x| x.as_str());
+        if garde.is_some_and(|g| g != id) {
+            bail!("l'identifiant du frontmatter doit rester {id}");
+        }
+    }
+    let mut t = texte.replace("\r\n", "\n");
+    if !t.ends_with('\n') {
+        t.push('\n');
+    }
+    crate::journal::ecrire(abs, t)?;
+    Ok(rel)
+}
+
+/// Change le statut du document (`validé`, `proposé`…) dans son frontmatter, sans toucher au reste.
+pub fn changer_statut(index: &Index, id: &str, statut: &str) -> Result<String> {
+    let statut = statut.trim();
+    if statut.is_empty() || statut.contains(['\n', ':']) {
+        bail!("statut invalide : {statut}");
+    }
+    let (_, texte) = source(index, id)?;
+    ecrire(index, id, &avec_champ(&texte, "statut", statut))
+}
+
+/// Pose `cle: valeur` dans le frontmatter (ligne remplacée, ou ajoutée avant la fermeture).
+pub fn avec_champ(texte: &str, cle: &str, valeur: &str) -> String {
+    let Some(fm) = frontmatter(texte) else {
+        return format!("---\n{cle}: {valeur}\n---\n\n{texte}");
+    };
+    let debut = texte.find(fm).unwrap_or(4);
+    let mut lignes: Vec<String> = fm.lines().map(str::to_string).collect();
+    let prefixe = format!("{cle}:");
+    match lignes.iter_mut().find(|l| l.starts_with(&prefixe)) {
+        Some(l) => *l = format!("{cle}: {valeur}"),
+        None => lignes.push(format!("{cle}: {valeur}")),
+    }
+    format!(
+        "{}{}\n{}",
+        &texte[..debut],
+        lignes.join("\n"),
+        texte[debut + fm.len()..].trim_start_matches('\n')
+    )
+}
+
+/// Contenu du frontmatter (entre les deux `---`), sans les séparateurs.
+fn frontmatter(texte: &str) -> Option<&str> {
+    let reste = texte.strip_prefix("---\n")?;
+    let fin = reste.find("\n---")?;
+    Some(&reste[..fin])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn champ_remplace_ou_ajoute() {
+        let t = "---\nid: B-1\nstatut: proposé\n---\n\n# B-1\n";
+        assert_eq!(
+            avec_champ(t, "statut", "validé"),
+            "---\nid: B-1\nstatut: validé\n---\n\n# B-1\n"
+        );
+        assert_eq!(
+            avec_champ("---\nid: B-1\n---\n# B\n", "statut", "validé"),
+            "---\nid: B-1\nstatut: validé\n---\n# B\n"
+        );
+    }
+}

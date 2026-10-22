@@ -1,7 +1,10 @@
 <script lang="ts">
   // Barre d'onglets au-dessus du contenu (EF-151) : un clic affiche l'onglet, × ou clic du milieu le ferme,
-  // l'icône ↗ le détache dans une fenêtre ; on les réordonne en les glissant.
+  // l'icône ↗ le détache dans une fenêtre ; ☆ met la page en favori (EF-157) ; on les réordonne en les
+  // glissant.
   import { onglets, activer, fermer, deplacer, detacher } from "../lib/onglets.svelte";
+  import { estFavori, basculerFavori } from "../lib/edition.svelte";
+  import { statique } from "../lib/statique";
 
   let glisse = $state<number | null>(null);
   let cible = $state<number | null>(null);
@@ -39,6 +42,12 @@
         onkeydown={(e) => e.key === "Enter" && activer(i)}
       >
         <span class="titre-onglet">{o.titre}</span>
+        {#if !statique}
+          {@const fav = estFavori(o.url)}
+          <button class="action-onglet" class:favori={fav} title={fav ? "Retirer des favoris" : "Mettre en favori"} aria-label={fav ? "Retirer des favoris" : "Mettre en favori"} aria-pressed={fav} onclick={(e) => { e.stopPropagation(); basculerFavori(o.url, o.titre); }}
+            ><svg width="12" height="12" viewBox="0 0 24 24" fill={fav ? "currentColor" : "none"} stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z" /></svg></button
+          >
+        {/if}
         <button class="action-onglet" title="Détacher dans une fenêtre" aria-label="Détacher" onclick={(e) => { e.stopPropagation(); detacher(i); }}
           ><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg></button
         >
@@ -103,6 +112,10 @@
   }
   .onglet:hover .action-onglet,
   .onglet.actif .action-onglet {
+    opacity: 1;
+  }
+  .action-onglet.favori {
+    color: var(--orange);
     opacity: 1;
   }
   .action-onglet:hover {

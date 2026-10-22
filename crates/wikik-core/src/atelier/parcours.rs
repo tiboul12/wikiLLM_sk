@@ -390,7 +390,7 @@ fn sauver_lot(index: &Index, pid: &str, lot: &Lot) -> Result<()> {
         &cle_lot(pid, &lot.etape, &lot.sous_etape, lot.cible.as_deref()),
     );
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(chemin, serde_json::to_string_pretty(lot)?)?;
+    crate::journal::ecrire(chemin, serde_json::to_string_pretty(lot)?)?;
     Ok(())
 }
 
@@ -1504,7 +1504,7 @@ fn ecrire_genere(index: &Index, relatif: &str, fm: Map<String, Value>, corps: &s
     let mut fm = fm;
     fm.insert("genere_par".into(), json!("atelier"));
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(chemin, artefacts::formater(&fm, corps))?;
+    crate::journal::ecrire(chemin, artefacts::formater(&fm, corps))?;
     Ok(())
 }
 

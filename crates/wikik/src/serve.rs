@@ -111,7 +111,8 @@ pub fn servir(
     lancer(routes(etat.clone()), ip, port, &racine, &cle, etat)
 }
 
-/// Toutes les routes : lecture du wiki, atelier, réception, paramètres, terminal ; écritures gardées
+/// Toutes les routes : lecture du wiki, atelier, réception, paramètres, terminal, édition (une action du
+/// journal d'annulation par requête d'écriture, ADR-0016) ; écritures gardées
 /// (corps JSON, même origine, 25 Mo au plus pour les captures) ; paramètres et terminal réservés au
 /// propriétaire (ADR-0013), comme le bouton d'arrêt (ADR-0014).
 pub(crate) fn routes(etat: Partage) -> Router {
@@ -120,6 +121,7 @@ pub(crate) fn routes(etat: Partage) -> Router {
         .merge(crate::reception::routes())
         .merge(crate::parametres::routes(etat.clone()))
         .merge(crate::terminal::routes(etat.clone()))
+        .merge(crate::edition::routes(etat.clone()))
         .merge(
             Router::new()
                 .route("/api/serveur/arreter", axum::routing::post(api_arreter))
@@ -130,6 +132,7 @@ pub(crate) fn routes(etat: Partage) -> Router {
         )
         // Le front aussi passe par les gardes : `/?cle=…` (adresse du lancement) pose le cookie.
         .fallback(statique)
+        .layer(axum::middleware::from_fn(crate::edition::action))
         .layer(axum::extract::DefaultBodyLimit::max(25 * 1024 * 1024))
         .layer(axum::middleware::from_fn(crate::atelier::meme_origine))
         .layer(axum::middleware::from_fn_with_state(

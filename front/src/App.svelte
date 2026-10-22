@@ -4,7 +4,8 @@
   // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler ;
   // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal ; après le
   // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Les pages ouvertes ont leurs onglets au-dessus
-  // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153). Le serveur du projet sert les quatre sections
+  // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153) ;
+  // Ctrl+Z / Ctrl+Y annulent ou rétablissent la dernière écriture, puis tout est relu (EF-159). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   // @relu 2026-10-22 58c85d1b
   import { untrack } from "svelte";
@@ -40,6 +41,9 @@
   import { terminal, chargerParametres } from "./lib/terminal.svelte";
   import Onglets from "./composants/Onglets.svelte";
   import { precharger } from "./lib/graphe";
+  import { edition, raccourcis, chargerFavoris } from "./lib/edition.svelte";
+  import { recharger as rechargerAtelier } from "./lib/atelier.svelte";
+  import { recharger as rechargerReception } from "./lib/reception.svelte";
   import { detachee, suivre, titreDe, ouvrir } from "./lib/onglets.svelte";
   import { nouvelOnglet } from "./lib/routeur.svelte";
 
@@ -48,15 +52,28 @@
   let saisie = $state("");
   let barreOuverte = $state(false);
 
-  api
-    .projet()
-    .then((p) => {
-      projet = p;
-      projetCourant.nom = p.nom;
-      retenir(p);
-      document.title = `${p.nom} · wikik`;
-    })
-    .catch((e) => (erreur = String(e)));
+  function chargerProjet() {
+    api
+      .projet()
+      .then((p) => {
+        projet = p;
+        projetCourant.nom = p.nom;
+        retenir(p);
+        document.title = `${p.nom} · wikik`;
+      })
+      .catch((e) => (erreur = String(e)));
+  }
+  chargerProjet();
+  chargerFavoris();
+  // Après une écriture (édition, validation, Ctrl+Z) : projet, atelier et réception relus (EF-159).
+  $effect(() => {
+    if (!edition.revision) return;
+    untrack(() => {
+      chargerProjet();
+      if (atelier.actif) rechargerAtelier().catch(() => {});
+      if (reception.actif) rechargerReception().catch(() => {});
+    });
+  });
   detecter().then((ok) => ok && choisirParcours(parcoursDeUrl()));
   // Le graphe global et sa disposition se préparent en tâche de fond (REC-045).
   precharger();
@@ -177,6 +194,7 @@
   <div class="colonne">
   {#if !detachee}<Onglets />{/if}
   <main class="contenu">
+    {#key edition.revision}
     {#if routeur.route.page === "fichier"}
       {#key routeur.route.chemin}<PageFichier chemin={routeur.route.chemin} ancre={routeur.route.ancre} />{/key}
     {:else if routeur.route.page === "document"}
@@ -214,10 +232,13 @@
     {:else if routeur.route.page === "reception"}
       {#if reception.etat}<CahierReception />{:else}<p class="discret">Chargement…</p>{/if}
     {/if}
+    {/key}
   </main>
   </div>
 </div>
 {#if terminal.ouvert}<PanneauTerminal bind:largeur={largeurTerminal} />{/if}
+<svelte:window onkeydown={raccourcis} />
+{#if edition.message}<div class="message-bref" class:erreur={edition.erreur} role="status">{edition.message}</div>{/if}
 {#if terminal.arrete}
   <div class="serveur-arrete" role="alertdialog" aria-label="Serveur arrêté">
     <div>

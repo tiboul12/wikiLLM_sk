@@ -2,7 +2,8 @@
   // Page document (EF-042, EF-143) : frontmatter, corps Markdown (images relatives servies par
   // `/api/image`), liens résolus, identifiants et chemins cités liés d'office, ce qui le cite ; liens vers
   // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21), « Reprendre » pour une clarification.
-  // Un plan ou le backlog s'ouvre en tableau à colonnes.
+  // Un plan ou le backlog s'ouvre en tableau à colonnes. Le propriétaire peut le valider ou l'éditer en
+  // entier (EF-158) ; `?editer=1` ouvre directement l'éditeur (« Corriger » de la relecture).
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -14,6 +15,10 @@
   import { autoLien } from "../lib/connus.svelte";
   import { colonnesPlan, colonnesBacklog } from "../lib/gestion";
   import Kanban from "../composants/Kanban.svelte";
+  import Editeur from "../composants/Editeur.svelte";
+  import { terminal } from "../lib/terminal.svelte";
+  import { GENRES_A_RELIRE, changerStatut, signaler } from "../lib/edition.svelte";
+  import { statique } from "../lib/statique";
 
   let { id, ancre }: { id: string; ancre: string } = $props();
   let page = $state<PageDocument | null>(null);
@@ -46,6 +51,16 @@
   });
   const colonnes = $derived(page?.genre === "plan" ? colonnesPlan(page.corps) : page?.genre === "backlog" ? colonnesBacklog(page.corps) : null);
   let vue = $state<"tableau" | "document">("tableau");
+  let edite = $state(!statique && new URLSearchParams(location.search).get("editer") === "1");
+  const aValider = $derived(page && GENRES_A_RELIRE.includes(page.genre) && (page.statut === "proposé" || page.statut === "brouillon"));
+  async function valider() {
+    if (!page) return;
+    try {
+      await changerStatut(page.id, page.genre === "adr" ? "accepté" : "validé");
+    } catch (e) {
+      signaler(String(e instanceof Error ? e.message : e), true);
+    }
+  }
 
   $effect(() => {
     if (!corps || !html) return;
@@ -85,7 +100,14 @@
     {#if page.genre === "clarification" && lienAtelier("/")}<a class="bouton principal reprendre" href={url.clarification(page.id)}>Reprendre la clarification →</a>
     {:else if ouvrir}<a class="action atelier" href={ouvrir}>ouvrir dans le Design thinking</a>{/if}
     {#if clarifier}<a class="action atelier" href={clarifier}>clarifier</a>{/if}
+    {#if terminal.proprietaire && !statique}
+      <span class="gestes-document">
+        {#if aValider}<button class="valider-doc" onclick={valider} title="Passer à « {page.genre === 'adr' ? 'accepté' : 'validé'} » (Ctrl+Z pour annuler)">✓ Valider</button>{/if}
+        {#if !edite}<button class="editer-doc" onclick={() => (edite = true)} title="Modifier tout le document, frontmatter compris">✎ Éditer</button>{/if}
+      </span>
+    {/if}
   </div>
+  {#if edite}<Editeur id={page.id} fermer={() => (edite = false)} />{/if}
   {#if colonnes}
     <div class="bascule vue-gestion" role="group" aria-label="Affichage">
       <button class:actif={vue === "tableau"} onclick={() => (vue = "tableau")}>Tableau</button>
@@ -93,7 +115,7 @@
     </div>
     {#if vue === "tableau"}<Kanban {colonnes} resoudre={autoLien} />{/if}
   {/if}
-  <article class="prose document" class:cache={colonnes && vue === "tableau"} bind:this={corps}>{@html html}</article>
+  <article class="prose document" class:cache={edite || (colonnes && vue === "tableau")} bind:this={corps}>{@html html}</article>
   {#if page.cite_par.length || page.references.length}
     <section class="cite-par">
       {#if page.cite_par.length}
@@ -109,3 +131,30 @@
 {:else}
   <p class="discret">Chargement…</p>
 {/if}
+
+<style>
+  .gestes-document {
+    display: inline-flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .valider-doc,
+  .editer-doc {
+    padding: 3px 10px;
+    border-radius: var(--rayon);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .valider-doc {
+    border: 1px solid var(--vert);
+    background: var(--vert-fond);
+    color: var(--vert);
+  }
+  .editer-doc {
+    border: 1px solid var(--bord-fort);
+    background: var(--fond-2);
+    color: var(--texte);
+  }
+</style>

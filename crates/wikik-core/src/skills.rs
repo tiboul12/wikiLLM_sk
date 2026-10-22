@@ -227,6 +227,7 @@ pub fn lister(racine: &Path, config: &Config) -> Vec<Skill> {
 ///
 /// @pitfall Le dossier du skill peut être un lien symbolique (`.claude/skills/wikik` → `skill/` dans
 /// wikiK lui-même) : on écrit à travers le lien, sans le remplacer.
+/// @relu 2026-10-22 5401fe99
 pub fn ecrire(racine: &Path, nom: &str, texte: &str) -> Result<()> {
     definition(nom)?;
     let t = texte.trim();
@@ -238,7 +239,7 @@ pub fn ecrire(racine: &Path, nom: &str, texte: &str) -> Result<()> {
     }
     let f = chemin(racine, nom);
     std::fs::create_dir_all(f.parent().expect("dossier du skill"))?;
-    std::fs::write(&f, format!("{t}\n"))?;
+    crate::journal::ecrire(&f, format!("{t}\n"))?;
     Ok(())
 }
 
@@ -261,11 +262,12 @@ pub fn installer_si_ancienne(racine: &Path, config: &Config, nom: &str) -> Resul
 }
 
 /// Revient au texte d'origine : le fichier du projet est supprimé (le dossier aussi s'il est vide).
+/// @relu 2026-10-22 fe4a5271
 pub fn retablir(racine: &Path, nom: &str) -> Result<()> {
     definition(nom)?;
     let f = chemin(racine, nom);
     if f.is_file() {
-        std::fs::remove_file(&f)?;
+        crate::journal::supprimer(&f)?;
         let _ = std::fs::remove_dir(f.parent().expect("dossier du skill"));
     }
     Ok(())

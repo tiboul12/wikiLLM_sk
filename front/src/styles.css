@@ -626,3 +626,22 @@ a.reprendre { margin-left: auto; }
   .barre-activite button.arret { flex: 1; height: 58px; border-left: 0; align-content: center; gap: 2px; }
   .barre-activite button.arret .libelle { display: block; font-size: 10.5px; }
 }
+
+/* Message bref après une écriture ou Ctrl+Z (EF-159). */
+.message-bref {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 30;
+  max-width: min(90vw, 640px); padding: 9px 16px; border-radius: var(--rayon);
+  background: var(--texte); color: var(--fond); font-size: 14px; box-shadow: 0 6px 24px rgb(0 0 0 / 25%);
+}
+.message-bref.erreur { background: var(--rouge); color: white; }
+
+/* Volet Projet : gestion, favoris, ⚙ de structure (EF-157, REC-054). */
+.barre .sous-groupe { margin: 0; }
+.barre .sous-groupe > summary { font-size: 12.5px; padding: 3px 6px; }
+.barre summary .reglage { margin-left: 6px; color: var(--texte-2); text-decoration: none; opacity: 0.55; font-size: 13px; }
+.barre summary .reglage:hover { opacity: 1; color: var(--accent); }
+.barre summary .compteur { float: right; margin-top: 1px; }
+.barre .favori { display: flex; align-items: center; }
+.barre .favori a { flex: 1; min-width: 0; }
+.barre .favori .retirer { border: none; background: none; color: var(--texte-2); cursor: pointer; opacity: 0; padding: 0 6px; }
+.barre .favori:hover .retirer { opacity: 1; }

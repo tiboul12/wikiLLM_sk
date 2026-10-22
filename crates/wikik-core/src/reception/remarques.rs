@@ -179,6 +179,7 @@ pub fn creer(index: &Index, s: &Saisie) -> Result<String> {
 }
 
 /// Écrit une version de remarque : frontmatter, texte, images gardées puis nouvelles.
+/// @relu 2026-10-22 d05af9ad
 fn ecrire_version(
     index: &Index,
     id: &str,
@@ -208,7 +209,7 @@ fn ecrire_version(
     let mut chemins: Vec<String> = s.garder.to_vec();
     for (n, (octets, ext)) in decodees.iter().enumerate() {
         let nom = format!("{id}-{}.{ext}", n + 1);
-        std::fs::write(racine.join("images").join(&nom), octets)?;
+        crate::journal::ecrire(racine.join("images").join(&nom), octets)?;
         chemins.push(format!("{}/images/{nom}", dossier(index)));
     }
     let mut corps = format!("# {id} : {}\n\n{}\n", titre(s.texte), s.texte.trim());
@@ -244,7 +245,7 @@ fn ecrire_version(
     if let Some(r) = remplace {
         fm.insert("remplace".into(), json!(r));
     }
-    std::fs::write(
+    crate::journal::ecrire(
         index.racine.join(chemin_remarque(index, id)),
         crate::atelier::artefacts::formater(&fm, &corps),
     )?;
@@ -334,6 +335,7 @@ pub fn modifier(index: &Index, id: &str, s: &Saisie) -> Result<String> {
 
 /// Supprime une remarque et toute sa chaîne de versions (SPEC-23 R9), avec les images qu'aucune autre
 /// remarque ne cite ; renvoie les identifiants supprimés, du plus ancien au plus récent.
+/// @relu 2026-10-22 37af892e
 pub fn supprimer(index: &Index, id: &str) -> Result<Vec<String>> {
     let lien = |id: &str, cle: &str| -> Option<String> {
         lire_fm(index, id)
@@ -360,7 +362,7 @@ pub fn supprimer(index: &Index, id: &str) -> Result<Vec<String>> {
         if let Ok((fm, _)) = lire_fm(index, i) {
             images.extend(chaines(fm.get("images")));
         }
-        let _ = std::fs::remove_file(index.racine.join(chemin_remarque(index, i)));
+        let _ = crate::journal::supprimer(index.racine.join(chemin_remarque(index, i)));
     }
     // Une image encore citée par une autre remarque reste.
     let restantes: Vec<String> =
@@ -375,7 +377,7 @@ pub fn supprimer(index: &Index, id: &str) -> Result<Vec<String>> {
         if !restantes.iter().any(|t| t.contains(&nom))
             && img.starts_with(&format!("{}/images/", dossier(index)))
         {
-            let _ = std::fs::remove_file(index.racine.join(&img));
+            let _ = crate::journal::supprimer(index.racine.join(&img));
         }
     }
     Ok(chaine)
