@@ -1,11 +1,13 @@
 <script lang="ts">
   // Graphe (EF-043, EF-141) : graphe local d'un symbole ou d'un document, ou graphe global (documents,
   // code ramené au fichier, pages de l'application, remarques). Une couleur et une puce par catégorie ;
-  // même dessin d'une ouverture à l'autre ; titre au survol ; appui long : les liens du nœud en couleur.
+  // même dessin d'une ouverture à l'autre ; titre au survol ; appui long : les liens du nœud en couleur ; un
+  // clic ouvre le nœud dans un nouvel onglet (EF-151).
   import { onDestroy } from "svelte";
   import cytoscape from "cytoscape";
   import { api } from "../lib/api";
-  import { aller, url } from "../lib/routeur.svelte";
+  import { url } from "../lib/routeur.svelte";
+  import { ouvrir } from "../lib/onglets.svelte";
   import { statique } from "../lib/statique";
   import type { Graphe } from "../types/Graphe";
 
@@ -113,10 +115,11 @@
     cy.on("tap", "node", (e) => {
       if (tenu) return void (tenu = false);
       const d = e.target.data();
-      if (d.genre === "symbole") aller(url.fichier(d.fichier, d.id.slice(d.fichier.length + 2)));
-      else if (d.genre === "fichier") aller(url.fichier(d.id));
-      else if (d.genre === "document") aller(url.document(d.id));
-      else if (d.genre === "page" && !statique) aller(url.pageReception(d.id.slice("page:".length)));
+      // Un nœud s'ouvre dans un nouvel onglet : le graphe reste à portée (REC-068).
+      if (d.genre === "symbole") ouvrir(url.fichier(d.fichier, d.id.slice(d.fichier.length + 2)));
+      else if (d.genre === "fichier") ouvrir(url.fichier(d.id));
+      else if (d.genre === "document") ouvrir(url.document(d.id));
+      else if (d.genre === "page" && !statique) ouvrir(url.pageReception(d.id.slice("page:".length)));
     });
     cy.on("taphold", "node", (e) => {
       tenu = true;

@@ -97,14 +97,47 @@ export function estCourant(href: string): boolean {
   return cible === lireUrl().chemin;
 }
 
-// Les liens internes (href commençant par /) sont gérés sans rechargement.
-addEventListener("click", (e) => {
-  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+/** Adresse de la page affichée, sous la forme que prend `aller` (ancre comprise). */
+export function adresseCourante(): string {
+  return statique ? location.hash || "#/" : location.pathname + location.search + location.hash;
+}
+
+/**
+ * Ouverture d'un lien dans un nouvel onglet de l'application (EF-151), branchée par le module des onglets :
+ * Ctrl+clic (⌘+clic) et clic du milieu sur un lien interne.
+ */
+export const nouvelOnglet: { ouvrir: ((href: string) => void) | null } = { ouvrir: null };
+
+const lienInterne = (e: MouseEvent): string | null => {
   const a = (e.target as Element | null)?.closest?.("a");
   const href = a?.getAttribute("href");
-  if (!a || !href || !href.startsWith("/") || href.startsWith("//") || a.target) return;
+  if (!a || !href || a.target || a.hasAttribute("download")) return null;
+  if (statique ? !href.startsWith("#/") : !href.startsWith("/") || href.startsWith("//")) return null;
+  return href;
+};
+
+// Les liens internes (href commençant par /) sont gérés sans rechargement ; Ctrl+clic et clic du milieu
+// les ouvrent dans un nouvel onglet de l'application.
+addEventListener("click", (e) => {
+  if (e.defaultPrevented || e.button !== 0 || e.shiftKey || e.altKey) return;
+  const href = lienInterne(e);
+  if (!href) return;
+  if (e.metaKey || e.ctrlKey) {
+    if (!nouvelOnglet.ouvrir) return;
+    e.preventDefault();
+    nouvelOnglet.ouvrir(href);
+    return;
+  }
+  if (statique) return;
   e.preventDefault();
   aller(href);
+});
+addEventListener("auxclick", (e) => {
+  if (e.defaultPrevented || e.button !== 1 || !nouvelOnglet.ouvrir) return;
+  const href = lienInterne(e);
+  if (!href) return;
+  e.preventDefault();
+  nouvelOnglet.ouvrir(href);
 });
 
 const prefixe = statique ? "#" : "";

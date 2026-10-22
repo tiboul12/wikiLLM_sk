@@ -3,9 +3,11 @@
   // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le
   // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler ;
   // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal ; après le
-  // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Le serveur du projet sert les quatre sections
+  // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Les pages ouvertes ont leurs onglets au-dessus
+  // du contenu (EF-151), sauf dans une fenêtre détachée. Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
   // @relu 2026-10-22 58c85d1b
+  import { untrack } from "svelte";
   import { api } from "./lib/api";
   import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
@@ -36,6 +38,9 @@
   import PanneauTerminal from "./composants/PanneauTerminal.svelte";
   import Icone from "./composants/Icone.svelte";
   import { terminal, chargerParametres } from "./lib/terminal.svelte";
+  import Onglets from "./composants/Onglets.svelte";
+  import { detachee, suivre, titreDe, ouvrir } from "./lib/onglets.svelte";
+  import { nouvelOnglet } from "./lib/routeur.svelte";
 
   let projet = $state<Projet | null>(null);
   let erreur = $state("");
@@ -54,6 +59,13 @@
   detecter().then((ok) => ok && choisirParcours(parcoursDeUrl()));
   detecterReception();
   chargerParametres();
+
+  // Onglets (EF-151) : l'onglet actif suit la page ; Ctrl+clic et clic du milieu en ouvrent un nouveau.
+  nouvelOnglet.ouvrir = ouvrir;
+  $effect(() => {
+    const titre = titreDe(routeur.route, projet);
+    untrack(() => suivre(titre));
+  });
 
   // Le parcours affiché suit l'URL des pages du Design thinking (EF-145).
   $effect(() => {
@@ -159,6 +171,8 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="poignee" onpointerdown={tirer} ondblclick={() => (largeur = 280)} title="Tirer pour élargir le panneau (double-clic : largeur d'origine)"></div>
   {/if}
+  <div class="colonne">
+  {#if !detachee}<Onglets />{/if}
   <main class="contenu">
     {#if routeur.route.page === "fichier"}
       {#key routeur.route.chemin}<PageFichier chemin={routeur.route.chemin} ancre={routeur.route.ancre} />{/key}
@@ -198,6 +212,7 @@
       {#if reception.etat}<CahierReception />{:else}<p class="discret">Chargement…</p>{/if}
     {/if}
   </main>
+  </div>
 </div>
 {#if terminal.ouvert}<PanneauTerminal bind:largeur={largeurTerminal} />{/if}
 {#if terminal.arrete}

@@ -103,6 +103,7 @@ h2 { font-size: 1.2rem; margin: 2rem 0 0.6rem; }
   padding: 12px 10px 40px; border-right: 1px solid var(--bord); background: var(--fond-2);
   font-size: 13.5px;
 }
+.colonne { min-width: 0; display: flex; flex-direction: column; }
 .contenu { padding: 28px 40px 80px; max-width: 980px; width: 100%; }
 
 .barre summary small, summary small { color: var(--texte-2); font-weight: 400; }
