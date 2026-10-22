@@ -41,7 +41,14 @@ pub(crate) struct Terminal {
 
 impl Terminal {
     /// Ouvre le shell de l'utilisateur (`$SHELL`, sinon `/bin/bash`) dans `racine`.
+    ///
+    /// @pitfall La racine de l'index est souvent relative (`.`) : elle est rendue absolue, et `PWD` posé,
+    /// sinon un shell lancé d'ailleurs (ou qui relit un `PWD` hérité) s'ouvre hors du projet (REC-066).
+    /// @req EF-168
     fn ouvrir(racine: &Path) -> Result<Arc<Terminal>> {
+        let racine = racine
+            .canonicalize()
+            .unwrap_or_else(|_| racine.to_path_buf());
         let paire = native_pty_system()
             .openpty(PtySize {
                 rows: 30,
@@ -52,7 +59,8 @@ impl Terminal {
             .context("ouverture du pseudo-terminal")?;
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
         let mut cmd = CommandBuilder::new(shell);
-        cmd.cwd(racine);
+        cmd.cwd(&racine);
+        cmd.env("PWD", &racine);
         cmd.env("TERM", "xterm-256color");
         let enfant = paire
             .slave

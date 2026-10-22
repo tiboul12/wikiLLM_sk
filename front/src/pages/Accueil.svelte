@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Accueil du projet (EF-131, EF-140) : une tuile par section avec son état, dans l'ordre de la barre.
+  // Accueil du projet (EF-131, EF-140, EF-150) : une tuile par section avec son état, dans l'ordre de la barre
+  // (les outils, comme le code, en dernier).
   import type { Projet } from "../types/Projet";
   import { url } from "../lib/routeur.svelte";
   import { SECTIONS } from "../lib/sections.svelte";
@@ -32,12 +33,6 @@
         <span class="discret">{atelier.etat?.projet ? `« ${atelier.etat.projet} »` : "Définir le besoin : commencer par le pitch"}{enCours ? ` · en cours : ${enCours}` : ""}</span>
       </a>
     {/if}
-    <a class="section-tuile" href={url.produit()}>
-      <span class="entete-tuile"><Icone nom="produit" taille={26} /> <strong>Produit</strong></span>
-      <span class="chiffre">{projet.fichiers.length} <small>fichiers</small></span>
-      <span class="discret">{projet.symboles} symboles · {taux} % documentés</span>
-      <span class="jauge"><span style="width: {taux}%"></span></span>
-    </a>
     {#if SECTIONS.includes("reception")}
       <a class="section-tuile" class:attention={ouvertes > 0} href={url.reception()}>
         <span class="entete-tuile"><Icone nom="reception" taille={26} /> <strong>Réception</strong></span>
@@ -45,6 +40,12 @@
         <span class="discret">{pages} pages trouvées dans le code</span>
       </a>
     {/if}
+    <a class="section-tuile" href={url.produit()}>
+      <span class="entete-tuile"><Icone nom="produit" taille={26} /> <strong>Code</strong></span>
+      <span class="chiffre">{projet.fichiers.length} <small>fichiers</small></span>
+      <span class="discret">{projet.symboles} symboles · {taux} % documentés · graphe</span>
+      <span class="jauge"><span style="width: {taux}%"></span></span>
+    </a>
   </div>
 {:else}
   <p class="discret">Chargement…</p>

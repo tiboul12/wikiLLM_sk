@@ -23,7 +23,7 @@ use wikik_core::atelier::fournisseur::{Demande, Fournisseur};
 use wikik_core::atelier::parcours;
 
 /// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel, parcours,
-/// clarifications) et l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
+/// clarifications), la recherche assistée par IA (EF-152) et l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/atelier/etat", get(api_etat))
@@ -37,6 +37,35 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/atelier/saisir", post(api_saisir))
         .route("/api/atelier/synthetiser", post(api_synthetiser))
         .route("/api/atelier/rappel", post(api_rappel))
+        .route("/api/recherche/ia", post(api_recherche_ia))
+}
+
+#[derive(Deserialize)]
+struct CorpsRechercheIa {
+    question: String,
+}
+
+/// Recherche assistée par IA (EF-152) : le LLM configuré lit le projet et rend les éléments qui
+/// répondent, chacun avec sa raison ; annulable comme tout appel au LLM.
+async fn api_recherche_ia(State(e): State<Partage>, Json(c): Json<CorpsRechercheIa>) -> Response {
+    let jeton = e.fournisseur.jeton();
+    let r = tokio::task::spawn_blocking(move || -> Result<Vec<Value>> {
+        let (consigne, schema) = {
+            let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+            i.mettre_a_jour()?;
+            wikik_core::wiki::demande_recherche(&i, &c.question)?
+        };
+        let exemple = Value::Array(vec![]);
+        let reponse = e.fournisseur.proposer(&Demande {
+            consigne: &consigne,
+            schema: &schema,
+            exemple: Some(&exemple),
+            jeton: Some(jeton),
+        })?;
+        Ok(reponse.elements)
+    })
+    .await;
+    resultat(r)
 }
 
 /// Une écriture venue d'une autre origine (page tierce ouverte dans le navigateur) est refusée.

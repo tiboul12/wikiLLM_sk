@@ -2,7 +2,9 @@
   // Panneau latéral de la section active (EF-131, EF-140) : arbre des fichiers (Produit), documents par
   // type, la gestion en tête puis les clarifications par sujet (Projet), parcours avec leurs étapes et
   // « + » pour en ajouter, artefacts (Design thinking), arborescence des pages et remarques (Réception).
-  // Le titre mène à l'accueil de la section ; un bouton replie tout ; l'élément ouvert est déplié et centré.
+  // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
+  // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
+  // déplie, centré.
   // @relu 2026-10-19 eb4d041f
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
@@ -71,6 +73,7 @@
   const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception };
   const titreDoc = (id: string) => projet.documents.find((d) => d.id === id)?.titre ?? "";
   const groupesClar = $derived(atelier.etat ? sujets(titreDoc) : []);
+  const aRelire = $derived(projet.documents.filter((d) => d.zone === "projet" && (d.statut === "proposé" || d.statut === "brouillon")));
 
   // « + » du groupe Parcours (REC-039) : titre et version du nouveau parcours.
   let ajout = $state(false);
@@ -97,9 +100,14 @@
   const arbre = $derived(reception.etat ? arbrePages(reception.etat.pages.filter(visible)) : []);
 
   let panneau: HTMLElement;
-  /** Replie tous les accordéons du panneau (REC-008, REC-010). */
-  function replier() {
-    panneau.querySelectorAll("details").forEach((d) => (d.open = false));
+  // Le bouton alterne : replier tout (REC-008, REC-010), puis tout déplier (REC-046).
+  let replie = $state(true);
+  $effect(() => {
+    replie = section !== "produit";
+  });
+  function basculer() {
+    replie = !replie;
+    panneau.querySelectorAll("details").forEach((d) => (d.open = !replie));
   }
   // L'élément de la page ouverte : ses accordéons s'ouvrent et il vient au centre du panneau (REC-037).
   $effect(() => {
@@ -119,7 +127,7 @@
 
 {#snippet clarifications()}
   {#if section === "projet" && atelier.etat}
-    <details open class="arbre">
+    <details class="arbre">
       <summary><a class="lien-groupe" href={url.clarifications()} title="Tableau de bord des clarifications">Clarifications</a> <small>{atelier.etat.clarifications.length}</small></summary>
       <ul>
         {#each groupesClar as g (g.sujet)}
@@ -166,10 +174,13 @@
     {:else}
       <span class="titre-panneau">{NOMS[section]}</span>
     {/if}
-    <button class="replier" onclick={replier} title="Replier tout" aria-label="Replier tout">⊟</button>
+    <button class="replier" onclick={basculer} title={replie ? "Déplier tout" : "Replier tout"} aria-label={replie ? "Déplier tout" : "Replier tout"}>{replie ? "⊞" : "⊟"}</button>
   </div>
 
   {#if section === "produit"}
+    <ul class="liens-section">
+      <li><a href={url.graphe()} class:actif={actif(url.graphe())}>Graphe du projet</a></li>
+    </ul>
     {#each dossiers as [dossier, fichiers]}
       <details open>
         <summary>{dossier}/</summary>
@@ -188,7 +199,7 @@
     {/each}
   {:else}
     {#if section === "atelier" && atelier.etat}
-      <details open class="arbre">
+      <details class="arbre">
         <summary>
           Parcours <small>{atelier.etat.tous_parcours.length}</small>
           <button class="ajouter" title="Nouveau parcours" aria-label="Nouveau parcours" onclick={(e) => { e.preventDefault(); ajout = !ajout; }}>＋</button>
@@ -230,14 +241,20 @@
       <ul class="liens-section">
         <li><a href={url.traitement()} class:actif={actif(url.traitement())}>Traitement des remarques</a></li>
       </ul>
-      <details open class="arbre">
+      <details class="arbre">
         <summary>Pages de l'application <small>{reception.etat.pages.filter(visible).length}</small></summary>
         {@render branche(arbre)}
       </details>
     {/if}
+    {#if section === "projet"}
+      {@const n = aRelire.length}
+      <ul class="liens-section">
+        <li><a href={url.relecture()} class:actif={actif(url.relecture())}>À relire {#if n}<span class="compteur faible">{n}</span>{/if}</a></li>
+      </ul>
+    {/if}
     {#if !groupes.some(([nom]) => nom === "Gestion")}{@render clarifications()}{/if}
     {#each groupes as [nom, g]}
-      <details open={g.docs.length <= 12}>
+      <details>
         <summary>{nom} <small>{g.docs.length}</small></summary>
         <ul>
           {#each g.docs as d}

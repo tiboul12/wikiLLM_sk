@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Accueil de la section Produit (EF-142) : chiffres du code, puis le récapitulatif fichier par fichier
+  // Accueil de la section Code, ex-Produit (EF-142, EF-150) : chiffres du code, puis le récapitulatif fichier par fichier
   // (mêmes chiffres que les tuiles, plus ce que `wikik check` y signale), triable et filtrable ; enfin la
   // doc à reprendre.
   import type { Projet } from "../types/Projet";
@@ -68,8 +68,8 @@
 </script>
 
 {#if projet}
-  <h1>Produit</h1>
-  <p class="discret">Le code et sa doc : ouvre un fichier dans la barre de gauche ou dans le tableau ; chaque symbole y a sa cellule.</p>
+  <h1>Code</h1>
+  <p class="discret">Le code et sa doc : ouvre un fichier dans la barre de gauche ou dans le tableau ; chaque symbole y a sa cellule. Les liens entre tout le projet : <a href={url.graphe()}>le graphe</a>.</p>
   <section class="tuiles">
     <div class="tuile"><span class="valeur">{projet.fichiers.length}</span><span class="nom">fichiers de code</span></div>
     <div class="tuile"><span class="valeur">{projet.lignes.toLocaleString("fr")}</span><span class="nom">lignes</span></div>
@@ -141,6 +141,6 @@
     {/if}
   {/if}
 {:else}
-  <h1>Produit</h1>
+  <h1>Code</h1>
   <p class="discret">Chargement…</p>
 {/if}

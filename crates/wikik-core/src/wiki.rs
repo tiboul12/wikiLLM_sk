@@ -816,6 +816,47 @@ pub fn cherche(index: &Index, texte: &str) -> Result<Vec<Resultat>> {
     Ok(v)
 }
 
+/// Demande au LLM de la recherche assistée (EF-152) : la question, les résultats plein texte comme
+/// point de départ (un modèle sans MCP n'a que ceux-là), et le schéma de la réponse : des éléments
+/// `{ cible, raison }` où `cible` est un identifiant de document, un chemin de fichier ou `chemin::Symbole`,
+/// que le front transforme en lien.
+/// @req EF-152
+pub fn demande_recherche(index: &Index, question: &str) -> Result<(String, serde_json::Value)> {
+    let question = question.trim();
+    if question.is_empty() {
+        bail!("question vide");
+    }
+    let indices: Vec<String> = cherche(index, question)?
+        .into_iter()
+        .take(15)
+        .map(|r| format!("- {} ({}) : {}", r.cle, r.genre, r.titre))
+        .collect();
+    let consigne = format!(
+        "Tu aides l'utilisateur à trouver ce qui répond à sa question dans son projet (code, documents, décisions).\n\
+         Lis le projet avec les outils wikik si tu les as (carte, cherche, symbole, document) ; tu n'écris rien.\n\
+         Méthode de lecture du wiki : {}\n\n\
+         Question : {question}\n\n\
+         Résultats de la recherche plein texte, comme point de départ :\n{}\n\n\
+         Réponds par les éléments du projet qui répondent le mieux, du plus utile au moins utile (8 au plus). \
+         Pour chacun : `cible`, l'identifiant exact (ex. `EF-140`, `crates/x/src/a.rs`, `crates/x/src/a.rs::Type::f`), \
+         et `raison`, une ou deux phrases qui disent ce qu'on y trouve. N'invente aucune cible ; `elements: []` si rien ne répond.",
+        index.config.ia.consigne_lecture,
+        if indices.is_empty() {
+            "(aucun)".to_string()
+        } else {
+            indices.join("\n")
+        }
+    );
+    let schema = serde_json::json!({
+        "type": "object", "required": ["elements"],
+        "properties": { "elements": { "type": "array", "items": {
+            "type": "object", "required": ["cible", "raison"],
+            "properties": { "cible": {"type": "string"}, "raison": {"type": "string"} }
+        }}}
+    });
+    Ok((consigne, schema))
+}
+
 /// Entrée de l'index de recherche du site statique (SPEC-16 R1).
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]

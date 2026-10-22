@@ -5,7 +5,7 @@
   // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal ; après le
   // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
-  // @relu 2026-10-19 64b2a015
+  // @relu 2026-10-22 58c85d1b
   import { api } from "./lib/api";
   import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
@@ -145,7 +145,7 @@
 {/if}
 
 <div class="cadre" class:sans-panneau={!avecPanneau} class:avec-terminal={terminal.ouvert} style="--largeur-panneau: {largeur}px; --largeur-terminal: {largeurTerminal}px">
-  <BarreActivite active={routeur.route.page === "graphe" ? null : section} graphe={routeur.route.page === "graphe"} />
+  <BarreActivite active={section} />
   {#if avecPanneau}
     <aside class="barre" class:ouverte={barreOuverte}>
       {#if projet}
