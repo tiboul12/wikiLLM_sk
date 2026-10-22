@@ -3,7 +3,8 @@
   // `/api/image`), liens résolus, identifiants et chemins cités liés d'office, ce qui le cite ; liens vers
   // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21), « Reprendre » pour une clarification.
   // Un plan ou le backlog s'ouvre en tableau à colonnes. Le propriétaire peut le valider ou l'éditer en
-  // entier (EF-158) ; `?editer=1` ouvre directement l'éditeur (« Corriger » de la relecture).
+  // entier (EF-158) ; `?editer=1` ouvre directement l'éditeur (« Corriger » de la relecture). Une exigence
+  // montre ses tests (« ＋ créer un test »), un test son ticket de validation (EF-160).
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -17,7 +18,8 @@
   import Kanban from "../composants/Kanban.svelte";
   import Editeur from "../composants/Editeur.svelte";
   import { terminal } from "../lib/terminal.svelte";
-  import { GENRES_A_RELIRE, changerStatut, signaler } from "../lib/edition.svelte";
+  import { GENRES_A_RELIRE, changerStatut, signaler, VALIDATIONS, validerTest, nouveauDocument } from "../lib/edition.svelte";
+  import { connus } from "../lib/connus.svelte";
   import { statique } from "../lib/statique";
 
   let { id, ancre }: { id: string; ancre: string } = $props();
@@ -53,6 +55,25 @@
   let vue = $state<"tableau" | "document">("tableau");
   let edite = $state(!statique && new URLSearchParams(location.search).get("editer") === "1");
   const aValider = $derived(page && GENRES_A_RELIRE.includes(page.genre) && (page.statut === "proposé" || page.statut === "brouillon"));
+  // Cascade (EF-160) : les tests d'une exigence, le ticket d'un test.
+  const tests = $derived(page && (page.genre === "exigence" || page.genre === "exigence-nf") ? connus.tests.filter((t) => t.exigences.includes(page!.id)) : []);
+  const ticket = $derived(page?.genre === "test" ? (VALIDATIONS[String(page.frontmatter.validation ?? "a_valider")] ?? VALIDATIONS.a_valider) : null);
+  async function verdict(v: "utilisateur" | "echec" | "a_valider") {
+    if (!page) return;
+    try {
+      await validerTest(page.id, v);
+    } catch (e) {
+      signaler(String(e instanceof Error ? e.message : e), true);
+    }
+  }
+  async function creerTest() {
+    if (!page) return;
+    try {
+      await nouveauDocument("test", `Vérifier ${page.titre.charAt(0).toLowerCase()}${page.titre.slice(1)}`, [page.id]);
+    } catch (e) {
+      signaler(String(e instanceof Error ? e.message : e), true);
+    }
+  }
   async function valider() {
     if (!page) return;
     try {
@@ -108,6 +129,28 @@
     {/if}
   </div>
   {#if edite}<Editeur id={page.id} fermer={() => (edite = false)} />{/if}
+  {#if ticket}
+    <div class="ticket-test ticket-{ticket[1]}">
+      <span>Ticket de validation : <strong>{ticket[0]}</strong>{#if page.frontmatter.valide_le} · le {page.frontmatter.valide_le}{/if}</span>
+      {#if terminal.proprietaire && !statique}
+        <button onclick={() => verdict("utilisateur")} title="Tu as constaté l'attendu">✓ Je valide</button>
+        <button onclick={() => verdict("echec")} title="L'attendu n'est pas constaté">✗ Échec</button>
+        {#if page.frontmatter.validation && page.frontmatter.validation !== "a_valider"}<button class="discret-bouton" onclick={() => verdict("a_valider")}>Rouvrir</button>{/if}
+      {/if}
+    </div>
+  {/if}
+  {#if page.genre === "exigence" || page.genre === "exigence-nf"}
+    <div class="tests-exigence">
+      <strong>Tests</strong>
+      {#each tests as t (t.id)}
+        {@const [mot, classe] = VALIDATIONS[t.validation ?? "a_valider"] ?? VALIDATIONS.a_valider}
+        <a class="pastille" href={url.document(t.id)} title={t.titre}>{t.id} · <span class="ticket-{classe}">{mot}</span></a>
+      {:else}
+        <span class="discret">aucun test : la cascade s'arrête ici</span>
+      {/each}
+      {#if terminal.proprietaire && !statique}<button class="discret-bouton" onclick={creerTest}>＋ créer un test</button>{/if}
+    </div>
+  {/if}
   {#if colonnes}
     <div class="bascule vue-gestion" role="group" aria-label="Affichage">
       <button class:actif={vue === "tableau"} onclick={() => (vue = "tableau")}>Tableau</button>
@@ -133,6 +176,46 @@
 {/if}
 
 <style>
+  .ticket-test,
+  .tests-exigence {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    margin: 10px 0;
+    border: 1px solid var(--bord);
+    border-radius: var(--rayon);
+    background: var(--fond-2);
+    font-size: 14px;
+  }
+  .ticket-test button {
+    padding: 3px 10px;
+    border: 1px solid var(--bord-fort);
+    border-radius: var(--rayon);
+    background: var(--fond);
+    color: var(--texte);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .ticket-test.ticket-ok {
+    border-color: var(--vert);
+    background: var(--vert-fond);
+  }
+  .ticket-test.ticket-ko {
+    border-color: var(--rouge);
+    background: var(--rouge-fond);
+  }
+  .ticket-ok {
+    color: var(--vert);
+  }
+  .ticket-ko {
+    color: var(--rouge);
+  }
+  .ticket-attente {
+    color: var(--orange);
+  }
   .gestes-document {
     display: inline-flex;
     gap: 6px;

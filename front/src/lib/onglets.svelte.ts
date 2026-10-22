@@ -156,6 +156,7 @@ const TITRES: Record<string, string> = {
   produit: "Code",
   projet: "Projet",
   relecture: "À relire",
+  cascade: "Cascade",
   atelier: "Design thinking",
   clarifications: "Clarifications",
   reception: "Cahier de réception",

@@ -2,9 +2,26 @@
 
 /**
  * Document de la zone Projet ou de l'atelier dans la barre latérale.
+ * @relu 2026-10-22 14e0d01e
  */
 export type DocumentResume = { id: string, chemin: string, genre: string, titre: string, statut: string | null, 
 /**
  * `projet` ou `atelier` (dossier où vit le document).
  */
-zone: string, };
+zone: string, 
+/**
+ * Besoins couverts (champ `besoins` d'une exigence) : la cascade du volet Projet (EF-160).
+ */
+besoins: Array<string>, 
+/**
+ * Exigences vérifiées (champ `exigences` d'un test ou d'une décision).
+ */
+exigences: Array<string>, 
+/**
+ * Ticket de validation d'un test : `a_valider`, `utilisateur`, `modele` ou `echec`.
+ */
+validation: string | null, 
+/**
+ * Version (`v8`) du frontmatter.
+ */
+version: string | null, };

@@ -146,6 +146,14 @@ const OUTILS: &[Outil] = &[
         ],
     },
     Outil {
+        nom: "test_valider",
+        description: "Ticket de validation d'un test d'exigence (TEST-xxx, EF-160) : verdict modele quand tu as vérifié le test (test automatisé vert, contrôle fait), echec sinon, a_valider pour le rouvrir. N'écrit que dans le test.",
+        parametres: &[
+            ("id", "Identifiant du test (TEST-001…).", true),
+            ("verdict", "modele, echec ou a_valider.", true),
+        ],
+    },
+    Outil {
         nom: "check",
         description: "Diagnostics de doc : périmée, manquante, références cassées, exigences non couvertes.",
         parametres: &[],
@@ -263,7 +271,7 @@ fn texte(args: &Value, cle: &str) -> Result<String> {
 }
 
 /// Exécute un outil sur l'index à jour et renvoie la sortie texte de la CLI.
-/// @relu 2026-10-18 8cd7d812
+/// @relu 2026-10-22 d726a57f
 fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
     index.mettre_a_jour()?;
     let i = &*index;
@@ -311,6 +319,15 @@ fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
                 commit.as_deref(),
             )?;
             return Ok(format!("{id} : {statut}."));
+        }
+        "test_valider" => {
+            let id = texte(args, "id")?;
+            let verdict = texte(args, "verdict")?;
+            if verdict == "utilisateur" {
+                anyhow::bail!("le verdict utilisateur est réservé à l'utilisateur (dans wikik)");
+            }
+            wikik_core::edition::valider_test(i, &id, &verdict)?;
+            return Ok(format!("{id} : {verdict}."));
         }
         _ => anyhow::bail!("outil inconnu : {nom}"),
     };

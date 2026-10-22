@@ -20,6 +20,7 @@ const GABARITS: &[(&str, &str)] = &[
         include_str!("../../../templates/bdr-2-definition.md"),
     ),
     ("besoin.md", include_str!("../../../templates/besoin.md")),
+    ("test.md", include_str!("../../../templates/test.md")),
     (
         "cahier-des-charges.md",
         include_str!("../../../templates/cahier-des-charges.md"),
@@ -203,6 +204,7 @@ pub fn hook(racine: &Path) -> Result<String> {
 }
 
 /// `wikik nouveau` : crée le fichier du prochain identifiant libre à partir du gabarit (SPEC-16 R6).
+/// @relu 2026-10-22 fda348a5
 pub fn nouveau(racine: &Path, config: &Config, genre: &str, titre: &str) -> Result<String> {
     let (prefixe, largeur, dossier, gabarit, type_doc) = match genre {
         "exigence" => ("EF-", 3, "exigences", "exigence.md", "exigence"),
@@ -210,7 +212,8 @@ pub fn nouveau(racine: &Path, config: &Config, genre: &str, titre: &str) -> Resu
         "besoin" => ("B-", 3, "besoins", "besoin.md", "besoin"),
         "adr" => ("ADR-", 4, "adr", "adr.md", "adr"),
         "spec" => ("SPEC-", 2, "specs", "spec.md", "spec"),
-        autre => bail!("genre inconnu : {autre} (exigence, exigence-nf, besoin, adr, spec)"),
+        "test" => ("TEST-", 3, "tests", "test.md", "test"),
+        autre => bail!("genre inconnu : {autre} (exigence, exigence-nf, besoin, adr, spec, test)"),
     };
     let base = racine.join(config.projet.dossier.trim_end_matches('/'));
     let mut max = 0u32;
@@ -266,8 +269,7 @@ pub fn nouveau(racine: &Path, config: &Config, genre: &str, titre: &str) -> Resu
     if chemin.exists() {
         bail!("{} existe déjà", chemin.display());
     }
-    std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(&chemin, contenu)?;
+    crate::journal::ecrire(&chemin, contenu)?;
     Ok(format!(
         "{}/{fichier}",
         config.projet.dossier.trim_end_matches('/')

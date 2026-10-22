@@ -65,6 +65,27 @@ pub fn changer_statut(index: &Index, id: &str, statut: &str) -> Result<String> {
     ecrire(index, id, &avec_champ(&texte, "statut", statut))
 }
 
+/// Ticket de validation d'un test (EF-160) : `utilisateur` ou `modele` (validé), `echec`, ou `a_valider`
+/// (rouvert) ; la date et l'auteur du verdict sont notés dans le frontmatter.
+pub fn valider_test(index: &Index, id: &str, verdict: &str) -> Result<String> {
+    if !matches!(verdict, "a_valider" | "utilisateur" | "modele" | "echec") {
+        bail!("verdict inconnu : {verdict} (a_valider, utilisateur, modele, echec)");
+    }
+    let genre: Option<String> = index
+        .conn
+        .query_row("SELECT genre FROM documents WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })
+        .optional()?;
+    if genre.as_deref() != Some("test") {
+        bail!("{id} n'est pas un test");
+    }
+    let (_, mut texte) = source(index, id)?;
+    texte = avec_champ(&texte, "validation", verdict);
+    texte = avec_champ(&texte, "valide_le", &crate::relu::aujourdhui());
+    ecrire(index, id, &texte)
+}
+
 /// Pose `cle: valeur` dans le frontmatter (ligne remplacée, ou ajoutée avant la fermeture).
 pub fn avec_champ(texte: &str, cle: &str, valeur: &str) -> String {
     let Some(fm) = frontmatter(texte) else {

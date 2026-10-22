@@ -161,7 +161,7 @@ struct SymDoc {
 }
 
 /// Lance toutes les vérifications sur un index à jour.
-/// @relu 2026-10-17 c95bccbb
+/// @relu 2026-10-22 cf50d0ad
 pub fn verifier(index: &Index) -> Result<RapportCheck> {
     let c = &index.conn;
     let mut col = Collecteur {
@@ -369,6 +369,49 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
                 None,
                 format!("{id} (must) n'est citée par aucun `@req`"),
             );
+        }
+    }
+
+    // Cascade jusqu'aux tests (EF-160) : dans une version qui a des tests, une exigence sans test est
+    // signalée ; un projet (ou une version) sans aucun test n'est pas encombré.
+    {
+        let mut st = c.prepare(
+            "SELECT id, chemin, genre, version, frontmatter FROM documents
+             WHERE genre IN ('exigence', 'exigence-nf', 'test') ORDER BY id",
+        )?;
+        let docs: Vec<(String, String, String, Option<String>, String)> = st
+            .query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut versions_testees = HashSet::new();
+        let mut testees = HashSet::new();
+        for (_, _, _, version, fm) in docs.iter().filter(|d| d.2 == "test") {
+            versions_testees.insert(version.clone().unwrap_or_default());
+            let fm: serde_json::Value = serde_json::from_str(fm).unwrap_or_default();
+            for e in fm
+                .get("exigences")
+                .and_then(|v| v.as_array())
+                .into_iter()
+                .flatten()
+            {
+                if let Some(e) = e.as_str() {
+                    testees.insert(e.to_string());
+                }
+            }
+        }
+        for (id, chemin, _, version, _) in docs.iter().filter(|d| d.2 != "test") {
+            if versions_testees.contains(&version.clone().unwrap_or_default())
+                && !testees.contains(id)
+            {
+                col.ajouter(
+                    "exigence-sans-test",
+                    chemin,
+                    1,
+                    None,
+                    format!("{id} n'a aucun test (`TEST-xxx` dont `exigences` la cite)"),
+                );
+            }
         }
     }
 

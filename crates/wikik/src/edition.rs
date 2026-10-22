@@ -22,11 +22,14 @@ use serde_json::{Value, json};
 use wikik_core::{edition, journal};
 
 /// Routes d'édition ; tout ce qui écrit dans le dépôt passe par la garde du propriétaire.
+/// @relu 2026-10-22 13a82864
 pub(crate) fn routes(etat: Partage) -> Router<Partage> {
     let reservees = Router::new()
         .route("/api/document/source", get(api_source))
         .route("/api/document/ecrire", post(api_ecrire))
         .route("/api/document/statut", post(api_statut))
+        .route("/api/document/valider-test", post(api_valider_test))
+        .route("/api/document/nouveau", post(api_nouveau))
         .route("/api/annuler", post(api_annuler))
         .route("/api/retablir", post(api_retablir))
         .route_layer(axum::middleware::from_fn_with_state(etat, acces::reserve));
@@ -60,10 +63,13 @@ pub(crate) async fn action(requete: Request, suite: Next) -> Response {
 }
 
 /// Nom d'un geste, montré après Ctrl+Z (« Annulé : décision sur une proposition »).
+/// @relu 2026-10-22 3c1fc0ff
 fn libelle(chemin: &str) -> &'static str {
     match chemin {
         "/api/document/ecrire" => "modification du document",
         "/api/document/statut" => "changement de statut",
+        "/api/document/valider-test" => "validation d'un test",
+        "/api/document/nouveau" => "nouveau document",
         "/api/atelier/decider" => "décision sur une proposition",
         "/api/atelier/saisir" => "saisie de l'atelier",
         "/api/atelier/selection" => "sélection",
@@ -128,6 +134,75 @@ async fn api_statut(State(e): State<Partage>, Json(c): Json<CorpsStatut>) -> Res
         let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
         i.mettre_a_jour()?;
         let chemin = edition::changer_statut(&i, &c.id, &c.statut)?;
+        i.mettre_a_jour()?;
+        Ok(chemin)
+    })
+    .await;
+    resultat(r)
+}
+
+#[derive(Deserialize)]
+struct CorpsNouveau {
+    genre: String,
+    titre: String,
+    /// Exigences vérifiées (un test créé depuis la page d'une exigence).
+    #[serde(default)]
+    exigences: Vec<String>,
+}
+
+/// Crée un document au prochain identifiant libre (`wikik nouveau`), éventuellement relié à des
+/// exigences ; renvoie son identifiant.
+async fn api_nouveau(State(e): State<Partage>, Json(c): Json<CorpsNouveau>) -> Response {
+    let r = tokio::task::spawn_blocking(move || -> Result<String> {
+        let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+        let rel = wikik_core::init::nouveau(&i.racine, &i.config, &c.genre, c.titre.trim())?;
+        let abs = i.racine.join(&rel);
+        let mut texte = std::fs::read_to_string(&abs)?;
+        if let Some(premiere) = c.exigences.first() {
+            texte = edition::avec_champ(
+                &texte,
+                "exigences",
+                &format!("[{}]", c.exigences.join(", ")),
+            );
+            // Le test prend la version de l'exigence qu'il vérifie.
+            let version: Option<String> = i
+                .conn
+                .query_row(
+                    "SELECT version FROM documents WHERE id = ?1",
+                    [premiere],
+                    |r| r.get(0),
+                )
+                .ok()
+                .flatten();
+            if let Some(v) = version {
+                texte = edition::avec_champ(&texte, "version", &v);
+            }
+            journal::ecrire(&abs, &texte)?;
+        }
+        i.mettre_a_jour()?;
+        let id = texte
+            .lines()
+            .find_map(|l| l.strip_prefix("id:"))
+            .map(|x| x.split('#').next().unwrap_or("").trim().to_string())
+            .unwrap_or_default();
+        Ok(id)
+    })
+    .await;
+    resultat(r)
+}
+
+#[derive(Deserialize)]
+struct CorpsVerdict {
+    id: String,
+    verdict: String,
+}
+
+/// Ticket de validation d'un test (EF-160) : validé par l'utilisateur, en échec, ou rouvert.
+async fn api_valider_test(State(e): State<Partage>, Json(c): Json<CorpsVerdict>) -> Response {
+    let r = tokio::task::spawn_blocking(move || -> Result<String> {
+        let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+        i.mettre_a_jour()?;
+        let chemin = edition::valider_test(&i, &c.id, &c.verdict)?;
         i.mettre_a_jour()?;
         Ok(chemin)
     })

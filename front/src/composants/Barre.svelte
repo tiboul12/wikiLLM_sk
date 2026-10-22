@@ -2,7 +2,8 @@
   // Panneau latéral de la section active (EF-131, EF-140) : arbre des fichiers (Code), documents par
   // type (Projet) : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), les plans,
   // les clarifications par sujet, puis un groupe par type avec ⚙ (skill de structure) et, en orange, ce
-  // qui attend une relecture, compté jusqu'à l'accordéon ; parcours avec leurs étapes et
+  // qui attend une relecture, compté jusqu'à l'accordéon ; les besoins en cascade avec leurs exigences et
+  // leurs tests (EF-160) ; parcours avec leurs étapes et
   // « + » pour en ajouter, artefacts (Design thinking), arborescence des pages et remarques (Réception).
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
@@ -34,6 +35,7 @@
     besoin: [3, "Besoins"],
     exigence: [4, "Exigences"],
     "exigence-nf": [5, "Exigences non fonctionnelles"],
+    test: [5.5, "Tests"],
     adr: [6, "Décisions (ADR)"],
     spec: [7, "Specs"],
     // Atelier (SPEC-17), dans l'ordre du parcours.
@@ -326,6 +328,7 @@
           {#if section === "projet" && SKILL_DE[nom] && !statique}<a class="reglage" href={url.parametres() + "#skill-" + SKILL_DE[nom]} title="Comment sont structurés ces documents (skill {SKILL_DE[nom]})" aria-label="Structure de la section">⚙</a>{/if}
         </summary>
         <ul>
+          {#if nom === "Besoins" && section === "projet"}<li><a href={url.cascade()} class:actif={actif(url.cascade())} class="lien-cascade">Cascade : besoins → exigences → tests</a></li>{/if}
           {#each g.docs as d}
             {@const href = url.document(d.id)}
             <li>
@@ -333,6 +336,23 @@
                 <span class="id">{d.id}</span> {d.titre === d.id ? "" : d.titre}
                 {#if aRelireIds.has(d.id)}<span class="compteur faible" title="à relire">●</span>{/if}
               </a>
+              {#if d.genre === "besoin"}
+                {@const es = projet.documents.filter((e) => e.besoins.includes(d.id))}
+                {#if es.length}
+                  <ul>
+                    {#each es as e (e.id)}
+                      {@const he = url.document(e.id)}
+                      {@const ts = projet.documents.filter((t) => t.genre === "test" && t.exigences.includes(e.id))}
+                      <li>
+                        <a href={he} class:actif={actif(he)} title={e.titre}><span class="id">{e.id}</span> {e.titre}{#if !ts.length}<span class="compteur" title="sans test">○</span>{/if}</a>
+                        {#if ts.length}
+                          <ul>{#each ts as t (t.id)}{@const ht = url.document(t.id)}<li><a href={ht} class:actif={actif(ht)} title={t.titre}><span class="id">{t.id}</span> {t.titre}<span class="compteur" class:faible={t.validation !== "utilisateur" && t.validation !== "modele"}>{t.validation === "utilisateur" || t.validation === "modele" ? "✓" : t.validation === "echec" ? "✗" : "…"}</span></a></li>{/each}</ul>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              {/if}
             </li>
           {/each}
         </ul>

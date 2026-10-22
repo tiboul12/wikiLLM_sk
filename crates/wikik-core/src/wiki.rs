@@ -40,6 +40,7 @@ pub struct FichierResume {
 }
 
 /// Document de la zone Projet ou de l'atelier dans la barre latérale.
+/// @relu 2026-10-22 14e0d01e
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct DocumentResume {
@@ -50,6 +51,14 @@ pub struct DocumentResume {
     pub statut: Option<String>,
     /// `projet` ou `atelier` (dossier où vit le document).
     pub zone: String,
+    /// Besoins couverts (champ `besoins` d'une exigence) : la cascade du volet Projet (EF-160).
+    pub besoins: Vec<String>,
+    /// Exigences vérifiées (champ `exigences` d'un test ou d'une décision).
+    pub exigences: Vec<String>,
+    /// Ticket de validation d'un test : `a_valider`, `utilisateur`, `modele` ou `echec`.
+    pub validation: Option<String>,
+    /// Version (`v8`) du frontmatter.
+    pub version: Option<String>,
 }
 
 /// Lien vers un symbole ou un document, prêt à afficher.
@@ -195,7 +204,7 @@ fn u(v: i64) -> u32 {
 }
 
 /// Accueil : fichiers avec leur rôle, documents avec leur zone (Projet, atelier, réception), statistiques.
-/// @relu 2026-10-19 48f30d62
+/// @relu 2026-10-22 789d77ac
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -229,8 +238,9 @@ pub fn projet(index: &Index) -> Result<Projet> {
         .collect::<rusqlite::Result<_>>()?;
     let dossier_atelier = format!("{}/", index.config.atelier.dossier.trim_end_matches('/'));
     let dossier_reception = format!("{}/", index.config.reception.dossier.trim_end_matches('/'));
-    let mut st =
-        c.prepare("SELECT id, chemin, genre, titre, statut FROM documents ORDER BY chemin")?;
+    let mut st = c.prepare(
+        "SELECT id, chemin, genre, titre, statut, frontmatter, version FROM documents ORDER BY chemin",
+    )?;
     let documents = st
         .query_map([], |r| {
             let chemin: String = r.get(1)?;
@@ -241,6 +251,18 @@ pub fn projet(index: &Index) -> Result<Projet> {
             } else {
                 "projet"
             };
+            let fm: serde_json::Value =
+                serde_json::from_str(&r.get::<_, String>(5)?).unwrap_or_default();
+            let liste = |cle: &str| -> Vec<String> {
+                match fm.get(cle) {
+                    Some(serde_json::Value::Array(a)) => a
+                        .iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect(),
+                    Some(serde_json::Value::String(t)) => vec![t.clone()],
+                    _ => vec![],
+                }
+            };
             Ok(DocumentResume {
                 id: r.get(0)?,
                 zone: zone.into(),
@@ -248,6 +270,13 @@ pub fn projet(index: &Index) -> Result<Projet> {
                 genre: r.get(2)?,
                 titre: r.get(3)?,
                 statut: r.get(4)?,
+                besoins: liste("besoins"),
+                exigences: liste("exigences"),
+                validation: fm
+                    .get("validation")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                version: r.get(6)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

@@ -69,7 +69,7 @@ enum Commande {
         #[arg(long)]
         hook: bool,
     },
-    /// Crée le fichier du prochain identifiant libre (`exigence`, `exigence-nf`, `besoin`, `adr`, `spec`).
+    /// Crée le fichier du prochain identifiant libre (`exigence`, `exigence-nf`, `besoin`, `adr`, `spec`, `test`).
     Nouveau { genre: String, titre: String },
     /// Couverture de la doc : symboles documentés, périmés, exigences couvertes.
     Stats {

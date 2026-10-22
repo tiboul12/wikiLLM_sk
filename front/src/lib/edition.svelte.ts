@@ -46,6 +46,30 @@ export async function ecrireDocument(id: string, texte: string) {
   rafraichir();
 }
 
+/** Verdict du ticket de validation d'un test (EF-160). */
+export async function validerTest(id: string, verdict: "utilisateur" | "echec" | "a_valider") {
+  await poster("/api/document/valider-test", { id, verdict });
+  const mot = { utilisateur: "validé par toi", echec: "en échec", a_valider: "à valider" }[verdict];
+  signaler(`${id} : ${mot} (Ctrl+Z pour annuler)`);
+  rafraichir();
+}
+
+/** Crée un document au prochain identifiant libre ; renvoie son identifiant. */
+export async function nouveauDocument(genre: string, titre: string, exigences: string[] = []): Promise<string> {
+  const id = await poster<string>("/api/document/nouveau", { genre, titre, exigences });
+  signaler(`${id} créé (Ctrl+Z pour annuler)`);
+  rafraichir();
+  return id;
+}
+
+/** Libellé et classe d'un ticket de validation de test. */
+export const VALIDATIONS: Record<string, [string, string]> = {
+  a_valider: ["à valider", "attente"],
+  utilisateur: ["validé (toi)", "ok"],
+  modele: ["validé (modèle)", "ok"],
+  echec: ["échec", "ko"],
+};
+
 type Bilan = { libelle: string; fichiers: string[] } | null;
 
 /** Annule (ou rétablit) la dernière écriture faite depuis wikik. */
