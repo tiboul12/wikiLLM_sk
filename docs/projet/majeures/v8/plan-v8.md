@@ -58,13 +58,14 @@ Ordre : la coquille et les onglets d'abord (tout le reste s'y range), puis ce qu
 | Phase | État | Date |
 |---|---|---|
 | 0 BDR, CDC, exigences, ADR-0015 à 0017, plan | ✅ | 2026-10-22 |
-| 1 Coquille | à faire | |
-| 2 Onglets | à faire | |
-| 3 Graphe et page fichier | à faire | |
-| 4 Paramètres | à faire | |
-| 5 Projet | à faire | |
-| 6 Cascade | à faire | |
-| 7 Design thinking | à faire | |
-| 8 Réception | à faire | |
-| 9 Git | à faire | |
-| 10 Dessin | à faire | |
+| 1 Coquille | ✅ Code (avec le graphe) en bas au-dessus des Paramètres ; accordéons fermés à l'arrivée hors Code ; ⊟/⊞ ; « À relire » dans le volet ; recherche avec champ et « Demander à l'IA » ; terminal ouvert dans le projet (racine absolue) | 2026-10-22 |
+| 2 Onglets | ✅ onglets au-dessus du contenu (fermer, glisser, gardés au rechargement), ↗ détache dans une fenêtre, Ctrl+clic et clic du milieu, le graphe ouvre en onglet | 2026-10-22 |
+| 3 Graphe et page fichier | ✅ graphe global et disposition préparés en tâche de fond, gardés pour la session, ↻ ; « Trouver un nœud » ; arêtes fichier → fichier et page → page ; check en cache (2,4 s → 24 ms) | 2026-10-22 |
+| 4 Paramètres | ✅ accordéons Connexion, Agent, Application, Prompts système ; connecteurs Claude Code, Antigravity, Mistral Vibe, Ollama, llama.cpp, commande libre, factice (modèles, effort, test : claude, agy et vibe essayés en vrai) ; consignes en skills `.claude/skills/` (11 skills livrés, migration des anciennes consignes) | 2026-10-22 |
+| 5 Projet | ✅ Gestion (backlog, À traiter, Favoris), Plans à part, compteurs orange remontés, ⚙ skill de structure par section ; À relire limité aux décisions, Valider et Corriger ; éditeur de document ; journal d'annulation (Ctrl+Z, Ctrl+Y) | 2026-10-22 |
+| 6 Cascade | ✅ type `test` (`wikik nouveau test`), page Cascade, arbre besoin → exigences → tests, tickets de validation, outil MCP `test_valider`, check `exigence-sans-test` | 2026-10-22 |
+| 7 Design thinking | ✅ ateliers numérotés avec statut et métadonnées modifiables ; clarifications à part, en tableau façon relecture ; hors-sujet jugé par le skill ; pistes liées ; bilan limité au parcours | 2026-10-22 |
+| 8 Réception | ✅ `@ecrans` (une page par étape, clarifications sous `/clarifications`), cahier rangé comme l'application ; validation des remarques (je valide, à reprendre) ; état git et couleur par version | 2026-10-22 |
+| 9 Git | ✅ section Git : graphe des branches à couloirs, refs, situation de la branche, détail et diff | 2026-10-22 |
+| 10 Dessin | ✅ éditeur Mermaid avec aperçu (carte mentale, tout diagramme) ; éditeur vectoriel SVG pour les vignettes et les maquettes d'interface | 2026-10-22 |
+| Clôture | ✅ 41 remarques traitées ; TEST-001 à 020 (17 validés par le modèle, 3 à valider par Tibo : modèles locaux, hors-sujet avec un vrai LLM, terminal) ; headless clair, sombre et téléphone sans erreur ni débordement | 2026-10-22 |
