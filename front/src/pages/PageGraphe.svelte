@@ -1,7 +1,9 @@
 <script lang="ts">
   // Graphe (EF-043, EF-141) : graphe local d'un symbole ou d'un document, ou graphe global (documents,
   // code ramené au fichier, pages de l'application, remarques). Une couleur et une puce par catégorie ;
-  // même dessin d'une ouverture à l'autre ; titre au survol ; appui long : les liens du nœud en couleur ; un
+  // même dessin d'une ouverture à l'autre ; titre au survol ; zoom à la molette rapide puis de plus en plus fin,
+  // double-clic : zoom sur le nœud (REC-002) ; appui long : le reste en gris, les nœuds liés en couleur et
+  // listés dessous (REC-003) ; un
   // clic ouvre le nœud dans un nouvel onglet (EF-151). Le graphe global et sa disposition sont gardés pour
   // la session (↻ les recharge) ; un champ trouve un nœud et zoome dessus (EF-153).
   import { onDestroy } from "svelte";
@@ -91,27 +93,43 @@
         { selector: "edge[genre = 'appel'], edge[genre = 'rend']", style: { "line-color": couleurDe("code"), "target-arrow-color": couleurDe("code"), opacity: 0.35 } },
         { selector: "edge[genre = 'navigue'], edge[genre = 'contient']", style: { "line-color": couleurDe("pages"), "target-arrow-color": couleurDe("pages"), opacity: 0.6 } },
         { selector: "edge[genre = 'contient']", style: { "line-style": "dotted" } },
-        { selector: ".estompe", style: { opacity: 0.08 } },
-        { selector: "edge.lie", style: { width: 2.4, opacity: 1, "line-color": "data(teinte)", "target-arrow-color": "data(teinte)", "z-index": 9 } },
-        { selector: "node.lie", style: { "font-size": 11, "font-weight": "bold", "z-index": 10 } },
+        // Appui long (REC-003) : le reste passe en gris, les nœuds liés gardent leur couleur, cerclés, et leurs liens la prennent.
+        { selector: "node.estompe", style: { "background-color": couleur("--bord-fort"), opacity: 0.3, label: "" } },
+        { selector: "edge.estompe", style: { opacity: 0.04 } },
+        { selector: "edge.lie", style: { width: 3, opacity: 1, "line-color": "data(teinte)", "target-arrow-color": "data(teinte)", "z-index": 9 } },
+        { selector: "node.lie", style: { width: 16, height: 16, "border-width": 3, "border-color": "data(couleur)", "border-opacity": 0.45, "font-size": 11, "font-weight": "bold", "z-index": 10 } },
+        { selector: "node.eclaire", style: { width: 24, height: 24, "border-width": 4, "border-color": couleur("--texte"), "border-opacity": 1, "font-size": 13, "z-index": 11 } },
         { selector: "node.trouve", style: { width: 26, height: 26, "border-width": 4, "border-color": couleur("--accent"), "font-size": 14, "font-weight": "bold", "z-index": 11 } },
       ],
       layout: { name: "preset" },
-      wheelSensitivity: 0.3,
-      maxZoom: 5,
+      // La molette est interceptée par `molette` (zoom progressif, REC-002) ; le pincement reste celui de cytoscape.
+      maxZoom: 12,
       minZoom: 0.05,
     });
     appliquerMasque();
+    conteneur!.addEventListener("wheel", molette, { passive: false, capture: true });
 
     let tenu = false;
+    /** Clic simple en attente : il n'ouvre le nœud que si aucun double-clic ne suit. */
+    let attente: ReturnType<typeof setTimeout> | null = null;
     cy.on("tap", "node", (e) => {
       if (tenu) return void (tenu = false);
       const d = e.target.data();
+      if (attente) clearTimeout(attente);
       // Un nœud s'ouvre dans un nouvel onglet : le graphe reste à portée (REC-068).
-      if (d.genre === "symbole") ouvrir(url.fichier(d.fichier, d.id.slice(d.fichier.length + 2)));
-      else if (d.genre === "fichier") ouvrir(url.fichier(d.id));
-      else if (d.genre === "document") ouvrir(url.document(d.id));
-      else if (d.genre === "page" && !statique) ouvrir(url.pageReception(d.id.slice("page:".length)));
+      attente = setTimeout(() => {
+        attente = null;
+        if (d.genre === "symbole") ouvrir(url.fichier(d.fichier, d.id.slice(d.fichier.length + 2)));
+        else if (d.genre === "fichier") ouvrir(url.fichier(d.id));
+        else if (d.genre === "document") ouvrir(url.document(d.id));
+        else if (d.genre === "page" && !statique) ouvrir(url.pageReception(d.id.slice("page:".length)));
+      }, 260);
+    });
+    // Double-clic sur un nœud (REC-002) : zoom dessus, sans l'ouvrir.
+    cy.on("dbltap", "node", (e) => {
+      if (attente) clearTimeout(attente);
+      attente = null;
+      cy!.animate({ center: { eles: e.target }, zoom: Math.min(cy!.maxZoom(), Math.max(cy!.zoom() * 2.5, 3)) }, { duration: 350, easing: "ease-out" });
     });
     cy.on("taphold", "node", (e) => {
       tenu = true;
@@ -129,27 +147,60 @@
     cy.on("pan zoom", () => (survol = null));
   });
 
-  /** Appui long (REC-003) : les liens du nœud prennent la couleur de l'autre bout, le reste s'estompe. */
+  /**
+   * Zoom à la molette (REC-002) : rapide au premier cran d'un geste, vers le point visé, puis de plus en plus fin
+   * tant que le geste continue (crans à moins de 300 ms d'intervalle) ; un pavé tactile (petits deltas) zoome en continu.
+   */
+  let geste = { dernier: 0, crans: 0 };
+  function molette(e: WheelEvent) {
+    if (!cy) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const t = performance.now();
+    geste = { dernier: t, crans: t - geste.dernier < 300 ? geste.crans + 1 : 0 };
+    // Facteur d'un cran : ×1,6 au départ, qui décroît jusqu'à ×1,08.
+    const pas = 1.08 + 0.52 * Math.pow(0.8, geste.crans);
+    const intensite = Math.min(1, Math.abs(e.deltaY) / 100);
+    const facteur = Math.pow(pas, intensite) ** (e.deltaY < 0 ? 1 : -1);
+    const r = conteneur!.getBoundingClientRect();
+    const z = Math.min(cy.maxZoom(), Math.max(cy.minZoom(), cy.zoom() * facteur));
+    cy.zoom({ level: z, renderedPosition: { x: e.clientX - r.left, y: e.clientY - r.top } });
+  }
+
+  /** Nœuds liés au nœud éclairé, avec leur couleur, listés sous le graphe (REC-003). */
+  let voisins = $state<{ id: string; label: string; couleur: string; categorie: string }[]>([]);
+  /** Appui long (REC-003) : le reste du graphe passe en gris ; les nœuds liés gardent leur couleur et leurs liens la prennent. */
   function eclairer(n: cytoscape.NodeSingular) {
     if (!cy) return;
     effacer();
     const aretes = n.connectedEdges();
+    const autres = new Map<string, cytoscape.NodeSingular>();
     cy.batch(() => {
       cy!.elements().addClass("estompe");
-      n.removeClass("estompe").addClass("lie");
+      n.removeClass("estompe").addClass("eclaire");
       aretes.forEach((a) => {
         const autre = a.source().id() === n.id() ? a.target() : a.source();
         a.data("teinte", autre.data("couleur"));
         a.removeClass("estompe").addClass("lie");
         autre.removeClass("estompe").addClass("lie");
+        autres.set(autre.id(), autre);
       });
     });
+    voisins = [...autres.values()].map((x) => ({ id: x.id(), label: x.data("genre") === "document" ? x.id() : x.data("label"), couleur: x.data("couleur"), categorie: x.data("categorie") ?? "" }));
     focus = { id: n.data("genre") === "document" ? n.id() : n.data("label"), liens: aretes.length };
   }
-  /** Retire l'éclairage : tout redevient visible. */
+  /** Retire l'éclairage : tout redevient visible.
+   * @relu 2026-10-24 9a0cd776
+   */
   function effacer() {
-    cy?.elements().removeClass("estompe lie");
+    cy?.elements().removeClass("estompe lie eclaire");
     focus = null;
+    voisins = [];
+  }
+  /** Centre le graphe sur un nœud lié, choisi dans la liste sous le graphe. */
+  function montrer(id: string) {
+    const n = cy?.getElementById(id);
+    if (n && n.length) cy!.animate({ center: { eles: n }, zoom: Math.max(cy!.zoom(), 2) }, { duration: 350 });
   }
 
   /** Texte cherché dans le graphe (REC-070) : le nœud trouvé est mis en avant, centré et zoomé. */
@@ -228,6 +279,9 @@
 </form>
 {#if focus}
   <p class="focus-graphe">Liens de <strong>{focus.id}</strong> : {focus.liens} · <button class="discret-bouton" onclick={effacer}>effacer (Échap)</button></p>
+  {#if voisins.length}
+    <ul class="voisins">{#each voisins as v (v.id)}<li><button class="discret-bouton" onclick={() => montrer(v.id)} title={v.categorie}><span class="puce" style="background: {v.couleur}"></span>{v.label}</button></li>{/each}</ul>
+  {/if}
 {/if}
 <div class="cadre-graphe">
   <div class="graphe" bind:this={conteneur}></div>
@@ -242,6 +296,23 @@
 </div>
 
 <style>
+  .voisins {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+    font-size: 13px;
+  }
+  .puce {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-right: 5px;
+    border-radius: 50%;
+    vertical-align: -1px;
+  }
   .chercher-graphe {
     display: flex;
     gap: 8px;
