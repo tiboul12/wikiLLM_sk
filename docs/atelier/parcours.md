@@ -3,7 +3,7 @@ id: "PARCOURS"
 type: "parcours"
 titre: "Parcours de l'atelier"
 statut: "brouillon"
-etapes: {"clarification":{"etat":"en_cours"},"exigences":{"etat":"en_cours","mode":"express"},"pitch":{"etat":"en_cours","mode":"express"}}
+etapes: {"carte-mentale":{"etat":"en_cours","mode":"express"},"clarification":{"etat":"en_cours"},"exigences":{"etat":"en_cours","mode":"express"},"pitch":{"etat":"en_cours","mode":"express"}}
 horizons: null
 liens_carte: []
 mode: "express"
@@ -16,7 +16,7 @@ selections: {}
 |---|---|---|
 | Pitch | en_cours | express |
 | Free writing | a_faire | express |
-| Carte mentale | a_faire | express |
+| Carte mentale | en_cours | express |
 | Pensée analogique | a_faire | express |
 | 5W1H | a_faire | express |
 | Cubing | a_faire | express |

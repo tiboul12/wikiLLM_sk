@@ -17,7 +17,7 @@ description: >-
 2. **Doc et code dans le même commit.** Si tu changes le contrat, l'intention ou un piège d'une fonction, mets son bloc `///` à jour dans le même commit. Si le bloc reste juste après un changement de code : `wikik relu <id>`.
 3. **Un bloc ne paraphrase pas le code.** Première phrase = rôle ; ensuite intention, contrat, pièges, raison d'un choix. Détail et exemples : `procedures/ecrire-bloc.md`.
 4. **Relier.** `@req EF-xxx` quand le code implémente une exigence, `@adr N` quand il applique une décision, `@pitfall` pour un piège. Une balise par ligne, en fin de bloc.
-5. **Vérifier avant de commiter.** `wikik check` : zéro erreur ; traiter chaque `perime-*` sur les symboles que tu as touchés.
+5. **Vérifier avant de commiter.** `wikik check` : zéro erreur ; traiter chaque `perime-*` sur les symboles que tu as touchés. `wikik stats` : 95 % de symboles documentés au moins, sur tout projet ; un symbole ajouté reçoit son bloc dans le même commit.
 
 ## Commandes
 

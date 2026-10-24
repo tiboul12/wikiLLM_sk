@@ -142,6 +142,7 @@ pub fn lire(chemin: &str, relatif_projet: &str, contenu: &str) -> Document {
     }
 }
 
+/// Valeur scalaire d'un champ de frontmatter en texte (chaîne rognée, nombre, booléen) ; `None` pour une liste ou un objet.
 fn valeur_texte(v: &Value) -> Option<String> {
     match v {
         Value::String(s) => Some(s.trim().to_string()),

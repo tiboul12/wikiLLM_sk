@@ -4,6 +4,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {

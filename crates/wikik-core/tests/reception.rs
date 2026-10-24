@@ -4,6 +4,7 @@ use std::path::Path;
 use wikik_core::Index;
 use wikik_core::reception::carte;
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {
@@ -16,6 +17,7 @@ fn copier(de: &Path, vers: &Path) {
     }
 }
 
+/// Index d'une copie de la fixture `reception-mini`.
 fn fixture() -> (tempfile::TempDir, Index) {
     let d = tempfile::tempdir().unwrap();
     copier(
@@ -136,6 +138,7 @@ fn corrections_gardees() {
     assert_eq!(n, 1);
 }
 
+/// PNG minimal valide (1 × 1), en data URL, pour joindre une capture.
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 /// Modifier crée une version numérotée liée à la précédente ; supprimer retire toute la chaîne.

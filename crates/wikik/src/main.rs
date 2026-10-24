@@ -9,7 +9,9 @@ use wikik_core::Index;
 mod acces;
 mod atelier;
 mod detache;
+mod edition;
 mod export;
+mod historique;
 mod mcp;
 mod parametres;
 mod reception;
@@ -49,6 +51,7 @@ struct OptionsServeur {
     factice: bool,
 }
 
+/// Format de sortie des commandes qui en proposent plusieurs.
 #[derive(Clone, Copy, ValueEnum)]
 enum Format {
     Texte,
@@ -57,6 +60,7 @@ enum Format {
     Github,
 }
 
+/// Sous-commandes de `wikik` ; sans sous-commande, le serveur du projet s'ouvre (ADR-0012).
 #[derive(Subcommand)]
 enum Commande {
     /// Crée `wikik.toml` et l'arborescence `docs/projet/` (n'écrase rien).
@@ -68,7 +72,7 @@ enum Commande {
         #[arg(long)]
         hook: bool,
     },
-    /// Crée le fichier du prochain identifiant libre (`exigence`, `exigence-nf`, `besoin`, `adr`, `spec`).
+    /// Crée le fichier du prochain identifiant libre (`exigence`, `exigence-nf`, `besoin`, `adr`, `spec`, `test`).
     Nouveau { genre: String, titre: String },
     /// Couverture de la doc : symboles documentés, périmés, exigences couvertes.
     Stats {
@@ -104,6 +108,7 @@ enum Commande {
     Relu { symbole: String },
 }
 
+/// Requêtes de `wikik query`, les mêmes que les outils MCP.
 #[derive(Subcommand)]
 enum Requete {
     /// Modules et fichiers avec leur rôle en une ligne.
@@ -147,6 +152,8 @@ enum Requete {
     Document { id: String },
 }
 
+/// Point d'entrée : une erreur est écrite sur la sortie d'erreur et le code de sortie vaut 2, distinct du 1
+/// d'un `check` qui trouve des erreurs.
 fn main() {
     let cli = Cli::parse();
     let code = match executer(cli) {

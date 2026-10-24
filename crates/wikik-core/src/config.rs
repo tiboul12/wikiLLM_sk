@@ -22,8 +22,9 @@ pub struct Config {
     pub ia: ConfigIa,
 }
 
-/// Section `[ia]` : consignes données aux LLM et agent de développement (EF-147), réglables dans la
-/// section Paramètres.
+/// Section `[ia]` : agent de développement (EF-147). Les consignes d'avant la v8 y restent lisibles, mais
+/// les consignes des LLM sont désormais des skills (ADR-0017) : une valeur trouvée ici passe dans son
+/// skill à la première écriture des Paramètres.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigIa {
@@ -37,6 +38,7 @@ pub struct ConfigIa {
 }
 
 impl Default for ConfigIa {
+    /// Consignes par défaut : interroger wikik avant de lire le code, traiter la réception par un plan validé puis lot par lot ; agent `claude`.
     fn default() -> Self {
         Self {
             consigne_lecture: "Interroger wikik avant d'ouvrir des fichiers source : carte en début de session, symbole puis impact avant de modifier du code ; document pour lire un besoin, une exigence ou une décision par son identifiant.".into(),
@@ -54,6 +56,7 @@ pub struct ConfigReception {
 }
 
 impl Default for ConfigReception {
+    /// Cahier de réception rangé dans `docs/reception`.
     fn default() -> Self {
         Self {
             dossier: "docs/reception".into(),
@@ -92,6 +95,7 @@ pub struct ConfigAtelier {
 }
 
 impl Default for ConfigAtelier {
+    /// Atelier rangé dans `docs/atelier`, version `v1`, LLM par défaut.
     fn default() -> Self {
         Self {
             dossier: "docs/atelier".into(),
@@ -101,25 +105,64 @@ impl Default for ConfigAtelier {
     }
 }
 
-/// Section `[atelier.llm]` : commande du fournisseur (SPEC-19). Les jetons `{consigne}`, `{schema}`
-/// et `{mcp}` des arguments sont remplacés à chaque appel.
+/// Section `[atelier.llm]` : le LLM de l'atelier, de la réception et de la recherche (SPEC-19, ADR-0015).
+/// `connecteur` choisit le fournisseur ; les connecteurs connus construisent leurs arguments à partir de
+/// `modele` et `effort`. Le connecteur `cli` garde la commande et les arguments à la main (jetons
+/// `{consigne}`, `{schema}`, `{mcp}` remplacés à chaque appel), comme avant la v8.
+///
+/// @req EF-155
+/// @adr 15
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigLlm {
-    /// `cli` (défaut) ou `factice` (tests, démonstration sans LLM).
+    /// `claude`, `agy`, `vibe`, `ollama`, `llama-cpp`, `cli` ou `factice` ; absent : déduit de
+    /// `fournisseur` et des arguments (configurations d'avant la v8).
+    pub connecteur: Option<String>,
+    /// Ancien choix (`cli` ou `factice`), gardé pour les fichiers existants.
     pub fournisseur: String,
+    /// Binaire du CLI (vide : celui du connecteur).
     pub commande: String,
     pub arguments: Vec<String>,
+    /// Modèle demandé (vide : celui par défaut du fournisseur).
+    pub modele: String,
+    /// Effort de raisonnement (`low` à `max` selon le fournisseur ; vide : par défaut).
+    pub effort: String,
+    /// Adresse d'un serveur local (Ollama, llama.cpp) ; vide : celle par défaut.
+    pub url: String,
     /// Délai maximum d'un appel, en secondes.
     pub delai: u64,
 }
 
+impl ConfigLlm {
+    /// Connecteur effectif : celui choisi, sinon `factice` pour `fournisseur = "factice"`, `cli` pour
+    /// des arguments modifiés à la main, `claude` sinon.
+    pub fn connecteur(&self) -> String {
+        if let Some(c) = self.connecteur.as_deref().filter(|c| !c.is_empty()) {
+            return c.to_string();
+        }
+        if self.fournisseur == "factice" {
+            "factice".into()
+        } else if self.arguments != ConfigLlm::default().arguments
+            || !matches!(self.commande.as_str(), "" | "claude")
+        {
+            "cli".into()
+        } else {
+            "claude".into()
+        }
+    }
+}
+
 impl Default for ConfigLlm {
+    /// LLM par défaut : Claude Code en CLI (`claude`), sans modèle ni effort imposés.
     fn default() -> Self {
         let a = |s: &str| s.to_string();
         Self {
+            connecteur: None,
             fournisseur: a("cli"),
             commande: a("claude"),
+            modele: String::new(),
+            effort: String::new(),
+            url: String::new(),
             arguments: [
                 "-p",
                 "{consigne}",
@@ -165,6 +208,7 @@ pub struct ConfigIndex {
 }
 
 impl Default for ConfigIndex {
+    /// Langages indexés par défaut : Rust, TypeScript, JavaScript, Svelte ; rien d'exclu en plus du `.gitignore`.
     fn default() -> Self {
         Self {
             exclure: vec![],
@@ -187,6 +231,7 @@ pub struct ConfigProjet {
 }
 
 impl Default for ConfigProjet {
+    /// Zone Projet dans `docs/projet`.
     fn default() -> Self {
         Self {
             dossier: "docs/projet".into(),
@@ -205,6 +250,7 @@ pub struct ConfigCheck {
 }
 
 impl Default for ConfigCheck {
+    /// Doc exigée sur les symboles publics ; sévérités par défaut de chaque diagnostic.
     fn default() -> Self {
         Self {
             seuil_visibilite: "pub".into(),

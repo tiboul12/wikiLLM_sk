@@ -51,9 +51,11 @@ pub struct Page {
 /// Page des remarques qui ne visent aucun écran en particulier.
 pub const GENERAL: &str = "general";
 
+/// Extensions des fichiers lus pour trouver les routes et les écrans.
 const EXTENSIONS: &[&str] = &[
     "rs", "ts", "tsx", "js", "jsx", "mjs", "vue", "svelte", "html",
 ];
+/// Dossiers dont les fichiers sont pris pour des pages quand aucun routeur n'est reconnu (Next, SvelteKit, conventions courantes).
 const DOSSIERS_PAGES: &[&str] = &["pages", "views", "routes", "screens", "ecrans", "vues"];
 /// Balises de structure des frameworks : jamais prises pour le composant d'une page.
 const STRUCTURE: &[&str] = &[
@@ -79,28 +81,36 @@ const STRUCTURE: &[&str] = &[
     "Navigate",
 ];
 
+/// Route déclarée en objet (`{ path: '/x', component: X }`, Angular, Vue Router) ; le second groupe garde le reste de l'objet.
 static OBJET_ROUTE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"\{\s*path\s*:\s*['"`]([^'"`]*)['"`]([^{}]*)\}"#).unwrap());
+/// Composant d'une route en objet : `component: X`, `element: <X`, ou `m.X` d'un import paresseux.
 static COMPOSANT_ROUTE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?:component|Component|element)\s*:\s*<?\s*([A-Z]\w*)|\bm\s*\.\s*([A-Z]\w*)")
         .unwrap()
 });
+/// Balise `<Route …>` (React Router, Leptos, Solid), lue sur 400 caractères au plus.
 static BALISE_ROUTE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<Route\b[^>]{0,400}").unwrap());
+/// Chemin d'une balise `<Route>` : `path="/x"`, `path={"/x"}`, `path!("/x")`, `StaticSegment("x")`.
 static CHEMIN_BALISE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"\bpath\s*=\s*\{?\s*(?:path!\(\s*|StaticSegment\(\s*)?["']([^"']*)["']"#).unwrap()
 });
+/// Composant d'une balise `<Route>` : `view=`, `element=`, `component=`.
 static VUE_BALISE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"\b(?:view|element|component|Component)\s*=\s*\{?\s*<?\s*([A-Z]\w*)").unwrap()
 });
+/// Énumération des écrans d'un routeur maison (`enum Page { … }` et variantes françaises et anglaises).
 static ENUM: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"\benum\s+(Page|Pages|Screen|Screens|View|Views|Ecran|Ecrans|Vue|Vues)\s*\{([^}]*)\}",
     )
     .unwrap()
 });
+/// Titre d'une page HTML statique, pris comme nom de la page.
 static TITRE_HTML: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?is)<title>\s*([^<]*?)\s*</title>").unwrap());
+/// Première balise à majuscule : le composant affiché derrière une condition d'écran.
 static BALISE_MAJ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<([A-Z]\w*)").unwrap());
 /// Routeur maison à discriminant : `if (chemin === "/produit") return { page: "produit" }`.
 static ROUTE_DISCRIMINANT: LazyLock<Regex> = LazyLock::new(|| {
@@ -111,12 +121,14 @@ static AFFICHAGE_DISCRIMINANT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"\.page\s*===?\s*["']([\w-]+)["'][^<]{0,200}<([A-Z]\w*)"#).unwrap()
 });
 
+/// Fichier source lu pour la carte : chemin relatif, extension et texte.
 struct Source {
     chemin: String,
     ext: String,
     texte: String,
 }
 
+/// Fichiers sources du projet (marcheur de l'index, donc `.gitignore` respecté) ; ceux de plus d'1 Mo sont sautés.
 fn sources(index: &Index) -> Result<Vec<Source>> {
     let mut v = vec![];
     for e in index.marcheur()? {
@@ -180,6 +192,7 @@ fn humaniser(t: &str) -> String {
         .unwrap_or_default()
 }
 
+/// Route normalisée : un seul `/` en tête, aucun en fin (`/` pour la racine).
 fn route_normale(r: &str) -> String {
     let r = r.trim().trim_matches('/');
     format!("/{r}")
@@ -198,6 +211,7 @@ fn symbole(index: &Index, nom: &str) -> Option<(String, String)> {
         .ok()
 }
 
+/// Exigences implémentées par les symboles d'une page (`@req`), sans doublon et triées.
 fn exigences(index: &Index, symboles: &[String]) -> Vec<String> {
     let mut v = BTreeSet::new();
     for s in symboles {
@@ -242,7 +256,7 @@ fn page(
 }
 
 /// Applique les détecteurs (SPEC-22 R2), dans l'ordre ; une route ou un composant déjà vus ne sont
-/// pas repris.
+/// pas repris. Les écrans déclarés par `@ecrans` passent en premier (EF-164).
 /// @relu 2026-10-19 ce02aeb0
 pub fn detecter(index: &Index) -> Result<Vec<Page>> {
     let fichiers = sources(index)?;
@@ -265,6 +279,47 @@ pub fn detecter(index: &Index) -> Result<Vec<Page>> {
         }
         pages.push(p);
     };
+
+    // 0. Écrans déclarés dans le code (EF-164) : `@ecrans /route Nom` sur le composant d'une page à route
+    //    paramétrée (`/atelier/<étape>`) en donne les valeurs, une page chacune ; le composant n'est plus
+    //    une page à lui seul.
+    let mut st = index.conn.prepare(
+        "SELECT symbole, valeur FROM balises WHERE nom = 'ecrans' ORDER BY symbole, ligne",
+    )?;
+    let declares: Vec<(String, String)> = st
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    let symboles_declares: BTreeSet<String> = declares.iter().map(|d| d.0.clone()).collect();
+    for (symbole, valeur) in declares {
+        let (route, nom) = valeur
+            .trim()
+            .split_once(char::is_whitespace)
+            .map_or((valeur.trim(), ""), |(r, n)| (r, n.trim()));
+        if !route.starts_with('/') {
+            continue;
+        }
+        let route = route_normale(route);
+        let nom = if nom.is_empty() {
+            humaniser(route.rsplit('/').next().unwrap_or(""))
+        } else {
+            nom.to_string()
+        };
+        let symboles = vec![symbole.clone()];
+        let p = Page {
+            cle: route.clone(),
+            nom,
+            route: Some(route),
+            exigences: exigences(index, &symboles),
+            fichier: symbole.split("::").next().map(str::to_string),
+            symboles,
+            source: "ecrans".into(),
+            groupe: None,
+            masque: false,
+            corrige: false,
+            disparue: false,
+        };
+        ajouter(p, None, &mut pages);
+    }
 
     // 1. Routes déclarées : objets (Angular, Vue, React Router en objets) et balises <Route> (React, Leptos).
     for f in fichiers.iter().filter(|f| f.ext != "html") {
@@ -616,6 +671,14 @@ pub fn detecter(index: &Index) -> Result<Vec<Page>> {
         );
         ajouter(p, Some(nom), &mut pages);
     }
+    // Un composant qui déclare ses écrans n'est pas une page de plus (REC-075).
+    pages.retain(|p| {
+        p.source == "ecrans"
+            || !p
+                .symboles
+                .first()
+                .is_some_and(|x| symboles_declares.contains(x))
+    });
     Ok(pages)
 }
 
@@ -679,6 +742,7 @@ fn composant_variante(
 
 // ---------------------------------------------------------------- carte persistée
 
+/// Chemin relatif de la carte des pages dans le dossier de réception.
 fn chemin_carte(index: &Index) -> String {
     format!(
         "{}/carte.md",
@@ -686,6 +750,7 @@ fn chemin_carte(index: &Index) -> String {
     )
 }
 
+/// Page « Général » toujours présente, pour les remarques qui ne visent pas un écran.
 fn page_generale() -> Page {
     Page {
         cle: GENERAL.into(),
@@ -711,6 +776,7 @@ pub fn lire(index: &Index) -> Vec<Page> {
         .unwrap_or_default()
 }
 
+/// Frontmatter de la carte écrite, s'il existe et se lit.
 fn frontmatter_carte(index: &Index) -> Option<Value> {
     let t = std::fs::read_to_string(index.racine.join(chemin_carte(index))).ok()?;
     let (yaml, _, _) = crate::projet::separer_frontmatter(&t);
@@ -765,6 +831,8 @@ pub fn ecrire(index: &Index, pages: &[Page]) -> Result<()> {
     ecrire_avec(index, pages, url_application(index).as_deref(), None)
 }
 
+/// Écrit la carte : frontmatter (pages, adresse de l'application, dernier numéro de remarque, qui ne doit jamais
+/// reculer) et un tableau lisible des pages non masquées. `numero` absent garde le dernier numéro connu.
 fn ecrire_avec(
     index: &Index,
     pages: &[Page],
@@ -801,13 +869,14 @@ fn ecrire_avec(
     }
     let chemin = index.racine.join(chemin_carte(index));
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(chemin, crate::atelier::artefacts::formater(&fm, &corps))?;
+    crate::journal::ecrire(chemin, crate::atelier::artefacts::formater(&fm, &corps))?;
     Ok(())
 }
 
 /// Fusionne un scan avec la carte existante (SPEC-22 R4) : corrections gardées (nom, masque, groupe,
 /// route ajoutée à la main), page retrouvée sous une autre clé reconnue à son composant (elle garde sa
 /// clé et ses remarques), nouvelles pages ajoutées, pages disparues marquées.
+/// @relu 2026-10-22 474b8f7b
 pub fn fusionner(anciennes: &[Page], trouvees: Vec<Page>) -> Vec<Page> {
     let par_cle: BTreeMap<&str, &Page> = anciennes.iter().map(|p| (p.cle.as_str(), p)).collect();
     let cles_trouvees: BTreeSet<String> = trouvees.iter().map(|p| p.cle.clone()).collect();
@@ -818,11 +887,21 @@ pub fn fusionner(anciennes: &[Page], trouvees: Vec<Page>) -> Vec<Page> {
         .filter(|a| !cles_trouvees.contains(&a.cle))
         .filter_map(|a| Some((a.symboles.first()?.as_str(), a.cle.as_str())))
         .collect();
+    // Un composant qui fait plusieurs écrans (`@ecrans`) ne transmet sa clé à aucun : l'ancienne page
+    // reste, avec ses remarques, marquée disparue.
+    let mut par_composant: BTreeMap<String, usize> = BTreeMap::new();
+    for p in &trouvees {
+        if let Some(s) = p.symboles.first() {
+            *par_composant.entry(s.clone()).or_default() += 1;
+        }
+    }
     let mut sortie: Vec<Page> = vec![];
     let mut vues = BTreeSet::new();
     for mut p in trouvees {
         if !par_cle.contains_key(p.cle.as_str())
-            && let Some(ancienne) = p.symboles.first().and_then(|s| par_symbole.get(s.as_str()))
+            && let Some(s) = p.symboles.first()
+            && par_composant.get(s) == Some(&1)
+            && let Some(ancienne) = par_symbole.get(s.as_str())
             && !vues.contains(*ancienne)
         {
             p.cle = (*ancienne).to_string();
@@ -969,7 +1048,7 @@ pub fn ajouter_llm(index: &Index, propositions: &[Value]) -> Result<Vec<Ajout>> 
 }
 
 /// Demande au LLM les pages que les détecteurs n'ont pas trouvées (SPEC-22 R5) : (consigne, schéma). La
-/// consigne reprend la méthode de lecture du wiki des paramètres (`[ia] consigne_lecture`).
+/// consigne reprend la méthode de lecture du wiki (skill `wikik-lecture`, ADR-0017).
 /// @relu 2026-10-19 b304927a
 pub fn demande_completion(index: &Index) -> (String, Value) {
     let connues: Vec<String> = lire(index)
@@ -987,14 +1066,14 @@ pub fn demande_completion(index: &Index) -> (String, Value) {
     let consigne = format!(
         "Tu prépares la réception d'une application : la liste de ses écrans, pour que l'utilisateur y dépose ses remarques.\n\
          Lis le projet avec les outils wikik (carte, fichier, symbole, cherche, pages) ; tu n'écris rien.\n\
-         Méthode de lecture du wiki : {}\n\n\
+         Méthode de lecture du wiki (skill wikik-lecture) :\n{}\n\n\
          Écrans déjà trouvés par l'analyse du code :\n{}\n\n\
          Trouve les écrans que l'utilisateur peut atteindre et qui manquent (vues affichées par un état, onglets, \
          fenêtres modales importantes, pages servies par le serveur). Pour chacun : un nom court en français, sa route \
          (l'adresse exacte qui l'ouvre dans l'application, paramètre compris, ex. `/atelier/pitch`) si elle existe, l'identifiant exact du symbole de l'index qui l'affiche (`chemin::Nom`), et en une phrase la \
          raison. N'invente aucun symbole : s'il n'est pas dans l'index, n'ajoute pas l'écran. Réponds `elements: []` \
          si rien ne manque.",
-        index.config.ia.consigne_lecture,
+        crate::skills::corps(&index.racine, &index.config, "wikik-lecture"),
         if connues.is_empty() {
             "(aucun)".to_string()
         } else {

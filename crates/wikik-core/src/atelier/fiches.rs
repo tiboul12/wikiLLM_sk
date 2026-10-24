@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 use std::sync::OnceLock;
 use ts_rs::TS;
 
+/// Fiches des techniques, embarquées dans le binaire depuis `atelier/techniques/` : l'atelier marche sans fichiers installés.
 const SOURCES: &[(&str, &str)] = &[
     (
         "00-clarification.md",
@@ -166,6 +167,7 @@ impl Fiche {
     }
 }
 
+/// Contenu d'une section `## titre` d'une fiche, jusqu'à la section suivante ; vide si elle manque.
 fn section<'a>(corps: &'a str, titre: &str) -> &'a str {
     let marque = format!("\n## {titre}\n");
     let Some(debut) = corps.find(&marque).map(|i| i + marque.len()) else {

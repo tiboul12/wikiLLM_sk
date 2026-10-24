@@ -3,6 +3,7 @@
   // projet ; saisie sur place si rien n'est déduit), ce que le code en dit (route,
   // composant, exigences), ses remarques, et la carte pour en ajouter une ; on passe à la page suivante
   // sans revenir à la carte.
+  // @ecrans /reception/page/:cle Carte de réception d'une page
   import { reception, remarquesDe, lienApplication, ecrireReception, visible, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
@@ -10,16 +11,24 @@
   import NouvelleRemarque from "../../composants/reception/NouvelleRemarque.svelte";
 
   let { cle }: { cle: string } = $props();
+  /** Pages visibles, dans l'ordre de la carte, pour passer à la précédente ou à la suivante. */
   const visibles = $derived(reception.etat?.pages.filter(visible) ?? []);
+  /** Rang de la page affichée parmi les visibles. */
   const i = $derived(visibles.findIndex((p) => p.cle === cle));
+  /** Page affichée, même masquée (on peut y arriver par un lien). */
   const p = $derived(reception.etat?.pages.find((x) => x.cle === cle));
+  /** Remarques de la page dans la réception en cours. */
   const rs = $derived(remarquesDe(cle));
+  /** Page visible précédente. */
   const precedente = $derived(i > 0 ? visibles[i - 1] : null);
+  /** Adresse de l'application saisie sur place quand rien n'est déduit du projet. */
   let adresse = $state("");
+  /** Enregistre l'adresse de l'application ; le lien de la page apparaît alors. */
   async function enregistrerAdresse(e: SubmitEvent) {
     e.preventDefault();
     if (adresse.trim()) await ecrireReception("application", { url: adresse.trim() }).catch(() => {});
   }
+  /** Page visible suivante, pour enchaîner sans revenir à la carte. */
   const suivante = $derived(i >= 0 && i < visibles.length - 1 ? visibles[i + 1] : null);
 </script>
 

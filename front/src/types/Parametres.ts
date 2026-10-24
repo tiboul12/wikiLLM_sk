@@ -2,13 +2,26 @@
 
 /**
  * Paramètres affichés et modifiables dans la section Paramètres.
+ * @relu 2026-10-22 8b5561b1
  */
 export type Parametres = { 
 /**
- * `cli` ou `factice`.
+ * `claude`, `agy`, `vibe`, `ollama`, `llama-cpp`, `cli` ou `factice` (ADR-0015).
  */
-fournisseur: string, commande: string, arguments: Array<string>, 
+connecteur: string, 
+/**
+ * Binaire du CLI (vide : celui du connecteur).
+ */
+commande: string, 
+/**
+ * Arguments du connecteur `cli` (commande libre).
+ */
+arguments: Array<string>, modele: string, effort: string, 
+/**
+ * Adresse du serveur local (Ollama, llama.cpp) ; vide : celle par défaut.
+ */
+url: string, 
 /**
  * Délai maximum d'un appel, en secondes.
  */
-delai: bigint, consigne_lecture: string, consigne_traitement: string, agent: string, };
+delai: bigint, agent: string, };

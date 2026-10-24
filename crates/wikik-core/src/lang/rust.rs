@@ -12,21 +12,27 @@ use crate::modele::{AppelBrut, Balise, ExtraitFichier, Import, Symbole};
 use std::collections::HashMap;
 use tree_sitter::{Node, Parser};
 
-/// Balises reconnues par SPEC-01 ; les autres sont gardées mais signalées par `check`.
-pub const BALISES_CONNUES: &[&str] = &["adr", "req", "topic", "pitfall", "relu"];
+/// Balises reconnues par SPEC-01 (et `@ecrans`, les écrans d'une route à paramètre : EF-164) ; les
+/// autres sont gardées mais signalées par `check`.
+pub const BALISES_CONNUES: &[&str] = &["adr", "req", "topic", "pitfall", "relu", "ecrans"];
 
 /// Langage Rust.
 pub struct Rust;
 
 impl Langage for Rust {
+    /// Nom du langage enregistré dans l'index (`fichiers.langage`).
     fn nom(&self) -> &'static str {
         "rust"
     }
 
+    /// Extensions prises en charge : `.rs` seulement.
     fn extensions(&self) -> &'static [&'static str] {
         &["rs"]
     }
 
+    /// Extrait symboles, imports, en-tête et mesures d'un fichier Rust.
+    /// Un fichier que tree-sitter ne sait pas analyser donne un extrait vide avec une erreur de parse, jamais une panique :
+    /// l'index reste utilisable et `check` signale le fichier.
     fn extraire(&self, chemin: &str, source: &[u8]) -> ExtraitFichier {
         let mut parser = Parser::new();
         parser
@@ -76,6 +82,7 @@ impl Langage for Rust {
     }
 }
 
+/// État partagé du parcours d'un fichier : source, chemin (préfixe des identifiants) et symboles déjà trouvés.
 struct Ctx<'a> {
     src: &'a [u8],
     chemin: &'a str,
@@ -97,10 +104,12 @@ struct Portee {
     est_test: bool,
 }
 
+/// Texte d'un nœud ; vide si la source n'est pas de l'UTF-8 valide à cet endroit.
 fn txt<'a>(n: Node, src: &'a [u8]) -> &'a str {
     n.utf8_text(src).unwrap_or("")
 }
 
+/// Nombre de lignes d'une source, la dernière comptée même sans retour à la ligne final.
 pub(crate) fn compter_lignes(src: &[u8]) -> usize {
     if src.is_empty() {
         return 0;
@@ -108,6 +117,7 @@ pub(crate) fn compter_lignes(src: &[u8]) -> usize {
     src.iter().filter(|b| **b == b'\n').count() + usize::from(*src.last().unwrap() != b'\n')
 }
 
+/// Nom qualifié dans la portée courante (`Type::methode`, `module::fonction`).
 fn qualifier(prefixe: &str, nom: &str) -> String {
     if prefixe.is_empty() {
         nom.to_string()
@@ -130,6 +140,7 @@ fn nom_type(n: Node, src: &[u8]) -> String {
         .to_string()
 }
 
+/// Visibilité d'un item (`pub`, `pub(crate)`, …, blancs retirés), `None` s'il est privé.
 fn visibilite(item: Node, src: &[u8]) -> Option<String> {
     let mut c = item.walk();
     for enfant in item.children(&mut c) {
@@ -156,6 +167,9 @@ struct Prelude {
     attributs: Vec<String>,
 }
 
+/// Doc et attributs qui précèdent un item : on remonte les frères tant qu'on trouve des `///`, des `/** */` ou des attributs.
+/// Un `////` ou un `/***` n'est pas de la doc et arrête la remontée, comme un commentaire ordinaire. Les lignes vides
+/// de début et de fin de bloc sont retirées ; les numéros de lignes servent à `check` pour situer le bloc.
 fn prelude(item: Node, src: &[u8]) -> Prelude {
     let mut docs: Vec<(usize, usize, Vec<String>)> = vec![];
     let mut attributs = vec![];
@@ -255,11 +269,14 @@ pub fn resume(lignes: &[String]) -> Option<String> {
     }
 }
 
+/// Ligne de balise : `@` suivi d'une minuscule (`@req`, `@adr`, `@pitfall`…), pour ne pas prendre une adresse ou un `@Composant`.
 fn est_ligne_balise(t: &str) -> bool {
     let mut it = t.chars();
     it.next() == Some('@') && it.next().is_some_and(|c| c.is_ascii_lowercase())
 }
 
+/// Balises d'un bloc, avec leur ligne dans le fichier quand le bloc est situé (0 sinon).
+/// Le nom va jusqu'au premier blanc, le reste est la valeur ; les balises inconnues sont gardées, `check` les signale.
 pub(crate) fn balises(lignes: &[String], ligne_debut: Option<usize>) -> Vec<Balise> {
     let mut v = vec![];
     for (i, l) in lignes.iter().enumerate() {
@@ -315,6 +332,8 @@ pub fn hash_normalise(n: Node, src: &[u8], sauter: Option<usize>) -> String {
     empreinte_morceaux(feuilles.into_iter().map(|f| f.1))
 }
 
+/// Accolades d'un bloc à expression unique sous un bras de `match` ou une closure : `rustfmt` les ajoute ou les retire
+/// selon la longueur, elles sont donc hors du hash pour qu'un reformatage ne rende pas la doc périmée.
 fn accolade_facultative(accolade: Node) -> bool {
     let Some(bloc) = accolade.parent() else {
         return false;
@@ -350,6 +369,7 @@ fn texte_signature(item: Node, corps: Option<Node>, src: &[u8]) -> String {
     }
 }
 
+/// Item de test : `#[test]`, `#[tokio::test]` et assimilés, ou module `#[cfg(test)]`. Les tests ne comptent pas dans la couverture.
 fn est_attribut_test(attrs: &[String]) -> bool {
     attrs.iter().any(|a| {
         let a: String = a.chars().filter(|c| !c.is_whitespace()).collect();
@@ -357,6 +377,7 @@ fn est_attribut_test(attrs: &[String]) -> bool {
     })
 }
 
+/// Prédicat d'un `#[cfg(...)]` sur l'item, pour distinguer deux définitions homonymes compilées sous des conditions différentes.
 fn predicat_cfg(attrs: &[String]) -> Option<String> {
     attrs.iter().find_map(|a| {
         let a: String = a.chars().filter(|c| !c.is_whitespace()).collect();
@@ -366,6 +387,8 @@ fn predicat_cfg(attrs: &[String]) -> Option<String> {
     })
 }
 
+/// Parcourt les items d'un module, d'un `impl` ou d'un `trait` et y crée un symbole par déclaration documentable.
+/// Descend dans les modules en ligne et les `impl` en allongeant la portée (préfixe du nom, test, type parent).
 fn parcourir_items(noeud: Node, portee: &Portee, ctx: &mut Ctx) {
     let mut c = noeud.walk();
     let enfants: Vec<Node> = noeud.children(&mut c).collect();
@@ -501,6 +524,7 @@ fn parcourir_items(noeud: Node, portee: &Portee, ctx: &mut Ctx) {
     }
 }
 
+/// Ajoute une fonction ou une méthode : signature, hash du corps et de la signature, appels relevés dans le corps.
 fn ajouter_fonction(item: Node, portee: &Portee, ctx: &mut Ctx) {
     let src = ctx.src;
     let nom = item
@@ -553,6 +577,8 @@ fn ajouter_fonction(item: Node, portee: &Portee, ctx: &mut Ctx) {
     ctx.symboles.push(s);
 }
 
+/// Construit un symbole à partir de l'item et de son prélude ; `hash_doc` porte sur la doc aux blancs de bord retirés,
+/// pour qu'une réindentation ne compte pas comme un changement de doc.
 #[allow(clippy::too_many_arguments)]
 fn nouveau_symbole(
     chemin: &str,
@@ -649,6 +675,7 @@ pub(crate) fn desambiguiser(symboles: &mut [Symbole]) {
     }
 }
 
+/// Relève les appels d'un corps (fonctions, chemins, méthodes, composants de `view!`), triés par ligne puis par cible.
 fn collecter_appels(corps: Node, src: &[u8], sortie: &mut Vec<AppelBrut>) {
     let mut pile = vec![corps];
     while let Some(x) = pile.pop() {
@@ -680,6 +707,7 @@ fn collecter_appels(corps: Node, src: &[u8], sortie: &mut Vec<AppelBrut>) {
     sortie.sort_by(|a, b| a.ligne.cmp(&b.ligne).then(a.cible.cmp(&b.cible)));
 }
 
+/// Chemin d'appel sans paramètres génériques (`Vec::<u8>::new` → `Vec::new`), pour le résoudre comme un chemin ordinaire.
 fn sans_turbofish(chemin: &str) -> String {
     let mut sortie = String::new();
     let mut profondeur = 0usize;
@@ -697,6 +725,8 @@ fn sans_turbofish(chemin: &str) -> String {
         .to_string()
 }
 
+/// Appel brut d'une expression appelée : identifiant direct, chemin, ou méthode (`self` noté comme qualificatif,
+/// les autres receveurs restent inconnus) ; `None` pour un appel de closure ou d'expression calculée.
 fn appel_de(f: Node, src: &[u8], ligne: usize) -> Option<AppelBrut> {
     match f.kind() {
         "identifier" => Some(AppelBrut {
@@ -757,6 +787,8 @@ fn composants_rendus(macro_view: Node, src: &[u8], sortie: &mut Vec<AppelBrut>) 
     }
 }
 
+/// Aplatit une déclaration `use` en paires alias → chemin complet : listes imbriquées, `as`, `self` (alias = le module).
+/// Les `*` sont ignorés : on ne sait pas ce qu'ils importent sans résoudre le module.
 fn aplatir_use(n: Node, prefixe: &str, src: &[u8], sortie: &mut Vec<Import>) {
     let joindre = |a: &str, b: &str| {
         if a.is_empty() {
@@ -837,6 +869,7 @@ fn entete(racine: Node, src: &[u8]) -> (Option<String>, Vec<Balise>) {
     ((!lignes.is_empty()).then(|| lignes.join("\n")), b)
 }
 
+/// Lignes occupées par des appels de macros, dont le contenu n'est pas analysé : mesure ce qui échappe à l'index.
 fn lignes_macros(racine: Node) -> usize {
     let mut total = 0;
     let mut pile = vec![racine];
@@ -853,6 +886,7 @@ fn lignes_macros(racine: Node) -> usize {
     total
 }
 
+/// Nœuds d'erreur ou manquants dans l'arbre : un fichier partiellement analysé reste indexé, `check` le signale.
 pub(crate) fn compter_erreurs(racine: Node) -> usize {
     if !racine.has_error() {
         return 0;

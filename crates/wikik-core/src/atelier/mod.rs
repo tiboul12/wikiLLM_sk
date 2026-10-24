@@ -6,6 +6,7 @@
 //! @adr 10
 
 pub mod artefacts;
+pub mod connecteurs;
 pub mod fiches;
 pub mod fournisseur;
 pub mod parcours;
@@ -25,6 +26,7 @@ use serde_json::json;
 /// d'en créer une autre.
 ///
 /// @req EF-110, EF-144
+/// @relu 2026-10-22 956e2351
 pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, String)> {
     let c = &index.conn;
     let existe: bool = c
@@ -43,7 +45,7 @@ pub fn rappel(index: &Index, sujet: &str, question: &str) -> Result<(String, Str
     let adresse = |id: &str| {
         let serveur =
             crate::reseau::pour_le_reseau(&crate::reseau::adresse_serveur(index), &index.config);
-        format!("{}/clarification/{id}", serveur.trim_end_matches('/'))
+        format!("{}/clarifications/{id}", serveur.trim_end_matches('/'))
     };
     let question = if question.trim().is_empty() {
         if let Some(id) = clarifications(index)?
@@ -95,6 +97,7 @@ struct Clar {
     chemin: String,
 }
 
+/// Clarifications du projet, par identifiant, frontmatter décodé.
 fn clarifications(index: &Index) -> Result<Vec<Clar>> {
     let mut st = index.conn.prepare(
         "SELECT id, chemin, frontmatter FROM documents WHERE genre = 'clarification' ORDER BY id",
@@ -120,6 +123,7 @@ fn clarifications(index: &Index) -> Result<Vec<Clar>> {
     Ok(v)
 }
 
+/// Clarification par identifiant ; erreur claire si elle n'existe pas.
 fn clarification(index: &Index, id: &str) -> Result<Clar> {
     clarifications(index)?
         .into_iter()
@@ -160,14 +164,15 @@ pub fn rouvrir(index: &Index, id: &str) -> Result<()> {
 }
 
 /// Supprime une clarification (REC-032) : son fichier et ses propositions en attente.
+/// @relu 2026-10-22 d7754c38
 pub fn supprimer(index: &Index, id: &str) -> Result<()> {
     let c = clarification(index, id)?;
-    std::fs::remove_file(index.racine.join(&c.chemin))?;
+    crate::journal::supprimer(index.racine.join(&c.chemin))?;
     let lot = parcours::travail(&index.racine)
         .join("propositions")
         .join(format!("clarification__reponse__{id}.json"));
     if lot.exists() {
-        std::fs::remove_file(lot)?;
+        crate::journal::supprimer(lot)?;
     }
     Ok(())
 }

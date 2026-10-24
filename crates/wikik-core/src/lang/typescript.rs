@@ -44,14 +44,18 @@ pub const BALISES_JSDOC: &[&str] = &[
 pub struct TypeScript;
 
 impl Langage for TypeScript {
+    /// Nom du langage enregistré dans l'index.
     fn nom(&self) -> &'static str {
         "typescript"
     }
 
+    /// Extensions TypeScript, modules ES et CommonJS compris.
     fn extensions(&self) -> &'static [&'static str] {
         &["ts", "tsx", "mts", "cts"]
     }
 
+    /// Extrait un fichier TypeScript ; un `.d.ts` ne donne que son nombre de lignes (déclarations de types tiers,
+    /// sans doc à suivre), un `.tsx` passe par la grammaire TSX.
     fn extraire(&self, chemin: &str, source: &[u8]) -> ExtraitFichier {
         if chemin.ends_with(".d.ts") {
             return ExtraitFichier {
@@ -72,14 +76,17 @@ impl Langage for TypeScript {
 pub struct JavaScript;
 
 impl Langage for JavaScript {
+    /// Nom du langage enregistré dans l'index.
     fn nom(&self) -> &'static str {
         "javascript"
     }
 
+    /// Extensions JavaScript, JSX et modules compris.
     fn extensions(&self) -> &'static [&'static str] {
         &["js", "jsx", "mjs", "cjs"]
     }
 
+    /// Extrait un fichier JavaScript avec la grammaire TSX, qui lit aussi le JS et le JSX.
     fn extraire(&self, chemin: &str, source: &[u8]) -> ExtraitFichier {
         extraire_ts(chemin, source, &tree_sitter_typescript::LANGUAGE_TSX.into())
     }
@@ -161,6 +168,7 @@ pub(crate) fn appels_niveau_module(
     appels
 }
 
+/// Fichier de tests (`.spec.ts`, `.test.ts`…) : ses symboles sont marqués tests et ne comptent pas dans la couverture.
 fn est_fichier_de_test(chemin: &str) -> bool {
     [
         ".spec.ts",
@@ -174,6 +182,7 @@ fn est_fichier_de_test(chemin: &str) -> bool {
     .any(|s| chemin.ends_with(s))
 }
 
+/// État partagé du parcours d'un fichier : source, chemin, symboles trouvés et commentaires exclus.
 struct Ctx<'a> {
     src: &'a [u8],
     chemin: &'a str,
@@ -183,6 +192,7 @@ struct Ctx<'a> {
     fichier_de_test: bool,
 }
 
+/// Portée courante : préfixe du nom qualifié, classe englobante et sa visibilité (un membre d'une classe non exportée est privé).
 #[derive(Default, Clone)]
 struct Portee {
     prefixe: String,
@@ -190,10 +200,12 @@ struct Portee {
     visibilite_classe: Option<String>,
 }
 
+/// Texte d'un nœud ; vide si la source n'est pas de l'UTF-8 valide à cet endroit.
 fn txt<'a>(n: Node, src: &'a [u8]) -> &'a str {
     n.utf8_text(src).unwrap_or("")
 }
 
+/// Nom qualifié dans la portée courante (`Classe::methode`).
 fn qualifier(prefixe: &str, nom: &str) -> String {
     if prefixe.is_empty() {
         nom.to_string()
@@ -275,6 +287,8 @@ struct Doc {
     decorateurs: Vec<String>,
 }
 
+/// Doc d'une déclaration : le `/** */` juste avant elle (décorateurs sautés), jamais un commentaire `//`
+/// ni un commentaire d'en-tête déjà pris par le fichier. Les décorateurs sont rendus à part pour reconnaître les composants Angular.
 fn doc_de(cible: Node, src: &[u8], exclus: &HashSet<usize>) -> Doc {
     let mut decorateurs = vec![];
     let mut c = cible.walk();
@@ -360,6 +374,7 @@ pub fn hash_normalise(n: Node, src: &[u8], sauter: Option<usize>) -> String {
     empreinte_morceaux(feuilles.into_iter().map(|f| f.1))
 }
 
+/// Signature affichée : de la déclaration à son corps, sans décorateurs, blancs compactés, 300 caractères au plus.
 fn texte_signature(cible: Node, corps: Option<Node>, src: &[u8]) -> String {
     let debut = {
         // Les décorateurs ne font pas partie de la signature affichée.
@@ -386,6 +401,8 @@ fn texte_signature(cible: Node, corps: Option<Node>, src: &[u8]) -> String {
     }
 }
 
+/// Ajoute un symbole. `hash_entier` (types, constantes) hache toute la déclaration, sans signature à part ni appels ;
+/// une classe décorée `@Component` devient un composant.
 #[allow(clippy::too_many_arguments)]
 fn ajouter(
     ctx: &mut Ctx,
@@ -454,11 +471,15 @@ fn ajouter(
     });
 }
 
+/// Nom d'une déclaration, s'il en a un (une fonction anonyme exportée n'en a pas).
 fn nom_de(n: Node, src: &[u8]) -> Option<String> {
     n.child_by_field_name("name")
         .map(|x| txt(x, src).to_string())
 }
 
+/// Parcourt les déclarations d'un programme ou d'un espace de noms : une déclaration exportée est publique,
+/// les autres sont indexées en privé ; un export sans déclaration (réexport, `export default` d'une expression)
+/// n'ajoute rien. Les `namespace` sont descendus, même écrits comme une expression.
 fn parcourir(noeud: Node, portee: &Portee, ctx: &mut Ctx) {
     let mut c = noeud.walk();
     let enfants: Vec<Node> = noeud.named_children(&mut c).collect();
@@ -588,6 +609,7 @@ fn declaration(d: Node, cible: Node, visibilite: &str, portee: &Portee, ctx: &mu
     }
 }
 
+/// Membres d'une classe : méthodes, champs (une fonction fléchée en champ compte comme méthode), signatures abstraites.
 fn membres(corps: Node, portee: &Portee, ctx: &mut Ctx) {
     let src = ctx.src;
     let mut c = corps.walk();
@@ -630,6 +652,7 @@ fn membres(corps: Node, portee: &Portee, ctx: &mut Ctx) {
     }
 }
 
+/// Relève les appels d'un corps : fonctions, méthodes, `new`, `inject(Service)` d'Angular, composants rendus en JSX.
 pub(crate) fn collecter_appels(corps: Node, src: &[u8], sortie: &mut Vec<AppelBrut>) {
     let mut pile = vec![corps];
     while let Some(x) = pile.pop() {
@@ -729,6 +752,7 @@ pub fn resoudre_module(depuis: &str, specificateur: &str) -> String {
     joint
 }
 
+/// Lit un `import` : alias → module résolu depuis le fichier ; un `.svelte` importé est un composant nommé d'après son fichier.
 fn lire_import(n: Node, src: &[u8], chemin: &str, sortie: &mut Vec<Import>) {
     let Some(source) = n.child_by_field_name("source") else {
         return;

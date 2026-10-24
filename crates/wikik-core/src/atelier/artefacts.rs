@@ -28,6 +28,7 @@ pub struct TypeArtefact {
     pub chiffres: usize,
 }
 
+/// Type d'artefact numéroté (`IDEE-001`…) rangé dans un dossier de sa zone.
 const fn t(
     nom: &'static str,
     prefixe: &'static str,
@@ -44,6 +45,7 @@ const fn t(
     }
 }
 
+/// Type d'artefact unique (un seul fichier, comme le pitch), rangé dans le dossier de l'atelier.
 const fn unique(nom: &'static str, prefixe: &'static str, fichier: &'static str) -> TypeArtefact {
     TypeArtefact {
         nom,
@@ -82,6 +84,7 @@ pub fn type_de(nom: &str) -> Result<&'static TypeArtefact> {
         .with_context(|| format!("type d'artefact inconnu : {nom}"))
 }
 
+/// Dossier de la zone d'un artefact (atelier ou projet), d'après wikik.toml.
 fn dossier_zone(racine: &Path, config: &Config, zone: Zone) -> PathBuf {
     racine.join(match zone {
         Zone::Atelier => config.atelier.dossier.trim_end_matches('/'),
@@ -153,6 +156,7 @@ pub fn formater(frontmatter: &Map<String, Value>, corps: &str) -> String {
 }
 
 /// Crée un artefact au prochain identifiant libre ; renvoie (identifiant, chemin relatif).
+/// @relu 2026-10-22 9ed1da27
 pub fn creer(
     racine: &Path,
     config: &Config,
@@ -170,11 +174,12 @@ pub fn creer(
         bail!("{relatif} existe déjà");
     }
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(&chemin, formater(&frontmatter, corps))?;
+    crate::journal::ecrire(&chemin, formater(&frontmatter, corps))?;
     Ok((id, relatif))
 }
 
 /// Comme [`creer`], mais le frontmatter et le corps sont construits une fois l'identifiant connu.
+/// @relu 2026-10-22 c255fdb4
 pub fn creer_avec(
     racine: &Path,
     config: &Config,
@@ -189,7 +194,7 @@ pub fn creer_avec(
     let relatif = chemin_relatif(config, ty, &id);
     let chemin = racine.join(&relatif);
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(&chemin, formater(&frontmatter, &corps))?;
+    crate::journal::ecrire(&chemin, formater(&frontmatter, &corps))?;
     Ok((id, relatif))
 }
 
@@ -206,13 +211,14 @@ pub fn lire(racine: &Path, relatif: &str) -> Result<(Map<String, Value>, String)
 }
 
 /// Réécrit un artefact existant (frontmatter et corps), en gardant son identifiant.
+/// @relu 2026-10-22 3a27c244
 pub fn reecrire(
     racine: &Path,
     relatif: &str,
     frontmatter: &Map<String, Value>,
     corps: &str,
 ) -> Result<()> {
-    std::fs::write(racine.join(relatif), formater(frontmatter, corps))?;
+    crate::journal::ecrire(racine.join(relatif), formater(frontmatter, corps))?;
     Ok(())
 }
 

@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::process::Command;
 
+/// Copie récursive d'un dossier de fixtures dans un dossier temporaire, pour que le test écrive sans toucher au dépôt.
 fn copier(de: &Path, vers: &Path) {
     std::fs::create_dir_all(vers).unwrap();
     for e in std::fs::read_dir(de).unwrap() {
@@ -15,6 +16,7 @@ fn copier(de: &Path, vers: &Path) {
     }
 }
 
+/// Copie de la fixture `rust-mini`.
 fn fixture() -> tempfile::TempDir {
     let d = tempfile::tempdir().unwrap();
     copier(
@@ -24,6 +26,7 @@ fn fixture() -> tempfile::TempDir {
     d
 }
 
+/// Lance le binaire `wikik` sur la copie avec ces arguments.
 fn wikik(racine: &Path, args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_wikik"))
         .arg("--racine")

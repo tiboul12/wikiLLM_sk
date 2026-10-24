@@ -6,11 +6,16 @@
   import Apercu from "./Apercu.svelte";
 
   let { etape, se }: { etape: string; se: SousEtape } = $props();
+  /** Documents produits par la synthèse, affichés en aperçu. */
   let ids = $state<string[]>([]);
+  /** Compteur qui force le rechargement des aperçus après une nouvelle synthèse. */
   let version = $state(0);
+  /** Erreur de la synthèse (fichier écrit à la main, LLM indisponible). */
   let erreur = $state("");
+  /** Synthèse en cours. */
   let enCours = $state(false);
 
+  /** Fait rédiger la synthèse puis retrouve l'identifiant de chaque document écrit à partir de son chemin. */
   async function assembler() {
     enCours = true;
     erreur = "";

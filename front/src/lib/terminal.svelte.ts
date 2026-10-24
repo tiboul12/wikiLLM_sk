@@ -3,12 +3,28 @@
 //
 // @req EF-147, EF-148
 import type { Parametres } from "../types/Parametres";
+import type { DescriptionConnecteur } from "../types/DescriptionConnecteur";
+import type { Skill } from "../types/Skill";
 import { statique } from "./statique";
 
-/** `ouvert` : volet affiché ; `proprietaire` : ce navigateur peut ouvrir le terminal et régler l'IA ; `arrete` : le serveur a été arrêté. */
-export const terminal = $state({ ouvert: false, proprietaire: false, factice: false, arrete: false, parametres: null as Parametres | null });
+/**
+ * `ouvert` : volet affiché ; `proprietaire` : ce navigateur peut ouvrir le terminal et régler l'IA ;
+ * `arrete` : le serveur a été arrêté ; `connecteurs` et `skills` : ce que montrent les Paramètres
+ * (EF-155, EF-156).
+ */
+export const terminal = $state({
+  ouvert: false,
+  proprietaire: false,
+  factice: false,
+  arrete: false,
+  parametres: null as Parametres | null,
+  connecteurs: [] as DescriptionConnecteur[],
+  skills: [] as Skill[],
+});
 
-/** Charge les paramètres et les droits du navigateur ; sans effet dans le site exporté. */
+/** Charge les paramètres et les droits du navigateur ; sans effet dans le site exporté.
+ * @relu 2026-10-22 4ffabc6c
+ */
 export async function chargerParametres() {
   if (statique) return;
   const r = await fetch("/api/parametres");
@@ -17,9 +33,12 @@ export async function chargerParametres() {
   terminal.parametres = v.parametres;
   terminal.proprietaire = v.proprietaire;
   terminal.factice = v.factice;
+  terminal.connecteurs = v.connecteurs ?? [];
+  terminal.skills = v.skills ?? [];
 }
 
-async function poster<T>(route: string, corps: unknown): Promise<T> {
+/** POST JSON vers une route du serveur ; l'erreur du serveur est levée. */
+export async function poster<T>(route: string, corps: unknown): Promise<T> {
   const r = await fetch(route, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) });
   const v = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(v.erreur ?? `${r.status}`);
@@ -37,6 +56,22 @@ export async function arreterServeur() {
 export async function enregistrerParametres(p: Parametres) {
   await poster("/api/parametres", p);
   await chargerParametres();
+}
+
+/** Écrit un skill modifié dans le projet (`.claude/skills/<nom>/SKILL.md`), ou revient à son origine. */
+export async function ecrireSkill(nom: string, texte: string | null) {
+  terminal.skills = texte === null ? await poster<Skill[]>("/api/skills/retablir", { nom }) : await poster<Skill[]>("/api/skills", { nom, texte });
+}
+
+/**
+ * Envoie à l'agent la consigne de traitement de la réception (EF-156) : le skill est d'abord installé
+ * dans le projet ; un agent Claude Code le reçoit par son nom (`/wikik-traiter-reception`), un autre agent
+ * en reçoit le texte.
+ */
+export async function traiterAvecAgent(): Promise<string> {
+  const corps = await poster<string>("/api/skills/installer", { nom: "wikik-traiter-reception" });
+  const agent = (terminal.parametres?.agent ?? "claude").trim().split(/\s+/)[0].split("/").pop() ?? "";
+  return envoyer(agent.startsWith("claude") ? "/wikik-traiter-reception" : corps, "consigne");
 }
 
 /**

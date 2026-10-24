@@ -11,6 +11,7 @@ use crate::index::{DOSSIER, Index};
 use crate::lang::{Langage, rust};
 use anyhow::Result;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Un problème trouvé par `check`.
@@ -22,6 +23,39 @@ pub struct Diagnostic {
     pub symbole: Option<String>,
     pub severite: String,
     pub message: String,
+}
+
+/// Empreinte de tout ce dont dépend un rapport (EF-154) : commit courant, contenu de chaque fichier de
+/// code et de chaque document, configuration. Deux appels de même empreinte donnent le même rapport : le
+/// serveur garde le dernier au lieu de relancer un `git blame` par fichier à chaque page ouverte.
+/// @req EF-154
+pub fn empreinte(index: &Index) -> Result<String> {
+    let mut h = Sha256::new();
+    let tete = std::process::Command::new("git")
+        .arg("-C")
+        .arg(&index.racine)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map(|s| s.stdout)
+        .unwrap_or_default();
+    h.update(&tete);
+    for requete in [
+        "SELECT chemin, hash_contenu FROM fichiers ORDER BY chemin",
+        "SELECT chemin, hash_contenu FROM documents ORDER BY chemin",
+    ] {
+        let mut st = index.conn.prepare(requete)?;
+        let mut lignes = st.query([])?;
+        while let Some(l) = lignes.next()? {
+            h.update(l.get::<_, String>(0)?.as_bytes());
+            h.update(
+                l.get::<_, Option<String>>(1)?
+                    .unwrap_or_default()
+                    .as_bytes(),
+            );
+        }
+    }
+    h.update(std::fs::read(index.racine.join("wikik.toml")).unwrap_or_default());
+    Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
 /// Résultat complet, sérialisé tel quel par `--format json`.
@@ -74,12 +108,14 @@ const MOTS_VIDES: &[&str] = &[
     "set", "is",
 ];
 
+/// Diagnostics trouvés, avec les sévérités réglées dans `[check]` de wikik.toml.
 struct Collecteur<'a> {
     severites: &'a BTreeMap<String, String>,
     diagnostics: Vec<Diagnostic>,
 }
 
 impl Collecteur<'_> {
+    /// Ajoute un diagnostic à la sévérité réglée (ou par défaut) ; un code réglé sur `ignore` n'est pas ajouté.
     fn ajouter(
         &mut self,
         code: &str,
@@ -107,6 +143,7 @@ impl Collecteur<'_> {
     }
 }
 
+/// Symbole lu pour le check : position du bloc, doc et hashs à comparer.
 struct SymDoc {
     id: String,
     fichier: String,
@@ -127,7 +164,7 @@ struct SymDoc {
 }
 
 /// Lance toutes les vérifications sur un index à jour.
-/// @relu 2026-10-17 c95bccbb
+/// @relu 2026-10-22 cf50d0ad
 pub fn verifier(index: &Index) -> Result<RapportCheck> {
     let c = &index.conn;
     let mut col = Collecteur {
@@ -338,6 +375,49 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
         }
     }
 
+    // Cascade jusqu'aux tests (EF-160) : dans une version qui a des tests, une exigence sans test est
+    // signalée ; un projet (ou une version) sans aucun test n'est pas encombré.
+    {
+        let mut st = c.prepare(
+            "SELECT id, chemin, genre, version, frontmatter FROM documents
+             WHERE genre IN ('exigence', 'exigence-nf', 'test') ORDER BY id",
+        )?;
+        let docs: Vec<(String, String, String, Option<String>, String)> = st
+            .query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut versions_testees = HashSet::new();
+        let mut testees = HashSet::new();
+        for (_, _, _, version, fm) in docs.iter().filter(|d| d.2 == "test") {
+            versions_testees.insert(version.clone().unwrap_or_default());
+            let fm: serde_json::Value = serde_json::from_str(fm).unwrap_or_default();
+            for e in fm
+                .get("exigences")
+                .and_then(|v| v.as_array())
+                .into_iter()
+                .flatten()
+            {
+                if let Some(e) = e.as_str() {
+                    testees.insert(e.to_string());
+                }
+            }
+        }
+        for (id, chemin, _, version, _) in docs.iter().filter(|d| d.2 != "test") {
+            if versions_testees.contains(&version.clone().unwrap_or_default())
+                && !testees.contains(id)
+            {
+                col.ajouter(
+                    "exigence-sans-test",
+                    chemin,
+                    1,
+                    None,
+                    format!("{id} n'a aucun test (`TEST-xxx` dont `exigences` la cite)"),
+                );
+            }
+        }
+    }
+
     // Traçabilité de l'atelier (SPEC-17) : seulement si le projet a un atelier.
     if index
         .racine
@@ -405,6 +485,7 @@ pub fn verifier(index: &Index) -> Result<RapportCheck> {
     })
 }
 
+/// Symboles de l'index, tous ou ceux des fichiers donnés (check incrémental d'un commit).
 fn charger_symboles(c: &rusqlite::Connection, fichiers: Option<&[String]>) -> Result<Vec<SymDoc>> {
     // Filtre passé en une seule chaîne `\nf1\nf2\n` pour rester dans une requête préparée.
     let filtre: Option<String> = fichiers.map(|f| format!("\n{}\n", f.join("\n")));
@@ -518,6 +599,9 @@ fn relus_a_jour(index: &Index, symboles: &[SymDoc]) -> Result<HashSet<String>> {
         .collect())
 }
 
+/// Péremption par git (SPEC-04) : pour chaque bloc pas encore relu, compare la date de la doc (blame) à celle du code
+/// qu'elle décrit ; le code changé après la doc la rend périmée. Les fichiers non suivis sont frais par définition ;
+/// les versions anciennes extraites sont gardées dans `.wikik/cache-git`.
 fn perimes_git(
     index: &Index,
     depot: &Depot,

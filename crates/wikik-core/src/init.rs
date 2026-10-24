@@ -9,6 +9,7 @@ use crate::config::Config;
 use anyhow::{Result, bail};
 use std::path::Path;
 
+/// Gabarits des documents copiés dans `templates/` par `wikik init` (n'écrase rien).
 const GABARITS: &[(&str, &str)] = &[
     ("adr.md", include_str!("../../../templates/adr.md")),
     (
@@ -20,6 +21,7 @@ const GABARITS: &[(&str, &str)] = &[
         include_str!("../../../templates/bdr-2-definition.md"),
     ),
     ("besoin.md", include_str!("../../../templates/besoin.md")),
+    ("test.md", include_str!("../../../templates/test.md")),
     (
         "cahier-des-charges.md",
         include_str!("../../../templates/cahier-des-charges.md"),
@@ -31,6 +33,7 @@ const GABARITS: &[(&str, &str)] = &[
     ("spec.md", include_str!("../../../templates/spec.md")),
 ];
 
+/// `wikik.toml` écrit par `wikik init` : toutes les clés commentées avec leur valeur par défaut.
 const CONFIG: &str = r#"# Configuration wikik (toutes les clés sont optionnelles).
 [index]
 # Motifs exclus de l'index, en plus du .gitignore.
@@ -203,6 +206,7 @@ pub fn hook(racine: &Path) -> Result<String> {
 }
 
 /// `wikik nouveau` : crée le fichier du prochain identifiant libre à partir du gabarit (SPEC-16 R6).
+/// @relu 2026-10-22 fda348a5
 pub fn nouveau(racine: &Path, config: &Config, genre: &str, titre: &str) -> Result<String> {
     let (prefixe, largeur, dossier, gabarit, type_doc) = match genre {
         "exigence" => ("EF-", 3, "exigences", "exigence.md", "exigence"),
@@ -210,7 +214,8 @@ pub fn nouveau(racine: &Path, config: &Config, genre: &str, titre: &str) -> Resu
         "besoin" => ("B-", 3, "besoins", "besoin.md", "besoin"),
         "adr" => ("ADR-", 4, "adr", "adr.md", "adr"),
         "spec" => ("SPEC-", 2, "specs", "spec.md", "spec"),
-        autre => bail!("genre inconnu : {autre} (exigence, exigence-nf, besoin, adr, spec)"),
+        "test" => ("TEST-", 3, "tests", "test.md", "test"),
+        autre => bail!("genre inconnu : {autre} (exigence, exigence-nf, besoin, adr, spec, test)"),
     };
     let base = racine.join(config.projet.dossier.trim_end_matches('/'));
     let mut max = 0u32;
@@ -266,8 +271,7 @@ pub fn nouveau(racine: &Path, config: &Config, genre: &str, titre: &str) -> Resu
     if chemin.exists() {
         bail!("{} existe déjà", chemin.display());
     }
-    std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(&chemin, contenu)?;
+    crate::journal::ecrire(&chemin, contenu)?;
     Ok(format!(
         "{}/{fichier}",
         config.projet.dossier.trim_end_matches('/')

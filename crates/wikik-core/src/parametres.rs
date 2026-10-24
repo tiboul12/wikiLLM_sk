@@ -1,9 +1,11 @@
-//! Paramètres du projet réglés à l'écran (EF-147) : LLM de l'atelier et de la réception, consignes des
-//! LLM, agent de développement. Ils vivent dans `wikik.toml`, réécrit en gardant ses commentaires ; une
-//! valeur égale au défaut est retirée du fichier, qui reste court.
+//! Paramètres du projet réglés à l'écran (EF-147, EF-155) : connexion au LLM de l'atelier, de la réception
+//! et de la recherche (connecteur, modèle, effort, adresse) et agent de développement. Ils vivent dans
+//! `wikik.toml`, réécrit en gardant ses commentaires ; une valeur égale au défaut est retirée du fichier,
+//! qui reste court. Les consignes des LLM sont des skills (ADR-0017, module `skills`).
 //!
-//! @req EF-147
+//! @req EF-147, EF-155
 //! @adr 13
+//! @adr 15
 
 use crate::config::{Config, ConfigIa, ConfigLlm};
 use anyhow::{Context, Result, bail};
@@ -13,80 +15,89 @@ use toml_edit::{DocumentMut, Item, Table, value};
 use ts_rs::TS;
 
 /// Paramètres affichés et modifiables dans la section Paramètres.
+/// @relu 2026-10-22 8b5561b1
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Parametres {
-    /// `cli` ou `factice`.
-    pub fournisseur: String,
+    /// `claude`, `agy`, `vibe`, `ollama`, `llama-cpp`, `cli` ou `factice` (ADR-0015).
+    pub connecteur: String,
+    /// Binaire du CLI (vide : celui du connecteur).
     pub commande: String,
+    /// Arguments du connecteur `cli` (commande libre).
     pub arguments: Vec<String>,
+    pub modele: String,
+    pub effort: String,
+    /// Adresse du serveur local (Ollama, llama.cpp) ; vide : celle par défaut.
+    pub url: String,
     /// Délai maximum d'un appel, en secondes.
     pub delai: u64,
-    pub consigne_lecture: String,
-    pub consigne_traitement: String,
     pub agent: String,
 }
 
 impl Parametres {
     /// Paramètres d'une configuration chargée.
+    /// @relu 2026-10-22 b24b0c40
     pub fn de(config: &Config) -> Parametres {
         let l = &config.atelier.llm;
         Parametres {
-            fournisseur: l.fournisseur.clone(),
+            connecteur: l.connecteur(),
             commande: l.commande.clone(),
             arguments: l.arguments.clone(),
+            modele: l.modele.clone(),
+            effort: l.effort.clone(),
+            url: l.url.clone(),
             delai: l.delai,
-            consigne_lecture: config.ia.consigne_lecture.clone(),
-            consigne_traitement: config.ia.consigne_traitement.clone(),
             agent: config.ia.agent.clone(),
         }
     }
 }
 
 /// Écrit les paramètres dans `<racine>/wikik.toml` (créé au besoin) et renvoie la configuration relue.
-/// Le fichier n'est remplacé que si la nouvelle configuration se charge.
+/// Le fichier n'est remplacé que si la nouvelle configuration se charge. Une consigne d'avant la v8
+/// (`[ia] consigne_lecture`, `consigne_traitement`) passe dans son skill et quitte le fichier.
+/// @relu 2026-10-22 1d700fc5
 pub fn ecrire(racine: &Path, p: &Parametres) -> Result<Config> {
-    if !matches!(p.fournisseur.as_str(), "cli" | "factice") {
-        bail!("fournisseur inconnu : {} (cli ou factice)", p.fournisseur);
+    let connus = crate::atelier::connecteurs::connecteurs();
+    if !connus.iter().any(|c| c.id == p.connecteur) {
+        bail!("connecteur inconnu : {}", p.connecteur);
     }
-    if p.fournisseur == "cli" && p.commande.trim().is_empty() {
+    if p.connecteur == "cli" && p.commande.trim().is_empty() {
         bail!("la commande du LLM est vide");
     }
     let chemin = racine.join("wikik.toml");
     let ancien = std::fs::read_to_string(&chemin).unwrap_or_default();
+    let avant: Config = toml::from_str(&ancien).unwrap_or_default();
+    for nom in ["wikik-lecture", "wikik-traiter-reception"] {
+        crate::skills::installer_si_ancienne(racine, &avant, nom)?;
+    }
     let mut doc: DocumentMut = ancien.parse().context("wikik.toml illisible")?;
     let (dl, di) = (ConfigLlm::default(), ConfigIa::default());
     let llm = table(&mut doc, &["atelier", "llm"]);
-    regler(llm, "fournisseur", &p.fournisseur, &dl.fournisseur);
+    llm.remove("fournisseur");
+    // Claude Code est le connecteur par défaut : il n'est pas écrit.
+    regler(llm, "connecteur", &p.connecteur, "claude");
     regler(llm, "commande", p.commande.trim(), &dl.commande);
-    if p.arguments == dl.arguments {
+    if p.connecteur != "cli" || p.arguments == dl.arguments {
         llm.remove("arguments");
     } else {
         llm["arguments"] = value(p.arguments.iter().collect::<toml_edit::Array>());
     }
+    regler(llm, "modele", p.modele.trim(), "");
+    regler(llm, "effort", p.effort.trim(), "");
+    regler(llm, "url", p.url.trim(), "");
     if p.delai == dl.delai {
         llm.remove("delai");
     } else {
         llm["delai"] = value(i64::try_from(p.delai).unwrap_or(i64::MAX));
     }
     let ia = table(&mut doc, &["ia"]);
-    regler(
-        ia,
-        "consigne_lecture",
-        p.consigne_lecture.trim(),
-        &di.consigne_lecture,
-    );
-    regler(
-        ia,
-        "consigne_traitement",
-        p.consigne_traitement.trim(),
-        &di.consigne_traitement,
-    );
+    ia.remove("consigne_lecture");
+    ia.remove("consigne_traitement");
     regler(ia, "agent", p.agent.trim(), &di.agent);
     nettoyer(&mut doc);
     let texte = doc.to_string();
     let config: Config = toml::from_str(&texte).context("paramètres refusés")?;
-    std::fs::write(&chemin, texte)?;
+    crate::journal::ecrire(&chemin, texte)?;
     Ok(config)
 }
 
@@ -143,24 +154,47 @@ mod tests {
         )
         .unwrap();
         let mut p = Parametres::de(&Config::charger(d.path()).unwrap());
+        assert_eq!(p.connecteur, "claude");
         ecrire(d.path(), &p).unwrap();
         assert_eq!(
             std::fs::read_to_string(d.path().join("wikik.toml")).unwrap(),
             "# Mon projet\n[serveur]\nreseau = true # depuis le portable\n"
         );
-        p.consigne_traitement = "Commence par un plan.".into();
+        p.modele = "sonnet".into();
+        p.effort = "medium".into();
         p.delai = 60;
         let c = ecrire(d.path(), &p).unwrap();
         assert_eq!(
-            (c.ia.consigne_traitement.as_str(), c.atelier.llm.delai),
-            ("Commence par un plan.", 60)
+            (c.atelier.llm.modele.as_str(), c.atelier.llm.delai),
+            ("sonnet", 60)
         );
         let t = std::fs::read_to_string(d.path().join("wikik.toml")).unwrap();
         assert!(
-            t.starts_with("# Mon projet") && t.contains("# depuis le portable"),
+            t.starts_with("# Mon projet")
+                && t.contains("# depuis le portable")
+                && !t.contains("connecteur"),
             "{t}"
         );
-        p.fournisseur = "autre".into();
+        p.connecteur = "autre".into();
         assert!(ecrire(d.path(), &p).is_err());
+    }
+
+    /// Une consigne d'avant la v8 passe dans son skill et quitte wikik.toml.
+    #[test]
+    fn consigne_migree_en_skill() {
+        let d = tempfile::tempdir().unwrap();
+        std::fs::write(
+            d.path().join("wikik.toml"),
+            "[ia]\nconsigne_traitement = \"Commence par un plan.\"\n",
+        )
+        .unwrap();
+        let p = Parametres::de(&Config::charger(d.path()).unwrap());
+        ecrire(d.path(), &p).unwrap();
+        let t = std::fs::read_to_string(d.path().join("wikik.toml")).unwrap();
+        assert!(!t.contains("consigne_traitement"), "{t}");
+        let skill =
+            std::fs::read_to_string(crate::skills::chemin(d.path(), "wikik-traiter-reception"))
+                .unwrap();
+        assert!(skill.contains("Commence par un plan."), "{skill}");
     }
 }

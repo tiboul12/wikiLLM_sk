@@ -19,6 +19,7 @@ struct Outil {
     parametres: &'static [(&'static str, &'static str, bool)],
 }
 
+/// Outils exposés par le serveur MCP : nom, description lue par l'agent pour choisir l'outil, paramètres.
 const OUTILS: &[Outil] = &[
     Outil {
         nom: "carte",
@@ -146,6 +147,14 @@ const OUTILS: &[Outil] = &[
         ],
     },
     Outil {
+        nom: "test_valider",
+        description: "Ticket de validation d'un test d'exigence (TEST-xxx, EF-160) : verdict modele quand tu as vérifié le test (test automatisé vert, contrôle fait), echec sinon, a_valider pour le rouvrir. N'écrit que dans le test.",
+        parametres: &[
+            ("id", "Identifiant du test (TEST-001…).", true),
+            ("verdict", "modele, echec ou a_valider.", true),
+        ],
+    },
+    Outil {
         nom: "check",
         description: "Diagnostics de doc : périmée, manquante, références cassées, exigences non couvertes.",
         parametres: &[],
@@ -176,12 +185,13 @@ pub fn servir(racine: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Réponse d'erreur JSON-RPC.
 fn erreur(id: Value, code: i64, message: &str) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
 }
 
 /// Réponse à un message ; `None` pour une notification.
-/// @relu 2026-10-19 2f982a20
+/// @relu 2026-10-22 05d9f294
 fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
     let id = m.get("id").cloned();
     let methode = m.get("method").and_then(Value::as_str).unwrap_or_default();
@@ -196,7 +206,7 @@ fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
                 "capabilities": { "tools": {} },
                 "serverInfo": { "name": "wikik", "version": env!("CARGO_PKG_VERSION") },
                 // Méthode de lecture du wiki, réglable dans les paramètres (EF-147).
-                "instructions": index.config.ia.consigne_lecture,
+                "instructions": wikik_core::skills::corps(&index.racine, &index.config, "wikik-lecture"),
             })
         }
         "ping" => json!({}),
@@ -231,6 +241,7 @@ fn traiter(index: &mut Index, m: &Value) -> Option<Value> {
     id.map(|id| json!({ "jsonrpc": "2.0", "id": id, "result": resultat }))
 }
 
+/// Schéma JSON des paramètres d'un outil : booléen pour `code`, entier pour `profondeur`, texte sinon.
 fn schema(o: &Outil) -> Value {
     let mut proprietes = serde_json::Map::new();
     let mut requis = vec![];
@@ -255,6 +266,7 @@ fn schema(o: &Outil) -> Value {
     })
 }
 
+/// Paramètre texte obligatoire d'un appel d'outil ; erreur claire s'il manque.
 fn texte(args: &Value, cle: &str) -> Result<String> {
     args.get(cle)
         .and_then(Value::as_str)
@@ -263,7 +275,7 @@ fn texte(args: &Value, cle: &str) -> Result<String> {
 }
 
 /// Exécute un outil sur l'index à jour et renvoie la sortie texte de la CLI.
-/// @relu 2026-10-18 8cd7d812
+/// @relu 2026-10-22 d726a57f
 fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
     index.mettre_a_jour()?;
     let i = &*index;
@@ -311,6 +323,15 @@ fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
                 commit.as_deref(),
             )?;
             return Ok(format!("{id} : {statut}."));
+        }
+        "test_valider" => {
+            let id = texte(args, "id")?;
+            let verdict = texte(args, "verdict")?;
+            if verdict == "utilisateur" {
+                anyhow::bail!("le verdict utilisateur est réservé à l'utilisateur (dans wikik)");
+            }
+            wikik_core::edition::valider_test(i, &id, &verdict)?;
+            return Ok(format!("{id} : {verdict}."));
         }
         _ => anyhow::bail!("outil inconnu : {nom}"),
     };

@@ -14,6 +14,7 @@ use axum::response::{IntoResponse, Response};
 use std::net::SocketAddr;
 use std::path::Path;
 
+/// Cookie qui porte la clé du propriétaire dans le navigateur (ADR-0013).
 const COOKIE: &str = "wikik_cle";
 
 /// Clé du serveur du projet : celle de `.wikik/cle`, tirée au hasard (128 bits) au premier lancement.

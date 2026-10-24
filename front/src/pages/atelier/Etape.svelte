@@ -1,6 +1,19 @@
 <script lang="ts">
   // Écran d'une étape du parcours affiché : « en bref » (à quoi elle sert, ce qu'on fait, ce qu'elle produit), règles de la
-  // fiche, mode, puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon).
+  // fiche, mode, puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon) ; la
+  // carte mentale se modifie dans l'éditeur Mermaid (EF-167).
+  // Une page de réception par étape (EF-164) :
+  // @ecrans /atelier/pitch Pitch
+  // @ecrans /atelier/free-writing Free writing
+  // @ecrans /atelier/carte-mentale Carte mentale
+  // @ecrans /atelier/analogies Pensée analogique
+  // @ecrans /atelier/5w1h 5W1H
+  // @ecrans /atelier/cubing Cubing
+  // @ecrans /atelier/scamper SCAMPER
+  // @ecrans /atelier/storyboard Storyboard
+  // @ecrans /atelier/bilan Bilan des besoins
+  // @ecrans /atelier/exigences Exigences
+  // @ecrans /atelier/roadmap Roadmap
   import type { SousEtape } from "../../types/SousEtape";
   import { atelier, deType, ecrire, PHASES, ETATS } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
@@ -10,20 +23,28 @@
   import Pitch from "../../composants/atelier/Pitch.svelte";
   import FreeWriting from "../../composants/atelier/FreeWriting.svelte";
   import Tri from "../../composants/atelier/Tri.svelte";
+  import EditeurMermaid from "../../composants/atelier/EditeurMermaid.svelte";
+  import { terminal } from "../../lib/terminal.svelte";
   import Planche from "../../composants/atelier/Planche.svelte";
   import EnBref from "../../composants/atelier/EnBref.svelte";
 
   let { etape }: { etape: string } = $props();
+  /** Rang de l'étape dans le parcours affiché ; -1 si elle n'y est pas. */
   const index = $derived(atelier.etat?.etapes.findIndex((e) => e.fiche.id === etape) ?? -1);
+  /** Étape affichée : fiche, état, mode, lots et sélections. */
   const e = $derived(atelier.etat?.etapes[index]);
+  /** Étape suivante du parcours, pour le lien de fin de page. */
   const suivante = $derived(atelier.etat?.etapes[index + 1]);
+  /** Erreur du dernier pilotage. */
   let erreur = $state("");
 
+  /** Leviers SCAMPER : lettre enregistrée dans le champ `levier` et nom de la colonne. */
   const SCAMPER: [string, string][] = [
     ["S", "Substituer"], ["C", "Combiner"], ["A", "Adapter"], ["M", "Modifier"],
     ["P", "Autre usage"], ["E", "Éliminer"], ["R", "Renverser"],
   ];
 
+  /** Termine, rouvre ou saute l'étape, ou change son mode. */
   async function piloter(action: string, mode?: string) {
     erreur = "";
     try {
@@ -40,9 +61,11 @@
     if (sel) return e.selections[sel.id] ?? [];
     return deType(se.pour_chaque).filter((a) => a.statut !== "ecarte").map((a) => a.id);
   }
+  /** Titre d'un artefact par identifiant. */
   const titre = (id: string) => atelier.etat?.artefacts.find((a) => a.id === id)?.titre ?? "";
   /** Sous-étapes rendues par un écran dédié qui en regroupe plusieurs. */
   const absorbee = (se: SousEtape) => etape === "free-writing" && se.id === "recolte";
+  /** Qui agit dans chaque genre de sous-étape, rappelé à côté de son titre. */
   const GENRES: Record<string, string> = { saisie: "à toi", propositions: "le LLM propose", selection: "choix", synthese: "rapport" };
 </script>
 
@@ -94,6 +117,14 @@
       {/if}
     </details>
   {/each}
+
+  {#if etape === "carte-mentale" && terminal.proprietaire}
+    {@const carte = deType("carte")[0]}
+    {#if carte}
+      <h2>Modifier la carte mentale</h2>
+      {#key carte.id}<EditeurMermaid id={carte.id} />{/key}
+    {/if}
+  {/if}
 
   <div class="actions fin-etape">
     {#if e.etat !== "faite"}

@@ -7,14 +7,17 @@ use std::path::Path;
 use std::process::{Child, Command};
 use std::time::{Duration, Instant};
 
+/// Serveur wikik lancé pour un test : processus et port ; arrêté quand il sort de portée.
 struct Serveur(Child, u16);
 
 impl Drop for Serveur {
+    /// Tue le serveur, même si le test a échoué.
     fn drop(&mut self) {
         let _ = self.0.kill();
     }
 }
 
+/// Lance `wikik --factice` au premier plan sur un port libre de la copie de test et attend qu'il réponde (20 s au plus).
 fn demarrer(racine: &Path) -> Serveur {
     let port = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
@@ -82,15 +85,30 @@ fn parametres_et_cle() {
     );
     assert_eq!(params["factice"], true);
     let mut p2 = params["parametres"].take();
-    p2["consigne_traitement"] = "Commence par un plan.".into();
+    p2["modele"] = "sonnet".into();
     let (c, _, _) = http(p, "POST", "/api/parametres", &p2.to_string());
     assert_eq!(c, 200);
     let toml = std::fs::read_to_string(d.path().join("wikik.toml")).unwrap();
     assert!(
-        toml.starts_with("# commentaire gardé")
-            && toml.contains("consigne_traitement = \"Commence par un plan.\""),
+        toml.starts_with("# commentaire gardé") && toml.contains("modele = \"sonnet\""),
         "{toml}"
     );
+
+    // Un skill modifié est écrit dans .claude/skills du projet, puis retiré par « revenir à l'origine ».
+    let corps =
+        r#"{"nom":"wikik-lecture","texte":"---\nname: wikik-lecture\ndescription: x\n---\nLis."}"#;
+    let (c, _, _) = http(p, "POST", "/api/skills", corps);
+    assert_eq!(c, 200);
+    let skill = d.path().join(".claude/skills/wikik-lecture/SKILL.md");
+    assert!(std::fs::read_to_string(&skill).unwrap().ends_with("Lis.\n"));
+    let (c, _, _) = http(
+        p,
+        "POST",
+        "/api/skills/retablir",
+        r#"{"nom":"wikik-lecture"}"#,
+    );
+    assert_eq!(c, 200);
+    assert!(!skill.exists());
 
     // La clé du lancement pose le cookie ; une fausse clé ne pose rien.
     let cle = std::fs::read_to_string(d.path().join(".wikik/cle")).unwrap();
@@ -143,9 +161,11 @@ fn serveur_detache_et_arret() {
     let (c, _, _) = http(port, "POST", "/api/serveur/arreter", "{}");
     assert_eq!(c, 200);
     let limite = Instant::now() + Duration::from_secs(8);
-    while TcpStream::connect(("127.0.0.1", port)).is_ok() {
+    // Le port se ferme avant que le serveur ne retire `serveur.json` : on attend les deux.
+    while TcpStream::connect(("127.0.0.1", port)).is_ok()
+        || d.path().join(".wikik/serveur.json").exists()
+    {
         assert!(Instant::now() < limite, "le serveur ne s'arrête pas");
         std::thread::sleep(Duration::from_millis(100));
     }
-    assert!(!d.path().join(".wikik/serveur.json").exists());
 }

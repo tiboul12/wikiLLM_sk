@@ -3,15 +3,20 @@
   import { deType, ecrire } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
 
+  /** Colonnes MoSCoW : priorité enregistrée et titre affiché. */
   const COLONNES: [string, string][] = [
     ["must", "Must : indispensable"],
     ["should", "Should : important"],
     ["could", "Could : souhaitable"],
     ["wont", "Won't : pas cette fois"],
   ];
+  /** Catégories proposées pour un besoin. */
   const CATEGORIES = ["fonctionnel", "technique", "ergonomique", "réglementaire", "économique"];
+  /** Besoins de l'atelier, seuls triés ici (ceux écrits à la main dans le projet n'y entrent pas). */
   const besoins = $derived(deType("besoin"));
+  /** Tri en cours : ordre de la liste, priorité et catégorie de chaque besoin ; enregistré d'un bloc. */
   let tri = $state<{ id: string; titre: string; priorite: string; categorie: string }[]>([]);
+  /** Empreinte des besoins chargés : le tri n'est recalculé que si les besoins changent, pas à chaque relecture de l'atelier. */
   let charge = $state("");
   $effect(() => {
     const cle = besoins.map((b) => b.id + b.frontmatter.priorite + b.frontmatter.categorie).join();
@@ -22,10 +27,14 @@
       .sort((a, b) => ordre(a) - ordre(b))
       .map((b) => ({ id: b.id, titre: b.titre, priorite: String(b.frontmatter.priorite || "should"), categorie: String(b.frontmatter.categorie || "fonctionnel") }));
   });
+  /** Besoin en cours de glisser. */
   let glisse = $state<string | null>(null);
+  /** Confirmation d'enregistrement, effacée au prochain déplacement. */
   let message = $state("");
+  /** Erreur d'enregistrement. */
   let erreur = $state("");
 
+  /** Dépose le besoin glissé dans une colonne, avant un autre besoin ou en fin de liste. */
   function deposer(priorite: string, avant: string | null) {
     if (!glisse) return;
     const b = tri.find((x) => x.id === glisse)!;
@@ -38,6 +47,7 @@
     message = "";
   }
 
+  /** Enregistre priorité, catégorie et rang de chaque besoin. */
   async function enregistrer() {
     erreur = message = "";
     try {

@@ -101,13 +101,17 @@ pub struct EtatAtelier {
     pub tous_parcours: Vec<ResumeParcours>,
 }
 
-/// Un parcours du projet, pour la liste du volet et de l'accueil.
+/// Un parcours du projet, pour la liste du volet et de l'accueil : un atelier, une session (EF-161).
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct ResumeParcours {
     pub id: String,
+    /// Numéro de session : 1 pour le parcours par défaut, n pour `PARCOURS-n`.
+    pub numero: u32,
     pub titre: String,
     pub version: String,
+    /// `a_faire`, `en_cours`, `termine` ou `archive` : posé à la main, sinon déduit des étapes.
+    pub statut: String,
     /// Étapes faites ou sautées, et nombre d'étapes.
     pub faites: u32,
     pub total: u32,
@@ -132,6 +136,7 @@ pub struct Preparation {
 
 // ---------------------------------------------------------------- état persistant
 
+/// Dossier de travail de l'atelier pour le projet de l'index.
 fn dossier_travail(index: &Index) -> PathBuf {
     travail(&index.racine)
 }
@@ -156,6 +161,7 @@ fn numero(pid: &str) -> Result<Option<&str>> {
     }
 }
 
+/// Dossier versionné des artefacts de l'atelier (`[atelier] dossier` de wikik.toml), sans `/` final.
 fn dossier_atelier(index: &Index) -> String {
     index
         .config
@@ -165,6 +171,8 @@ fn dossier_atelier(index: &Index) -> String {
         .to_string()
 }
 
+/// Chemin relatif du fichier d'un parcours : `PARCOURS` garde son emplacement historique, `PARCOURS-n` vit dans
+/// `<dossier>/parcours-n/parcours.md` avec ses artefacts.
 fn chemin_parcours(index: &Index, pid: &str) -> Result<String> {
     Ok(match numero(pid)? {
         None => artefacts::chemin_relatif(
@@ -228,6 +236,7 @@ fn version_de(index: &Index, p: &Map<String, Value>) -> String {
 }
 
 /// Les parcours du projet : le parcours par défaut, puis `PARCOURS-2`, `PARCOURS-3`… dans l'ordre.
+/// @relu 2026-10-22 cfbbc126
 pub fn lister_parcours(index: &Index) -> Result<Vec<ResumeParcours>> {
     let mut ids = vec![DEFAUT.to_string()];
     let mut numeros: Vec<u32> = std::fs::read_dir(index.racine.join(dossier_atelier(index)))
@@ -265,13 +274,29 @@ pub fn lister_parcours(index: &Index) -> Result<Vec<ResumeParcours>> {
                     })
                     .count() as u32
             });
+            let commencees = p
+                .get("etapes")
+                .and_then(Value::as_object)
+                .map_or(0, |e| e.len());
+            let statut = match p.get("session").and_then(Value::as_str) {
+                Some(s) if !s.is_empty() => s.to_string(),
+                _ if faites >= total => "termine".into(),
+                _ if commencees > 0 => "en_cours".into(),
+                _ => "a_faire".into(),
+            };
             ResumeParcours {
+                numero: numero(&id)
+                    .ok()
+                    .flatten()
+                    .and_then(|n| n.parse().ok())
+                    .unwrap_or(1),
                 titre: p
                     .get("titre")
                     .and_then(Value::as_str)
                     .unwrap_or("Parcours de l'atelier")
                     .to_string(),
                 version: version_de(index, &p),
+                statut,
                 faites,
                 total,
                 id,
@@ -308,6 +333,40 @@ pub fn creer_parcours(index: &Index, titre: &str, version: &str) -> Result<Strin
     Ok(pid)
 }
 
+/// Modifie le titre, la version documentée et le statut de session d'un atelier (REC-073) ; un statut vide
+/// revient au statut déduit des étapes.
+/// @req EF-161
+pub fn modifier_parcours(
+    index: &Index,
+    pid: &str,
+    titre: &str,
+    version: &str,
+    statut: &str,
+) -> Result<()> {
+    verifier_parcours(index, pid)?;
+    if titre.trim().is_empty() {
+        bail!("donne un titre à l'atelier");
+    }
+    if !matches!(statut, "" | "a_faire" | "en_cours" | "termine" | "archive") {
+        bail!("statut inconnu : {statut} (a_faire, en_cours, termine, archive)");
+    }
+    let mut p = charger_parcours(index, pid);
+    p.insert("titre".into(), json!(titre.trim()));
+    if version.trim().is_empty() {
+        p.remove("version");
+    } else {
+        p.insert("version".into(), json!(version.trim()));
+    }
+    if statut.is_empty() {
+        p.remove("session");
+    } else {
+        p.insert("session".into(), json!(statut));
+    }
+    sauver_parcours(index, pid, &p)
+}
+
+/// Réécrit le fichier du parcours : le frontmatter porte l'état, le corps est un tableau lisible étape · état · mode
+/// régénéré à chaque fois (ne pas l'éditer à la main, il serait écrasé).
 fn sauver_parcours(index: &Index, pid: &str, p: &Map<String, Value>) -> Result<()> {
     let relatif = chemin_parcours(index, pid)?;
     std::fs::create_dir_all(index.racine.join(&relatif).parent().unwrap())?;
@@ -332,6 +391,7 @@ fn sauver_parcours(index: &Index, pid: &str, p: &Map<String, Value>) -> Result<(
     artefacts::reecrire(&index.racine, &relatif, p, &lignes)
 }
 
+/// Mode d'une étape : celui choisi pour l'étape, sinon celui du parcours, sinon Express.
 fn mode_de(p: &Map<String, Value>, etape: &str) -> String {
     p.get("etapes")
         .and_then(|e| e.get(etape))
@@ -342,6 +402,7 @@ fn mode_de(p: &Map<String, Value>, etape: &str) -> String {
         .to_string()
 }
 
+/// Fixe l'état d'une étape dans le frontmatter du parcours, en créant l'entrée au besoin.
 fn marquer(p: &mut Map<String, Value>, etape: &str, etat: &str) {
     let etapes = p.entry("etapes").or_insert_with(|| json!({}));
     let e = etapes
@@ -365,12 +426,14 @@ fn cle_lot(pid: &str, etape: &str, sous: &str, cible: Option<&str>) -> String {
     }
 }
 
+/// Fichier JSON d'un lot de propositions dans le dossier de travail (non versionné).
 fn chemin_lot(index: &Index, cle: &str) -> PathBuf {
     dossier_travail(index)
         .join("propositions")
         .join(format!("{cle}.json"))
 }
 
+/// Lot d'une sous-étape ; un lot absent ou illisible repart vide plutôt que de bloquer l'écran.
 fn charger_lot(index: &Index, pid: &str, etape: &str, sous: &str, cible: Option<&str>) -> Lot {
     std::fs::read_to_string(chemin_lot(index, &cle_lot(pid, etape, sous, cible)))
         .ok()
@@ -384,18 +447,20 @@ fn charger_lot(index: &Index, pid: &str, etape: &str, sous: &str, cible: Option<
         })
 }
 
+/// Enregistre un lot par le journal d'annulation (ADR-0016) : Ctrl+Z revient au lot précédent.
 fn sauver_lot(index: &Index, pid: &str, lot: &Lot) -> Result<()> {
     let chemin = chemin_lot(
         index,
         &cle_lot(pid, &lot.etape, &lot.sous_etape, lot.cible.as_deref()),
     );
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(chemin, serde_json::to_string_pretty(lot)?)?;
+    crate::journal::ecrire(chemin, serde_json::to_string_pretty(lot)?)?;
     Ok(())
 }
 
 // ---------------------------------------------------------------- lecture de l'index
 
+/// Document de l'index tel que l'atelier le lit : genre, statut et frontmatter décodé.
 struct Doc {
     id: String,
     genre: String,
@@ -405,6 +470,7 @@ struct Doc {
     fm: Value,
 }
 
+/// Tous les documents indexés, triés par identifiant ; un frontmatter illisible devient `null`.
 fn documents(index: &Index) -> Result<Vec<Doc>> {
     let mut st = index.conn.prepare("SELECT id, genre, titre, coalesce(statut, ''), chemin, frontmatter FROM documents ORDER BY id")?;
     let v = st
@@ -425,18 +491,31 @@ fn documents(index: &Index) -> Result<Vec<Doc>> {
 
 /// Documents d'un parcours : ceux qui portent son identifiant, ou aucun pour le parcours par défaut
 /// (besoins et exigences écrits à la main compris, comme avant la v7).
+/// Documents d'un parcours : ceux qui le nomment (`parcours`), et pour le parcours par défaut ceux que
+/// l'atelier a produits (dans son dossier, ou portant la `technique` qui les a faits).
+///
+/// @pitfall Sans ce filtre, le parcours par défaut prenait tous les documents sans champ `parcours` :
+/// les besoins et exigences écrits à la main dans `docs/projet/` remplissaient le bilan d'un atelier
+/// encore vide (REC-076).
+/// @req EF-163
 fn documents_de(index: &Index, pid: &str) -> Result<Vec<Doc>> {
+    let dossier = format!("{}/", dossier_atelier(index));
     Ok(documents(index)?
         .into_iter()
         .filter(|d| {
-            d.fm.get("parcours")
-                .and_then(Value::as_str)
-                .unwrap_or(DEFAUT)
-                == pid
+            let nomme = d.fm.get("parcours").and_then(Value::as_str);
+            match nomme {
+                Some(p) => p == pid,
+                None => {
+                    pid == DEFAUT
+                        && (d.chemin.starts_with(&dossier) || d.fm.get("technique").is_some())
+                }
+            }
         })
         .collect())
 }
 
+/// Résumé d'artefact envoyé à l'écran (identifiant, genre, titre, statut, sources, frontmatter).
 fn resume(d: &Doc) -> ArtefactResume {
     ArtefactResume {
         id: d.id.clone(),
@@ -449,6 +528,7 @@ fn resume(d: &Doc) -> ArtefactResume {
     }
 }
 
+/// Liste de chaînes d'une valeur JSON ; ce qui n'est pas une chaîne est ignoré, l'absence donne une liste vide.
 fn chaines(v: Option<&Value>) -> Vec<String> {
     v.and_then(Value::as_array)
         .map(|a| {
@@ -460,6 +540,7 @@ fn chaines(v: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Champ texte d'une valeur JSON, rogné ; vide s'il manque ou n'est pas une chaîne.
 fn texte(v: &Value, cle: &str) -> String {
     v.get(cle)
         .and_then(Value::as_str)
@@ -593,6 +674,8 @@ fn lots_de(index: &Index, pid: &str, f: &Fiche) -> Vec<Lot> {
         .collect()
 }
 
+/// Dernière consommation de quota relevée dans le journal des appels au LLM, affichée dans l'atelier ; aucune si le
+/// fournisseur ne la donne pas.
 fn derniere_consommation(index: &Index) -> Option<Consommation> {
     let t = std::fs::read_to_string(dossier_travail(index).join("journal.jsonl")).ok()?;
     t.lines()
@@ -730,7 +813,7 @@ fn verifier_cible<'d>(
 
 /// Construit la demande au LLM pour une sous-étape d'un parcours (sous verrou ; l'appel se fait ensuite
 /// sans). Une clarification, hors parcours, peut viser un document de n'importe quel parcours.
-/// @relu 2026-10-19 6da16c27
+/// @relu 2026-10-22 3804c376
 pub fn preparer(
     index: &Index,
     pid: &str,
@@ -773,9 +856,16 @@ pub fn preparer(
     c.push_str(&format!("Tu animes l'étape « {} » d'un atelier de définition du besoin (framework Fast Design Thinking).\n", fiche.titre));
     c.push_str("Réponds en français. Tu lis le projet avec les outils wikik (atelier, document, cherche) ; tu n'écris rien toi-même.\n");
     c.push_str(&format!(
-        "Méthode de lecture du wiki : {}\n\n",
-        index.config.ia.consigne_lecture
+        "Méthode de lecture du wiki (skill wikik-lecture) :\n{}\n\n",
+        crate::skills::corps(&index.racine, &index.config, "wikik-lecture")
     ));
+    // La clarification suit son skill (EF-162) : juger la question avant de proposer des pistes.
+    if fiche.id == "clarification" {
+        c.push_str(&format!(
+            "Méthode de clarification (skill wikik-clarification) :\n{}\n\n",
+            crate::skills::corps(&index.racine, &index.config, "wikik-clarification")
+        ));
+    }
     if let Some(pt) = pitch {
         c.push_str(&format!(
             "Projet : {} — {}\n",
@@ -833,6 +923,7 @@ pub fn preparer(
     })
 }
 
+/// Texte aux blancs compactés et en minuscules, pour comparer un verbatim au texte libre sans dépendre de la mise en forme.
 fn compacter(t: &str) -> String {
     t.split_whitespace()
         .collect::<Vec<_>>()
@@ -984,6 +1075,7 @@ fn connus(index: &Index) -> Result<BTreeSet<String>> {
     Ok(v)
 }
 
+/// Garde les identifiants qui existent dans le projet, sans doublon, dans l'ordre : un LLM invente parfois des sources.
 fn ids_reels(connus: &BTreeSet<String>, v: impl IntoIterator<Item = String>) -> Vec<String> {
     let mut vus = BTreeSet::new();
     v.into_iter()
@@ -991,10 +1083,12 @@ fn ids_reels(connus: &BTreeSet<String>, v: impl IntoIterator<Item = String>) -> 
         .collect()
 }
 
+/// Objet JSON d'une valeur ; vide si ce n'en est pas un.
 fn objet(v: Value) -> Map<String, Value> {
     v.as_object().cloned().unwrap_or_default()
 }
 
+/// Texte rogné et coupé à `n` caractères avec « … », pour un titre tiré d'un texte long.
 fn tronquer(t: &str, n: usize) -> String {
     let t = t.trim();
     if t.chars().count() > n {
@@ -1344,6 +1438,7 @@ fn completer(index: &Index, ty: &str, id: &str, sous: &str, d: &Value) -> Result
     Ok(id.to_string())
 }
 
+/// Corps Markdown d'un storyboard : scénario, personnage · scène · intrigue s'ils sont remplis, tableau des vignettes.
 fn corps_storyboard(fm: &Map<String, Value>) -> String {
     let t = |k: &str| {
         fm.get(k)
@@ -1401,6 +1496,8 @@ fn corps_storyboard(fm: &Map<String, Value>) -> String {
     c
 }
 
+/// Corps d'une clarification : l'en-tête existant (question, contexte) est gardé tel quel, les sections « Pistes » et
+/// « Conclusion » sont régénérées depuis le frontmatter.
 pub(crate) fn corps_clarification(fm: &Map<String, Value>, ancien: &str) -> String {
     let entete = ancien
         .split("\n## Pistes")
@@ -1493,6 +1590,8 @@ pub fn saisir(
 
 // ---------------------------------------------------------------- synthèses
 
+/// Écrit un document produit par une synthèse, marqué `genere_par: atelier`. Un fichier existant écrit à la main
+/// n'est jamais écrasé : l'écriture échoue avec un message qui le dit.
 fn ecrire_genere(index: &Index, relatif: &str, fm: Map<String, Value>, corps: &str) -> Result<()> {
     let chemin = index.racine.join(relatif);
     if chemin.exists() {
@@ -1504,7 +1603,7 @@ fn ecrire_genere(index: &Index, relatif: &str, fm: Map<String, Value>, corps: &s
     let mut fm = fm;
     fm.insert("genere_par".into(), json!("atelier"));
     std::fs::create_dir_all(chemin.parent().unwrap())?;
-    std::fs::write(chemin, artefacts::formater(&fm, corps))?;
+    crate::journal::ecrire(chemin, artefacts::formater(&fm, corps))?;
     Ok(())
 }
 

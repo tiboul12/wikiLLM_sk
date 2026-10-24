@@ -24,6 +24,7 @@ export const atelier = $state({
   erreur: "",
 });
 
+/** État du parcours affiché, lu sur le serveur. */
 async function lireEtat(): Promise<EtatAtelier> {
   const r = await fetch(`/api/atelier/etat?parcours=${encodeURIComponent(atelier.parcours)}`);
   if (!r.ok) throw new Error(String(r.status));
@@ -111,6 +112,9 @@ export function adapterHote(adresse: string): string {
     return adresse;
   }
 }
+
+/** Statut de session d'un atelier (EF-161). */
+export const STATUTS_ATELIER: Record<string, string> = { a_faire: "à faire", en_cours: "en cours", termine: "terminé", archive: "archivé" };
 
 /** Artefacts d'un type, dans l'ordre des identifiants. */
 export function deType(genre: string | null | undefined): ArtefactResume[] {

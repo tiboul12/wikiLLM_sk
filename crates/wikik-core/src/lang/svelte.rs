@@ -18,14 +18,18 @@ use tree_sitter::Parser;
 pub struct Svelte;
 
 impl Langage for Svelte {
+    /// Nom du langage enregistré dans l'index.
     fn nom(&self) -> &'static str {
         "svelte"
     }
 
+    /// Extension prise en charge : `.svelte`.
     fn extensions(&self) -> &'static [&'static str] {
         &["svelte"]
     }
 
+    /// Extrait le script d'un composant (TypeScript si `lang="ts"`, sinon JavaScript) et les composants rendus dans
+    /// le balisage ; le composant lui-même devient un symbole nommé d'après son fichier, documenté par son commentaire de tête.
     fn extraire(&self, chemin: &str, source: &[u8]) -> ExtraitFichier {
         let texte = String::from_utf8_lossy(source);
         let (script, balisage, en_ts) = separer(&texte);

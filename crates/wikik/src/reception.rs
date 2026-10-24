@@ -18,7 +18,8 @@ use wikik_core::Index;
 use wikik_core::atelier::fournisseur::{Demande, Fournisseur};
 use wikik_core::reception::{carte, remarques};
 
-/// Routes du cahier de réception.
+/// Routes du cahier de réception : carte, remarques, traitement, validation par l'utilisateur et état git
+/// des corrections (EF-165).
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/reception/etat", get(api_etat))
@@ -26,6 +27,8 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/reception/page", post(api_page))
         .route("/api/reception/remarque", post(api_remarque))
         .route("/api/reception/traiter", post(api_traiter))
+        .route("/api/reception/valider", post(api_valider))
+        .route("/api/reception/git", get(api_git))
         .route("/api/reception/supprimer", post(api_supprimer))
         .route("/api/reception/application", post(api_application))
         .route("/api/reception/completer", post(api_completer))
@@ -39,15 +42,18 @@ fn assurer_carte(i: &Index) -> Result<()> {
     Ok(())
 }
 
+/// État de la réception (carte, remarques, fournisseur LLM) pour les écrans de la section.
 async fn api_etat(State(e): State<Partage>) -> Response {
     let nom = e.fournisseur.nom();
     repondre(e, move |i| wikik_core::reception::etat(i, &nom)).await
 }
 
+/// Reconstruit la carte des pages à partir du code ; les corrections faites à l'écran sont gardées.
 async fn api_scanner(State(e): State<Partage>) -> Response {
     ecrire(e, carte::scanner).await
 }
 
+/// Corps d'une correction de page : seuls les champs présents changent.
 #[derive(Deserialize)]
 struct Correction {
     cle: String,
@@ -57,6 +63,7 @@ struct Correction {
     route: Option<String>,
 }
 
+/// Renomme, masque, regroupe une page ou change sa route.
 async fn api_page(State(e): State<Partage>, Json(p): Json<Correction>) -> Response {
     ecrire(e, move |i| {
         assurer_carte(i)?;
@@ -72,11 +79,13 @@ async fn api_page(State(e): State<Partage>, Json(p): Json<Correction>) -> Respon
     .await
 }
 
+/// Corps de `/api/reception/application`.
 #[derive(Deserialize)]
 struct Application {
     url: String,
 }
 
+/// Enregistre l'adresse de l'application reçue en tête de la carte (SPEC-23 R7).
 async fn api_application(State(e): State<Partage>, Json(p): Json<Application>) -> Response {
     ecrire(e, move |i| {
         assurer_carte(i)?;
@@ -99,6 +108,7 @@ struct SaisieRemarque {
     garder: Vec<String>,
 }
 
+/// Ajoute une remarque datée du jour et rend son identifiant ; crée la carte d'abord si elle n'existe pas encore.
 async fn api_remarque(State(e): State<Partage>, Json(p): Json<SaisieRemarque>) -> Response {
     ecrire(e, move |i| {
         assurer_carte(i)?;
@@ -120,15 +130,18 @@ async fn api_remarque(State(e): State<Partage>, Json(p): Json<SaisieRemarque>) -
     .await
 }
 
+/// Corps de `/api/reception/supprimer`.
 #[derive(Deserialize)]
 struct Suppression {
     id: String,
 }
 
+/// Supprime une remarque et toutes ses versions.
 async fn api_supprimer(State(e): State<Partage>, Json(p): Json<Suppression>) -> Response {
     ecrire(e, move |i| remarques::supprimer(i, &p.id)).await
 }
 
+/// Corps du traitement d'une remarque : statut, explication en une phrase, commit de la correction.
 #[derive(Deserialize)]
 struct Traitement {
     id: String,
@@ -138,9 +151,46 @@ struct Traitement {
     commit: Option<String>,
 }
 
+/// Enregistre le traitement d'une remarque, comme l'outil MCP `reception_traiter`.
 async fn api_traiter(State(e): State<Partage>, Json(p): Json<Traitement>) -> Response {
     ecrire(e, move |i| {
         remarques::traiter(i, &p.id, &p.statut, &p.resolution, p.commit.as_deref())
+    })
+    .await
+}
+
+/// Corps de `/api/reception/valider` : `validee` ou `a_reprendre`, avec ce qui reste à reprendre.
+#[derive(Deserialize)]
+struct Validation {
+    id: String,
+    verdict: String,
+    #[serde(default)]
+    commentaire: String,
+}
+
+/// Validation par l'utilisateur d'une remarque traitée (EF-165) : validée, ou à reprendre.
+async fn api_valider(State(e): State<Partage>, Json(p): Json<Validation>) -> Response {
+    ecrire(e, move |i| {
+        remarques::valider(i, &p.id, &p.verdict, &p.commentaire)
+    })
+    .await
+}
+
+/// État git des commits cités par les remarques (EF-165) : existe, poussé, première version.
+async fn api_git(State(e): State<Partage>) -> Response {
+    repondre(e, |i| {
+        let Some(depot) = wikik_core::git::Depot::trouver(&i.racine) else {
+            return Ok(vec![]);
+        };
+        let commits: std::collections::BTreeSet<String> = remarques::lister(i)?
+            .into_iter()
+            .filter_map(|r| r.commit)
+            .filter(|c| !c.trim().is_empty())
+            .collect();
+        Ok(commits
+            .iter()
+            .map(|c| depot.etat_commit(c))
+            .collect::<Vec<_>>())
     })
     .await
 }

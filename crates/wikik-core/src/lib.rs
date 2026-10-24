@@ -8,10 +8,12 @@
 pub mod atelier;
 pub mod check;
 pub mod config;
+pub mod edition;
 pub mod git;
 pub mod hash;
 pub mod index;
 pub mod init;
+pub mod journal;
 pub mod lang;
 pub mod modele;
 pub mod parametres;
@@ -21,6 +23,7 @@ pub mod reception;
 pub mod relu;
 pub mod reseau;
 pub mod resolution;
+pub mod skills;
 pub mod stats;
 pub mod wiki;
 

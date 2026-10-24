@@ -7,14 +7,17 @@
 
 import { statique } from "./statique";
 /** Page à afficher, déduite de l'URL : `produit` et `projet` sont les accueils de section, `relecture` la
- * liste des documents à relire, `clarifications` leur tableau de bord ; `etape` à
+ * liste des documents à relire, `cascade` les besoins jusqu'aux tests, `clarifications` leur tableau de bord ; `etape` à
  * `clarifier` n'existent que dans l'atelier, `reception` à `traitement` dans le cahier de réception, et
- * `parametres` (pas dans le site exporté). */
+ * `parametres` (pas dans le site exporté).
+ * @relu 2026-10-22 53893dde
+ */
 export type Route =
   | { page: "accueil" }
   | { page: "produit" }
   | { page: "projet" }
   | { page: "relecture" }
+  | { page: "cascade" }
   | { page: "fichier"; chemin: string; ancre: string }
   | { page: "document"; id: string; ancre: string }
   | { page: "recherche"; q: string }
@@ -27,7 +30,8 @@ export type Route =
   | { page: "reception" }
   | { page: "reception-page"; cle: string }
   | { page: "traitement" }
-  | { page: "parametres" };
+  | { page: "parametres" }
+  | { page: "git" };
 
 /** Chemin, paramètres et ancre de l'URL courante, quel que soit le mode. */
 function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
@@ -39,26 +43,30 @@ function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
   return { chemin: decodeURIComponent(chemin), params: new URLSearchParams(requete), ancre: decodeURIComponent(ancre) };
 }
 
+/** Coupe au premier séparateur seulement (`a/b/c` → `a`, `b/c`). */
 function splitUne(t: string, sep: string): [string, string?] {
   const i = t.indexOf(sep);
   return i < 0 ? [t] : [t.slice(0, i), t.slice(i + 1)];
 }
 
+/** Route de l'URL courante ; une adresse inconnue tombe sur l'accueil. */
 function analyser(): Route {
   const { chemin, params, ancre } = lireUrl();
   if (chemin === "/produit" || chemin === "/produit/") return { page: "produit" };
   if (chemin === "/projet" || chemin === "/projet/") return { page: "projet" };
   if (chemin === "/projet/relecture") return { page: "relecture" };
+  if (chemin === "/projet/cascade") return { page: "cascade" };
   if (chemin.startsWith("/produit/")) return { page: "fichier", chemin: chemin.slice("/produit/".length), ancre };
   if (chemin.startsWith("/projet/")) return { page: "document", id: chemin.slice("/projet/".length), ancre };
   if (chemin === "/recherche") return { page: "recherche", q: params.get("q") ?? "" };
   if (chemin === "/graphe") return { page: "graphe", centre: params.get("centre") ?? "" };
   if (chemin === "/atelier") return { page: "atelier" };
   if (chemin.startsWith("/atelier/")) return { page: "etape", etape: chemin.slice("/atelier/".length) };
-  if (chemin.startsWith("/clarification/")) return { page: "clarification", id: chemin.slice("/clarification/".length) };
   if (chemin === "/clarifications") return { page: "clarifications" };
-  if (chemin.startsWith("/clarifier/")) return { page: "clarifier", sujet: chemin.slice("/clarifier/".length) };
+  if (chemin.startsWith("/clarifications/clarifier/")) return { page: "clarifier", sujet: chemin.slice("/clarifications/clarifier/".length) };
+  if (chemin.startsWith("/clarifications/")) return { page: "clarification", id: chemin.slice("/clarifications/".length) };
   if (chemin === "/parametres") return { page: "parametres" };
+  if (chemin === "/git") return { page: "git" };
   if (chemin === "/reception") return { page: "reception" };
   if (chemin === "/reception/traitement") return { page: "traitement" };
   if (chemin.startsWith("/reception/page/")) return { page: "reception-page", cle: params.get("cle") ?? "" };
@@ -97,17 +105,56 @@ export function estCourant(href: string): boolean {
   return cible === lireUrl().chemin;
 }
 
-// Les liens internes (href commençant par /) sont gérés sans rechargement.
-addEventListener("click", (e) => {
-  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+/** Adresse de la page affichée, sous la forme que prend `aller` (ancre comprise). */
+export function adresseCourante(): string {
+  return statique ? location.hash || "#/" : location.pathname + location.search + location.hash;
+}
+
+/**
+ * Ouverture d'un lien dans un nouvel onglet de l'application (EF-151), branchée par le module des onglets :
+ * Ctrl+clic (⌘+clic) et clic du milieu sur un lien interne.
+ */
+export const nouvelOnglet: { ouvrir: ((href: string) => void) | null } = { ouvrir: null };
+
+/**
+ * Adresse d'un clic sur un lien interne de l'application, ou `null` (lien externe, cible ou téléchargement) pour laisser
+ * faire le navigateur ; dans le site statique, seules les adresses `#/` sont internes.
+ */
+const lienInterne = (e: MouseEvent): string | null => {
   const a = (e.target as Element | null)?.closest?.("a");
   const href = a?.getAttribute("href");
-  if (!a || !href || !href.startsWith("/") || href.startsWith("//") || a.target) return;
+  if (!a || !href || a.target || a.hasAttribute("download")) return null;
+  if (statique ? !href.startsWith("#/") : !href.startsWith("/") || href.startsWith("//")) return null;
+  return href;
+};
+
+// Les liens internes (href commençant par /) sont gérés sans rechargement ; Ctrl+clic et clic du milieu
+// les ouvrent dans un nouvel onglet de l'application.
+addEventListener("click", (e) => {
+  if (e.defaultPrevented || e.button !== 0 || e.shiftKey || e.altKey) return;
+  const href = lienInterne(e);
+  if (!href) return;
+  if (e.metaKey || e.ctrlKey) {
+    if (!nouvelOnglet.ouvrir) return;
+    e.preventDefault();
+    nouvelOnglet.ouvrir(href);
+    return;
+  }
+  if (statique) return;
   e.preventDefault();
   aller(href);
 });
+addEventListener("auxclick", (e) => {
+  if (e.defaultPrevented || e.button !== 1 || !nouvelOnglet.ouvrir) return;
+  const href = lienInterne(e);
+  if (!href) return;
+  e.preventDefault();
+  nouvelOnglet.ouvrir(href);
+});
 
+/** Préfixe des adresses : `#` dans le site statique (pas de serveur pour répondre aux chemins), rien sinon. */
 const prefixe = statique ? "#" : "";
+/** Paramètre `?parcours=` d'une adresse de l'atelier ; absent pour le parcours d'origine. */
 const avecParcours = (p?: string) => (p && p !== "PARCOURS" ? `?parcours=${encodeURIComponent(p)}` : "");
 
 /** Parcours de l'atelier désigné par l'URL courante (`PARCOURS` sans paramètre). */
@@ -116,16 +163,17 @@ export function parcoursDeUrl(): string {
 }
 
 /**
- * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`,
+ * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`, `/projet/cascade`,
  * `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
  * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>` (avec
- * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarification/<id>`, `/clarifier/<id>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres`.
+ * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarifications/<id>`, `/clarifications/clarifier/<sujet>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres` ; `/git` (historique).
  */
 export const url = {
   accueil: () => `${prefixe}/`,
   produit: () => `${prefixe}/produit`,
   projet: () => `${prefixe}/projet`,
   relecture: () => `${prefixe}/projet/relecture`,
+  cascade: () => `${prefixe}/projet/cascade`,
   fichier: (chemin: string, ancre?: string) =>
     `${prefixe}/produit/${chemin.split("/").map(encodeURIComponent).join("/")}${ancre ? "#" + encodeURIComponent(ancre) : ""}`,
   document: (id: string) => `${prefixe}/projet/${encodeURIComponent(id)}`,
@@ -135,11 +183,15 @@ export const url = {
   atelier: (parcours?: string) => `${prefixe}/atelier${avecParcours(parcours)}`,
   etape: (etape: string, parcours?: string) => `${prefixe}/atelier/${encodeURIComponent(etape)}${avecParcours(parcours)}`,
   clarifications: () => `${prefixe}/clarifications`,
-  clarification: (id: string) => `${prefixe}/clarification/${encodeURIComponent(id)}`,
-  clarifier: (sujet: string) => `${prefixe}/clarifier/${encodeURIComponent(sujet)}`,
+  // Les clarifications sont rangées sous leur tableau (REC-074).
+  clarification: (id: string) => `${prefixe}/clarifications/${encodeURIComponent(id)}`,
+  clarifier: (sujet: string) => `${prefixe}/clarifications/clarifier/${encodeURIComponent(sujet)}`,
   reception: () => `${prefixe}/reception`,
   // La clé d'une page est souvent une route (`/configurer`) : elle voyage en paramètre.
   pageReception: (cle: string) => `${prefixe}/reception/page/?cle=${encodeURIComponent(cle)}`,
   traitement: () => `${prefixe}/reception/traitement`,
   parametres: () => `${prefixe}/parametres`,
+  // Historique git (EF-166) : un commit ou une branche à montrer voyage en paramètre.
+  git: (q?: { commit?: string; ref?: string }) =>
+    `${prefixe}/git${q?.commit ? `?commit=${encodeURIComponent(q.commit)}` : q?.ref ? `?ref=${encodeURIComponent(q.ref)}` : ""}`,
 };

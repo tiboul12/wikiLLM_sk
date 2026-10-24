@@ -7,8 +7,10 @@
   import { rendre } from "../../lib/markdown";
 
   let { fiche, mode }: { fiche: Fiche; mode: string } = $props();
+  /** Valeur du mode choisi (Express ou Complet) d'un réglage de la fiche, ou rien. */
   const m = (x: { express: number; complet: number } | null) => (x ? (mode === "complet" ? x.complet : x.express) : null);
 
+  /** Phrase « ce que l'on fait » d'une sous-étape, tirée de son genre et de ses réglages (durée, variantes, nombre à garder). */
   function phrase(se: SousEtape): string {
     const cible = se.pour_chaque ? ` pour chaque ${nomArtefact(se.pour_chaque, false)} retenu(e)` : "";
     switch (se.genre) {
@@ -30,6 +32,7 @@
         return se.genre;
     }
   }
+  /** Types d'artefacts que l'étape laisse dans le projet. */
   const produits = $derived([...new Set(fiche.sous_etapes.map((s) => s.cree).filter((x): x is string => !!x))]);
 </script>
 

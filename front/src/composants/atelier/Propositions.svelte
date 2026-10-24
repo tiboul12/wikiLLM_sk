@@ -17,20 +17,29 @@
     entree = null,
   }: { etape: string; se: SousEtape; cible?: string | null; mode: string; colonnes?: { champ: string; valeurs: [string, string][] } | null; entree?: string | null } = $props();
 
+  /** Lot de propositions de la sous-étape (et de la cible si elle est répétée) ; les clarifications ont leurs lots à part. */
   const lot = $derived<Lot | undefined>(
     (etape === "clarification" ? atelier.etat?.lots_clarification : atelier.etat?.etapes.find((e) => e.fiche.id === etape)?.lots)?.find(
       (l) => l.sous_etape === se.id && (l.cible ?? null) === (cible ?? null),
     ),
   );
+  /** Demande au LLM en cours. */
   let enCours = $state(false);
+  /** Rang de la proposition ouverte en correction. */
   let edition = $state<number | null>(null);
+  /** Erreur de la dernière demande ou décision. */
   let erreur = $state("");
 
+  /** Schéma JSON d'une proposition, qui donne les champs du formulaire de correction. */
   const schemaElement = $derived((se.schema as any)?.properties?.elements?.items ?? {});
+  /** Propositions qui attendent une décision. */
   const attente = $derived(lot?.elements.filter((e) => e.etat === "en_attente").length ?? 0);
+  /** Propositions gardées. */
   const gardes = $derived(lot?.elements.filter((e) => e.etat === "garde").length ?? 0);
+  /** Nombre conseillé de propositions à garder dans le mode choisi, s'il y en a un. */
   const conseil = $derived(se.garder ? (mode === "complet" ? se.garder.complet : se.garder.express) : null);
 
+  /** Demande des propositions au LLM (annulable, d'où le drapeau `true` d'`ecrire`) ; les décisions déjà prises sont gardées. */
   async function proposer() {
     enCours = true;
     erreur = "";
@@ -43,6 +52,7 @@
     }
   }
 
+  /** Garde, corrige (avec les données modifiées) ou écarte une proposition, désignée par son rang dans le lot. */
   async function decider(indice: number, decision: string, donnees: unknown = null) {
     erreur = "";
     try {
@@ -60,7 +70,9 @@
     const t = Object.values(o).find((x) => typeof x === "string");
     return typeof t === "string" ? t.slice(0, 90) : "proposition";
   }
+  /** Propositions avec leur rang dans le lot, qui reste la clé des décisions même après regroupement. */
   const indices = $derived((lot?.elements ?? []).map((p, i) => ({ p, i })));
+  /** Cartes rangées par colonne (valeur du champ de `colonnes`, SCAMPER), ou une seule colonne sans titre. */
   const groupes = $derived(
     colonnes
       ? colonnes.valeurs.map(([v, nom]) => ({ nom, items: indices.filter(({ p }) => (p.donnees as any)[colonnes!.champ] === v) }))

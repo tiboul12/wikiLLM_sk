@@ -3,9 +3,12 @@
   // (largeur réglable en tirant son bord), page courante ; en-tête avec le projet et la recherche. Le
   // parcours du Design thinking affiché suit l'URL ; le bandeau d'un appel au LLM permet de l'annuler ;
   // le bouton Terminal (propriétaire seulement, ADR-0013) ouvre le volet droit du terminal ; après le
-  // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Le serveur du projet sert les quatre sections
+  // bouton d'arrêt, un écran dit comment relancer (ADR-0014). Les pages ouvertes ont leurs onglets au-dessus
+  // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153) ;
+  // Ctrl+Z / Ctrl+Y annulent ou rétablissent la dernière écriture, puis tout est relu (EF-159). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
-  // @relu 2026-10-19 64b2a015
+  // @relu 2026-10-22 f3e2b7ca
+  import { untrack } from "svelte";
   import { api } from "./lib/api";
   import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
   import { projetCourant } from "./lib/hook";
@@ -18,6 +21,7 @@
   import ProduitAccueil from "./pages/ProduitAccueil.svelte";
   import ProjetAccueil from "./pages/ProjetAccueil.svelte";
   import Relecture from "./pages/Relecture.svelte";
+  import Cascade from "./pages/Cascade.svelte";
   import PageFichier from "./pages/PageFichier.svelte";
   import PageDocument from "./pages/PageDocument.svelte";
   import Recherche from "./pages/Recherche.svelte";
@@ -33,27 +37,62 @@
   import CarteReception from "./pages/reception/CarteReception.svelte";
   import Traitement from "./pages/reception/Traitement.svelte";
   import Parametres from "./pages/Parametres.svelte";
+  import Git from "./pages/Git.svelte";
   import PanneauTerminal from "./composants/PanneauTerminal.svelte";
   import Icone from "./composants/Icone.svelte";
   import { terminal, chargerParametres } from "./lib/terminal.svelte";
+  import Onglets from "./composants/Onglets.svelte";
+  import { precharger } from "./lib/graphe";
+  import { edition, raccourcis, chargerFavoris } from "./lib/edition.svelte";
+  import { recharger as rechargerAtelier } from "./lib/atelier.svelte";
+  import { recharger as rechargerReception } from "./lib/reception.svelte";
+  import { detachee, suivre, titreDe, ouvrir } from "./lib/onglets.svelte";
+  import { nouvelOnglet } from "./lib/routeur.svelte";
 
+  /** Projet chargé (nom, documents, fichiers) ; relu après chaque écriture. */
   let projet = $state<Projet | null>(null);
+  /** Erreur de chargement du projet, affichée à la place des pages. */
   let erreur = $state("");
+  /** Texte du champ de recherche de l'en-tête. */
   let saisie = $state("");
+  /** Panneau ouvert en surimpression sur téléphone ; refermé à chaque changement de page. */
   let barreOuverte = $state(false);
 
-  api
-    .projet()
-    .then((p) => {
-      projet = p;
-      projetCourant.nom = p.nom;
-      retenir(p);
-      document.title = `${p.nom} · wikik`;
-    })
-    .catch((e) => (erreur = String(e)));
+  /** Charge le projet, le retient pour lier les identifiants cités et nomme l'onglet du navigateur. */
+  function chargerProjet() {
+    api
+      .projet()
+      .then((p) => {
+        projet = p;
+        projetCourant.nom = p.nom;
+        retenir(p);
+        document.title = `${p.nom} · wikik`;
+      })
+      .catch((e) => (erreur = String(e)));
+  }
+  chargerProjet();
+  chargerFavoris();
+  // Après une écriture (édition, validation, Ctrl+Z) : projet, atelier et réception relus (EF-159).
+  $effect(() => {
+    if (!edition.revision) return;
+    untrack(() => {
+      chargerProjet();
+      if (atelier.actif) rechargerAtelier().catch(() => {});
+      if (reception.actif) rechargerReception().catch(() => {});
+    });
+  });
   detecter().then((ok) => ok && choisirParcours(parcoursDeUrl()));
+  // Le graphe global et sa disposition se préparent en tâche de fond (REC-045).
+  precharger();
   detecterReception();
   chargerParametres();
+
+  // Onglets (EF-151) : l'onglet actif suit la page ; Ctrl+clic et clic du milieu en ouvrent un nouveau.
+  nouvelOnglet.ouvrir = ouvrir;
+  $effect(() => {
+    const titre = titreDe(routeur.route, projet);
+    untrack(() => suivre(titre));
+  });
 
   // Le parcours affiché suit l'URL des pages du Design thinking (EF-145).
   $effect(() => {
@@ -61,14 +100,15 @@
     if (atelier.actif && (p === "atelier" || p === "etape")) choisirParcours(parcoursDeUrl());
   });
 
-  // Section active : celle de la page, ou la dernière ouverte pour une page commune (recherche, graphe).
+  /** Section active : celle de la page, ou la dernière ouverte pour une page commune (recherche, graphe). */
   const section = $derived(sectionDe(routeur.route, projet) ?? navigation.section);
   $effect(() => {
     navigation.section = section;
   });
+  /** Le panneau latéral n'a pas lieu d'être sur l'accueil et les paramètres. */
   const avecPanneau = $derived(section !== "accueil" && section !== "parametres");
 
-  // Durée de l'appel au LLM en cours, pour le bandeau.
+  /** Heure courante pendant un appel au LLM, pour afficher sa durée dans le bandeau. */
   let maintenant = $state(Date.now());
   $effect(() => {
     if (!atelier.occupe) return;
@@ -76,6 +116,7 @@
     return () => clearInterval(t);
   });
 
+  /** Ouvre la page de recherche sur le texte saisi. */
   function chercher(e: SubmitEvent) {
     e.preventDefault();
     if (saisie.trim()) aller(url.recherche(saisie.trim()));
@@ -86,7 +127,7 @@
     barreOuverte = false;
   });
 
-  // Largeur du panneau, réglée en tirant son bord (REC-011) et gardée par ce navigateur.
+  /** Largeur du panneau gardée par ce navigateur (REC-011), 280 px par défaut ou sans stockage. */
   const lireLargeur = () => {
     try {
       return Number(localStorage.getItem("wikik.panneau")) || 280;
@@ -94,7 +135,9 @@
       return 280;
     }
   };
+  /** Largeur du panneau, réglée en tirant son bord. */
   let largeur = $state(lireLargeur());
+  /** Largeur du volet du terminal gardée par ce navigateur, 560 px par défaut. */
   const lireLargeurTerminal = () => {
     try {
       return Number(localStorage.getItem("wikik.terminal")) || 560;
@@ -102,7 +145,9 @@
       return 560;
     }
   };
+  /** Largeur du volet du terminal. */
   let largeurTerminal = $state(lireLargeurTerminal());
+  /** Tire le bord du panneau : largeur bornée entre 180 et 700 px, enregistrée au relâchement. */
   function tirer(e: PointerEvent) {
     const poignee = e.currentTarget as HTMLElement;
     poignee.setPointerCapture(e.pointerId);
@@ -145,7 +190,7 @@
 {/if}
 
 <div class="cadre" class:sans-panneau={!avecPanneau} class:avec-terminal={terminal.ouvert} style="--largeur-panneau: {largeur}px; --largeur-terminal: {largeurTerminal}px">
-  <BarreActivite active={routeur.route.page === "graphe" ? null : section} graphe={routeur.route.page === "graphe"} />
+  <BarreActivite active={section} />
   {#if avecPanneau}
     <aside class="barre" class:ouverte={barreOuverte}>
       {#if projet}
@@ -159,7 +204,10 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="poignee" onpointerdown={tirer} ondblclick={() => (largeur = 280)} title="Tirer pour élargir le panneau (double-clic : largeur d'origine)"></div>
   {/if}
+  <div class="colonne">
+  {#if !detachee}<Onglets />{/if}
   <main class="contenu">
+    {#key edition.revision}
     {#if routeur.route.page === "fichier"}
       {#key routeur.route.chemin}<PageFichier chemin={routeur.route.chemin} ancre={routeur.route.ancre} />{/key}
     {:else if routeur.route.page === "document"}
@@ -174,10 +222,14 @@
       <ProjetAccueil {projet} />
     {:else if routeur.route.page === "relecture"}
       <Relecture {projet} />
+    {:else if routeur.route.page === "cascade"}
+      <Cascade {projet} />
     {:else if routeur.route.page === "accueil"}
       <Accueil {projet} />
     {:else if routeur.route.page === "parametres"}
       <Parametres />
+    {:else if routeur.route.page === "git"}
+      <Git />
     {:else if !atelier.actif && !reception.actif}
       <p class="discret">Cette page n'existe pas dans le site exporté : lance <code>wikik</code> dans le projet.</p>
     {:else if routeur.route.page === "etape"}
@@ -197,9 +249,13 @@
     {:else if routeur.route.page === "reception"}
       {#if reception.etat}<CahierReception />{:else}<p class="discret">Chargement…</p>{/if}
     {/if}
+    {/key}
   </main>
+  </div>
 </div>
 {#if terminal.ouvert}<PanneauTerminal bind:largeur={largeurTerminal} />{/if}
+<svelte:window onkeydown={raccourcis} />
+{#if edition.message}<div class="message-bref" class:erreur={edition.erreur} role="status">{edition.message}</div>{/if}
 {#if terminal.arrete}
   <div class="serveur-arrete" role="alertdialog" aria-label="Serveur arrêté">
     <div>

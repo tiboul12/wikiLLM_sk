@@ -3,16 +3,28 @@
 //
 // @req EF-143
 import type { Projet } from "../types/Projet";
+import type { DocumentResume } from "../types/DocumentResume";
 import { url } from "./routeur.svelte";
 
-/** Ensembles remplacés d'un bloc au chargement (assignation : le rendu qui les lit se met à jour). */
-export const connus = $state({ documents: new Set<string>(), fichiers: new Set<string>(), minuscules: new Map<string, string>() });
+/** Ensembles remplacés d'un bloc au chargement (assignation : le rendu qui les lit se met à jour).
+ * @relu 2026-10-22 55020bdc
+ */
+export const connus = $state({
+  documents: new Set<string>(),
+  fichiers: new Set<string>(),
+  minuscules: new Map<string, string>(),
+  /** Tests d'exigence du projet (cascade, EF-160). */
+  tests: [] as DocumentResume[],
+});
 
-/** Retient les documents et les fichiers du projet chargé. */
+/** Retient les documents et les fichiers du projet chargé.
+ * @relu 2026-10-22 2b15c51e
+ */
 export function retenir(p: Projet) {
   connus.documents = new Set(p.documents.map((d) => d.id));
   connus.minuscules = new Map(p.documents.map((d) => [d.id.toLowerCase(), d.id]));
   connus.fichiers = new Set(p.fichiers.map((f) => f.chemin));
+  connus.tests = p.documents.filter((d) => d.genre === "test");
 }
 
 /**

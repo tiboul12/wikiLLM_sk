@@ -28,6 +28,7 @@ pub fn noter_port(racine: &Path, port: Option<u16>) {
     }
 }
 
+/// Port noté par le serveur du projet dans `.wikik/serveur.json`, s'il y en a un et qu'il se lit.
 fn port_note(racine: &Path) -> Option<u16> {
     let t = std::fs::read_to_string(racine.join(DOSSIER).join(SERVEUR)).ok()?;
     let v: Value = serde_json::from_str(&t).ok()?;

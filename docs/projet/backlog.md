@@ -45,7 +45,14 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 - [x] Traiter les 39 remarques du périmètre : PLAN-v7 (branche temporaire `v7-retours`), 7 phases, toutes traitées le 19/10.
 - [x] **Serveur en arrière-plan** (20/10, ADR-0014) : il survit à la fin de la connexion SSH, bouton ⏻ pour l'arrêter.
 - [ ] **Relire et recevoir la v7** (Tibo) : tester la branche, puis la fusionner dans `master` ; nouvelle campagne de réception au besoin.
-- [ ] **v8** : front en Rust / WebAssembly (REC-009.2), **en attente du design system complet en Rust que Tibo fournira** ; alors BDR, ADR qui remplace ADR-0004, puis portage écran par écran.
+- [ ] **v9** (ex-v8) : front en Rust / WebAssembly (REC-009.2), **en attente du design system complet en Rust que Tibo fournira** ; alors BDR, ADR qui remplace ADR-0004, puis portage écran par écran.
+
+## 🔁 v8 : retours de la réception du 22/10
+
+- [x] Traiter les 41 remarques (REC-042 à REC-082) : PLAN-v8 (branche `v8-retours`, partie de `v7-retours`), 10 phases, toutes traitées le 22/10.
+- [ ] **Recevoir la v8** (Tibo) : `make install`, relancer `wikik` (⏻ puis `wikik`), valider les remarques traitées (Traitement › À valider) et les tests restants (Projet › Cascade : TEST-007 modèles locaux, TEST-014 hors-sujet avec un vrai LLM, TEST-020 terminal).
+- [ ] **Fusionner** `v7-retours` puis `v8-retours` dans `master` une fois la réception faite ; poser le tag `v8.0-rc1`.
+- [ ] **Relire** BDR-v8-1/2, CDC-v8, EF-150 à 168, ADR-0015 à 0017, et les 11 skills livrés (Paramètres › Prompts système).
 
 ## 🧩 Constats de la v1 à traiter
 

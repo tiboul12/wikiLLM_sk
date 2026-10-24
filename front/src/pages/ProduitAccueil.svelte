@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Accueil de la section Produit (EF-142) : chiffres du code, puis le récapitulatif fichier par fichier
+  // Accueil de la section Code, ex-Produit (EF-142, EF-150) : chiffres du code, puis le récapitulatif fichier par fichier
   // (mêmes chiffres que les tuiles, plus ce que `wikik check` y signale), triable et filtrable ; enfin la
   // doc à reprendre.
   import type { Projet } from "../types/Projet";
@@ -7,19 +7,25 @@
   import { url } from "../lib/routeur.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
+  /** Rapport du check (cache du serveur) : alertes par fichier et doc à reprendre. */
   let rapport = $state<RapportCheck | null>(null);
   api.check().then((r) => (rapport = r)).catch(() => {});
 
+  /** Part des symboles documentés, en pourcentage entier, comme `wikik stats`. */
   const taux = $derived(projet && projet.symboles ? Math.round((100 * projet.documentes) / projet.symboles) : 0);
+  /** Premières alertes du check (40 au plus), hors informations. */
   const aReprendre = $derived(
     rapport?.diagnostics.filter((d) => d.severite !== "info").slice(0, 40) ?? [],
   );
+  /** Lien d'une alerte : le document pour un `.md`, sinon le symbole dans sa page de fichier. */
   const lienDiag = (d: { fichier: string; symbole: string | null }) =>
     d.fichier.endsWith(".md")
       ? url.document(projet?.documents.find((x) => x.chemin === d.fichier)?.id ?? "")
       : url.fichier(d.fichier, d.symbole?.slice(d.fichier.length + 2));
 
+  /** Ligne du récapitulatif par fichier. */
   type Ligne = { chemin: string; lignes: number; symboles: number; documentes: number; taux: number; sansDoc: number; perimes: number; alertes: number };
+  /** Colonnes du récapitulatif : champ trié et titre. */
   const COLONNES: [keyof Ligne, string][] = [
     ["chemin", "Fichier"],
     ["lignes", "Lignes"],
@@ -29,9 +35,16 @@
     ["perimes", "Périmés"],
     ["alertes", "Autres alertes"],
   ];
+  /** Colonne triée. */
   let tri = $state<keyof Ligne>("chemin");
+  /** Sens du tri : 1 croissant, -1 décroissant. */
   let sens = $state(1);
+  /** Filtre sur le chemin du fichier. */
   let filtre = $state("");
+  /**
+   * Lignes du récapitulatif filtrées et triées. « Sans doc » vient de l'index, comme la tuile « documentés » ;
+   * périmés et autres alertes viennent du check (doc manquante exclue, déjà comptée). Un fichier sans symbole compte à 100 %.
+   */
   const lignes = $derived.by((): Ligne[] => {
     // « Sans doc » vient de l'index (comme la tuile « documentés ») ; périmés et autres alertes, du check.
     const diag = new Map<string, { perimes: number; alertes: number }>();
@@ -57,6 +70,7 @@
       }))
       .sort((a, b) => (a[tri] < b[tri] ? -sens : a[tri] > b[tri] ? sens : 0));
   });
+  /** Trie sur une colonne ; un second clic inverse le sens. Les chiffres se lisent du pire au meilleur, le chemin et le taux en croissant. */
   function trier(c: keyof Ligne) {
     if (tri === c) sens = -sens;
     else {
@@ -68,8 +82,8 @@
 </script>
 
 {#if projet}
-  <h1>Produit</h1>
-  <p class="discret">Le code et sa doc : ouvre un fichier dans la barre de gauche ou dans le tableau ; chaque symbole y a sa cellule.</p>
+  <h1>Code</h1>
+  <p class="discret">Le code et sa doc : ouvre un fichier dans la barre de gauche ou dans le tableau ; chaque symbole y a sa cellule. Les liens entre tout le projet : <a href={url.graphe()}>le graphe</a>.</p>
   <section class="tuiles">
     <div class="tuile"><span class="valeur">{projet.fichiers.length}</span><span class="nom">fichiers de code</span></div>
     <div class="tuile"><span class="valeur">{projet.lignes.toLocaleString("fr")}</span><span class="nom">lignes</span></div>
@@ -141,6 +155,6 @@
     {/if}
   {/if}
 {:else}
-  <h1>Produit</h1>
+  <h1>Code</h1>
   <p class="discret">Chargement…</p>
 {/if}

@@ -11,19 +11,25 @@
   import Balises from "./Balises.svelte";
 
   let { cellule, ouverte = false, langage = "rust" }: { cellule: Cellule; ouverte?: boolean; langage?: string } = $props();
+  /** Retour de la copie de la référence (⚓), effacé après 1,6 s. */
   let copie = $state<"" | "copie" | "echec">("");
+  /** Doc du symbole rendue en HTML, identifiants cités liés. */
   const doc = $derived(cellule.doc ? rendre(cellule.doc, undefined, undefined, undefined, autoLien) : "");
-  // Pas de grammaire Svelte dans highlight.js : le script est du TypeScript.
+  /** Langage de coloration : highlight.js n'a pas de grammaire Svelte, le script d'un composant est du TypeScript. */
   const langageCode = $derived(langage === "svelte" ? "typescript" : langage);
+  /** Code du symbole coloré. */
   const code = $derived(colorer(cellule.code, langageCode));
+  /** Nombre de lignes du symbole, affiché sur le code replié. */
   const nbLignes = $derived(cellule.ligne_fin - cellule.ligne_debut + 1);
+  /** Classe CSS du statut de la doc : à jour, périmée ou absente. */
   const classeStatut = $derived(cellule.statut === "périmé" ? "perime" : cellule.statut === "sans doc" ? "sansdoc" : "ajour");
 
+  /** Copie la référence `@wiki:` du symbole dans le presse-papiers. */
   async function hook() {
     copie = (await copier(reference(cellule.id))) ? "copie" : "echec";
     setTimeout(() => (copie = ""), 1600);
   }
-  // Lien permanent vers ce symbole (REC-020) : la page du fichier, ancrée sur la cellule.
+  /** Lien permanent vers ce symbole (REC-020) : la page de son fichier, ancrée sur la cellule. */
   const ancre = $derived(url.fichier(cellule.id.slice(0, cellule.id.length - cellule.nom_qualifie.length - 2), cellule.nom_qualifie));
 </script>
 

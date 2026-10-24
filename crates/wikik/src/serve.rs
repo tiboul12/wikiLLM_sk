@@ -28,6 +28,7 @@ use wikik_core::{Index, check, wiki};
 #[folder = "../../front/dist"]
 pub(crate) struct Front;
 
+/// État partagé par toutes les routes du serveur : index du projet sous verrou, fournisseur LLM, mode factice, propriétaire.
 pub(crate) struct Etat {
     pub(crate) index: Mutex<Index>,
     /// Fournisseur LLM de l'atelier et du complément de la carte de réception, remplacé par les
@@ -41,8 +42,11 @@ pub(crate) struct Etat {
     pub(crate) terminal: Mutex<Option<Arc<crate::terminal::Terminal>>>,
     /// Bouton « Arrêter le serveur » (ADR-0014).
     pub(crate) arret: tokio::sync::Notify,
+    /// Dernier rapport de `check` et son empreinte (EF-154) : rendu tel quel tant que rien n'a changé.
+    pub(crate) dernier_check: Mutex<Option<(String, check::RapportCheck)>>,
 }
 
+/// État du serveur tel que le reçoivent les gestionnaires axum.
 pub(crate) type Partage = Arc<Etat>;
 
 /// Port d'écoute : celui demandé (`--port`), ou le port par défaut et, s'il est pris (un autre projet
@@ -65,7 +69,8 @@ impl Port {
 
 /// Démarre le serveur du projet sur `port` (ou le suivant libre) et bloque jusqu'à Ctrl+C ; `factice`
 /// remplace le LLM par les exemples des fiches. La clé du propriétaire est lue ou créée (`.wikik/cle`).
-/// @relu 2026-10-20 5ba2f739
+/// Le premier `check` est calculé en tâche de fond (EF-154).
+/// @relu 2026-10-22 fb16f1ce
 pub fn servir(
     racine: &Path,
     adresse: &str,
@@ -78,7 +83,7 @@ pub fn servir(
     index.mettre_a_jour()?;
     let mut config = index.config.atelier.llm.clone();
     if factice {
-        config.fournisseur = "factice".into();
+        config.connecteur = Some("factice".into());
     }
     let travail = wikik_core::atelier::parcours::travail(&index.racine);
     let fournisseur = fournisseur::depuis_config(&config, &index.racine, &travail)?;
@@ -92,19 +97,35 @@ pub fn servir(
         cle: cle.clone(),
         terminal: Mutex::new(None),
         arret: tokio::sync::Notify::new(),
+        dernier_check: Mutex::new(None),
+    });
+    // Premier `check` calculé en tâche de fond : la première page de fichier n'attend pas les blames.
+    let chaud = etat.clone();
+    std::thread::spawn(move || {
+        let i = chaud.index.lock().unwrap_or_else(|x| x.into_inner());
+        if let (Ok(em), Ok(r)) = (check::empreinte(&i), check::verifier(&i)) {
+            *chaud
+                .dernier_check
+                .lock()
+                .unwrap_or_else(|x| x.into_inner()) = Some((em, r));
+        }
     });
     lancer(routes(etat.clone()), ip, port, &racine, &cle, etat)
 }
 
-/// Toutes les routes : lecture du wiki, atelier, réception, paramètres, terminal ; écritures gardées
+/// Toutes les routes : lecture du wiki, atelier, réception, paramètres, terminal, édition (une action du
+/// journal d'annulation par requête d'écriture, ADR-0016) ; écritures gardées
 /// (corps JSON, même origine, 25 Mo au plus pour les captures) ; paramètres et terminal réservés au
 /// propriétaire (ADR-0013), comme le bouton d'arrêt (ADR-0014).
+/// @relu 2026-10-22 575fd80b
 pub(crate) fn routes(etat: Partage) -> Router {
     routes_wiki()
         .merge(crate::atelier::routes())
         .merge(crate::reception::routes())
         .merge(crate::parametres::routes(etat.clone()))
         .merge(crate::terminal::routes(etat.clone()))
+        .merge(crate::edition::routes(etat.clone()))
+        .merge(crate::historique::routes())
         .merge(
             Router::new()
                 .route("/api/serveur/arreter", axum::routing::post(api_arreter))
@@ -115,6 +136,7 @@ pub(crate) fn routes(etat: Partage) -> Router {
         )
         // Le front aussi passe par les gardes : `/?cle=…` (adresse du lancement) pose le cookie.
         .fallback(statique)
+        .layer(axum::middleware::from_fn(crate::edition::action))
         .layer(axum::extract::DefaultBodyLimit::max(25 * 1024 * 1024))
         .layer(axum::middleware::from_fn(crate::atelier::meme_origine))
         .layer(axum::middleware::from_fn_with_state(
@@ -147,6 +169,7 @@ pub(crate) fn routes_wiki() -> Router<Partage> {
         .route("/api/image", get(api_image))
 }
 
+/// Paramètre `?chemin=` d'une image.
 #[derive(Deserialize)]
 struct ParamImage {
     chemin: String,
@@ -321,39 +344,47 @@ where
     }
 }
 
+/// Paramètre `?chemin=` d'un fichier de code.
 #[derive(Deserialize)]
 struct ParamChemin {
     chemin: String,
 }
 
+/// Paramètre `?id=` d'un document.
 #[derive(Deserialize)]
 struct ParamId {
     id: String,
 }
 
+/// Paramètres du graphe : centre (symbole, fichier ou document) et profondeur ; sans centre, graphe global.
 #[derive(Deserialize)]
 struct ParamGraphe {
     centre: Option<String>,
     profondeur: Option<usize>,
 }
 
+/// Paramètre `?q=` de la recherche.
 #[derive(Deserialize)]
 struct ParamCherche {
     q: String,
 }
 
+/// Projet : nom, documents résumés et fichiers indexés, pour la barre et les accueils.
 async fn api_projet(State(e): State<Partage>) -> Response {
     repondre(e, wiki::projet).await
 }
 
+/// Page d'un fichier de code : en-tête et cellules des symboles.
 async fn api_fichier(State(e): State<Partage>, Query(p): Query<ParamChemin>) -> Response {
     repondre(e, move |i| wiki::fichier(i, &p.chemin)).await
 }
 
+/// Page d'un document : frontmatter, corps, liens résolus et rétroliens.
 async fn api_document(State(e): State<Partage>, Query(p): Query<ParamId>) -> Response {
     repondre(e, move |i| wiki::document(i, &p.id)).await
 }
 
+/// Graphe local d'un nœud à la profondeur demandée (1 par défaut), ou graphe global du projet.
 async fn api_graphe(State(e): State<Partage>, Query(p): Query<ParamGraphe>) -> Response {
     repondre(e, move |i| {
         wiki::graphe(
@@ -365,12 +396,27 @@ async fn api_graphe(State(e): State<Partage>, Query(p): Query<ParamGraphe>) -> R
     .await
 }
 
+/// Recherche plein texte dans la doc du code et les documents.
 async fn api_cherche(State(e): State<Partage>, Query(p): Query<ParamCherche>) -> Response {
     repondre(e, move |i| wiki::cherche(i, &p.q)).await
 }
 
+/// Rapport de `check`, gardé tant que l'empreinte du projet ne change pas (EF-154, REC-047).
 async fn api_check(State(e): State<Partage>) -> Response {
-    repondre(e, check::verifier).await
+    let memo = e.clone();
+    repondre(e, move |i| {
+        let empreinte = check::empreinte(i)?;
+        let mut d = memo.dernier_check.lock().unwrap_or_else(|x| x.into_inner());
+        if let Some((em, r)) = d.as_ref()
+            && *em == empreinte
+        {
+            return Ok(r.clone());
+        }
+        let r = check::verifier(i)?;
+        *d = Some((empreinte, r.clone()));
+        Ok(r)
+    })
+    .await
 }
 
 /// Fichiers du front ; toute autre route renvoie `index.html` (application monopage).

@@ -40,6 +40,7 @@ pub struct FichierResume {
 }
 
 /// Document de la zone Projet ou de l'atelier dans la barre latérale.
+/// @relu 2026-10-22 14e0d01e
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct DocumentResume {
@@ -50,6 +51,14 @@ pub struct DocumentResume {
     pub statut: Option<String>,
     /// `projet` ou `atelier` (dossier où vit le document).
     pub zone: String,
+    /// Besoins couverts (champ `besoins` d'une exigence) : la cascade du volet Projet (EF-160).
+    pub besoins: Vec<String>,
+    /// Exigences vérifiées (champ `exigences` d'un test ou d'une décision).
+    pub exigences: Vec<String>,
+    /// Ticket de validation d'un test : `a_valider`, `utilisateur`, `modele` ou `echec`.
+    pub validation: Option<String>,
+    /// Version (`v8`) du frontmatter.
+    pub version: Option<String>,
 }
 
 /// Lien vers un symbole ou un document, prêt à afficher.
@@ -190,12 +199,13 @@ pub struct Resultat {
     pub fichier: Option<String>,
 }
 
+/// Entier SQLite en `u32` pour les types exportés au front ; une valeur négative ou trop grande donne 0.
 fn u(v: i64) -> u32 {
     u32::try_from(v).unwrap_or(0)
 }
 
 /// Accueil : fichiers avec leur rôle, documents avec leur zone (Projet, atelier, réception), statistiques.
-/// @relu 2026-10-19 48f30d62
+/// @relu 2026-10-22 789d77ac
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -229,8 +239,9 @@ pub fn projet(index: &Index) -> Result<Projet> {
         .collect::<rusqlite::Result<_>>()?;
     let dossier_atelier = format!("{}/", index.config.atelier.dossier.trim_end_matches('/'));
     let dossier_reception = format!("{}/", index.config.reception.dossier.trim_end_matches('/'));
-    let mut st =
-        c.prepare("SELECT id, chemin, genre, titre, statut FROM documents ORDER BY chemin")?;
+    let mut st = c.prepare(
+        "SELECT id, chemin, genre, titre, statut, frontmatter, version FROM documents ORDER BY chemin",
+    )?;
     let documents = st
         .query_map([], |r| {
             let chemin: String = r.get(1)?;
@@ -241,6 +252,18 @@ pub fn projet(index: &Index) -> Result<Projet> {
             } else {
                 "projet"
             };
+            let fm: serde_json::Value =
+                serde_json::from_str(&r.get::<_, String>(5)?).unwrap_or_default();
+            let liste = |cle: &str| -> Vec<String> {
+                match fm.get(cle) {
+                    Some(serde_json::Value::Array(a)) => a
+                        .iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect(),
+                    Some(serde_json::Value::String(t)) => vec![t.clone()],
+                    _ => vec![],
+                }
+            };
             Ok(DocumentResume {
                 id: r.get(0)?,
                 zone: zone.into(),
@@ -248,6 +271,13 @@ pub fn projet(index: &Index) -> Result<Projet> {
                 genre: r.get(2)?,
                 titre: r.get(3)?,
                 statut: r.get(4)?,
+                besoins: liste("besoins"),
+                exigences: liste("exigences"),
+                validation: fm
+                    .get("validation")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                version: r.get(6)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -277,6 +307,7 @@ struct Resolveur {
 }
 
 impl Resolveur {
+    /// Charge de quoi nommer et classer toutes les cibles de liens : symboles, documents, fichiers et catégorie de chaque document.
     fn charger(index: &Index) -> Result<Resolveur> {
         let c = &index.conn;
         let mut st = c.prepare("SELECT id, fichier, nom_qualifie FROM symboles")?;
@@ -382,6 +413,7 @@ impl Resolveur {
         }
     }
 
+    /// Lien vers un symbole, un document ou un fichier, avec le libellé à afficher ; une cible inconnue reste un lien marqué absent.
     fn lien(&self, id: &str, genre: &str, confiance: &str) -> Lien {
         if let Some((fichier, nq)) = self.symboles.get(id) {
             return Lien {
@@ -422,6 +454,7 @@ impl Resolveur {
     }
 }
 
+/// Arêtes d'un nœud des genres demandés, entrantes ou sortantes : (autre bout, genre, confiance).
 fn aretes(
     index: &Index,
     id: &str,
@@ -447,6 +480,7 @@ fn aretes(
     Ok(v)
 }
 
+/// Balise affichée : `@adr`, `@req`, `@topic` deviennent des liens vers chaque cible citée, les autres restent du texte.
 fn balise_vue(res: &Resolveur, nom: String, valeur: String) -> BaliseVue {
     let cibles = match nom.as_str() {
         "adr" | "req" | "topic" => valeur
@@ -667,9 +701,11 @@ pub fn document(index: &Index, id: &str) -> Result<PageDocument> {
 }
 
 /// Graphe local autour de `centre` (symbole ou document), ou graphe global : documents, code ramené au
-/// fichier, pages de l'application et remarques (EF-141).
+/// fichier, pages de l'application et remarques (EF-141). Le graphe global relie aussi les fichiers de
+/// code entre eux (appels sûrs et composants rendus, ramenés au fichier) et les pages entre elles
+/// (arborescence des routes, page dont le code cite la route d'une autre, ou appelle son fichier) : EF-153.
 ///
-/// @req EF-043, EF-141
+/// @req EF-043, EF-141, EF-153
 pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<Graphe> {
     let res = Resolveur::charger(index)?;
     let mut ar: BTreeMap<(String, String, String), String> = BTreeMap::new();
@@ -712,17 +748,24 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
                     .get(id)
                     .map_or_else(|| id.to_string(), |(f, _)| f.clone())
             };
+            // Les appels « probables » (nom seul) restent hors du graphe global : trop de faux liens.
             let mut st = index.conn.prepare(
-                "SELECT source, cible, genre, confiance FROM aretes WHERE genre IN ('lien', 'req', 'adr')",
+                "SELECT source, cible, genre, confiance FROM aretes
+                 WHERE genre IN ('lien', 'req', 'adr', 'rend') OR (genre = 'appel' AND confiance = 'certain')",
             )?;
             let v: Vec<(String, String, String, String)> = st
                 .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
                 .collect::<rusqlite::Result<_>>()?;
+            let mut entre_fichiers: BTreeSet<(String, String)> = BTreeSet::new();
             for (s, c, g, conf) in v {
                 let (s, c) = (fichier_de(&s), fichier_de(&c));
-                if s != c {
-                    ar.insert((s, c, g), conf);
+                if s == c {
+                    continue;
                 }
+                if g == "appel" || g == "rend" {
+                    entre_fichiers.insert((s.clone(), c.clone()));
+                }
+                ar.insert((s, c, g), conf);
             }
             for id in res.documents.keys() {
                 ar.entry((id.clone(), id.clone(), "_".into())).or_default();
@@ -731,7 +774,12 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
                 &crate::reception::carte::lire(index),
                 crate::reception::carte::detecter(index).unwrap_or_default(),
             );
-            for p in carte.iter().filter(|p| !p.masque) {
+            let visibles: Vec<&crate::reception::carte::Page> =
+                carte.iter().filter(|p| !p.masque).collect();
+            for (a, b, g) in liens_entre_pages(index, &visibles, &entre_fichiers, &fichier_de) {
+                ar.insert((a, b, g), "certain".into());
+            }
+            for p in visibles {
                 let id = format!("page:{}", p.cle);
                 pages.insert(
                     id.clone(),
@@ -787,6 +835,63 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
     Ok(Graphe { noeuds, aretes })
 }
 
+/// Liens entre pages de l'application (EF-153) : `contient` de la page dont la route est le plus long
+/// préfixe, `navigue` quand le fichier d'une page cite la route d'une autre (`"/reception/traitement"`)
+/// ou appelle son fichier. Une route à paramètre n'est citée que par sa partie fixe.
+fn liens_entre_pages(
+    index: &Index,
+    pages: &[&crate::reception::carte::Page],
+    entre_fichiers: &BTreeSet<(String, String)>,
+    fichier_de: &dyn Fn(&str) -> String,
+) -> Vec<(String, String, String)> {
+    let id = |p: &crate::reception::carte::Page| format!("page:{}", p.cle);
+    let fixe = |r: &str| -> String {
+        let fin = r.find([':', '{', '[', '*', '<']).unwrap_or(r.len());
+        r[..fin].trim_end_matches('/').to_string()
+    };
+    let fichier = |p: &crate::reception::carte::Page| {
+        p.symboles
+            .first()
+            .map(|s| fichier_de(s))
+            .or(p.fichier.clone())
+    };
+    let mut liens = vec![];
+    for p in pages {
+        let Some(r) = p.route.as_deref().map(fixe) else {
+            continue;
+        };
+        let parent = pages
+            .iter()
+            .filter(|q| q.cle != p.cle)
+            .filter_map(|q| Some((q, fixe(q.route.as_deref()?))))
+            .filter(|(_, rq)| {
+                !rq.is_empty() && r.len() > rq.len() && r.starts_with(&format!("{rq}/"))
+            })
+            .max_by_key(|(_, rq)| rq.len());
+        if let Some((q, _)) = parent {
+            liens.push((id(q), id(p), "contient".to_string()));
+        }
+    }
+    for a in pages {
+        let Some(fa) = fichier(a) else { continue };
+        let texte = std::fs::read_to_string(index.racine.join(&fa)).unwrap_or_default();
+        for b in pages.iter().filter(|b| b.cle != a.cle) {
+            let cite = b.route.as_deref().map(fixe).is_some_and(|r| {
+                r.len() > 1
+                    && ["\"", "'", "`"]
+                        .iter()
+                        .any(|q| texte.contains(&format!("{q}{r}")))
+            });
+            let appelle =
+                fichier(b).is_some_and(|fb| fb != fa && entre_fichiers.contains(&(fa.clone(), fb)));
+            if cite || appelle {
+                liens.push((id(a), id(b), "navigue".to_string()));
+            }
+        }
+    }
+    liens
+}
+
 /// Recherche plein texte, mêmes règles que `wikik query cherche`.
 pub fn cherche(index: &Index, texte: &str) -> Result<Vec<Resultat>> {
     let mots: Vec<String> = texte
@@ -814,6 +919,48 @@ pub fn cherche(index: &Index, texte: &str) -> Result<Vec<Resultat>> {
         })?
         .collect::<rusqlite::Result<_>>()?;
     Ok(v)
+}
+
+/// Demande au LLM de la recherche assistée (EF-152) : la question, les résultats plein texte comme
+/// point de départ (un modèle sans MCP n'a que ceux-là), et le schéma de la réponse : des éléments
+/// `{ cible, raison }` où `cible` est un identifiant de document, un chemin de fichier ou `chemin::Symbole`,
+/// que le front transforme en lien.
+/// @req EF-152
+/// @relu 2026-10-22 499eb872
+pub fn demande_recherche(index: &Index, question: &str) -> Result<(String, serde_json::Value)> {
+    let question = question.trim();
+    if question.is_empty() {
+        bail!("question vide");
+    }
+    let indices: Vec<String> = cherche(index, question)?
+        .into_iter()
+        .take(15)
+        .map(|r| format!("- {} ({}) : {}", r.cle, r.genre, r.titre))
+        .collect();
+    let consigne = format!(
+        "Tu aides l'utilisateur à trouver ce qui répond à sa question dans son projet (code, documents, décisions).\n\
+         Lis le projet avec les outils wikik si tu les as (carte, cherche, symbole, document) ; tu n'écris rien.\n\
+         Méthode de lecture du wiki (skill wikik-lecture) :\n{}\n\n\
+         Question : {question}\n\n\
+         Résultats de la recherche plein texte, comme point de départ :\n{}\n\n\
+         Réponds par les éléments du projet qui répondent le mieux, du plus utile au moins utile (8 au plus). \
+         Pour chacun : `cible`, l'identifiant exact (ex. `EF-140`, `crates/x/src/a.rs`, `crates/x/src/a.rs::Type::f`), \
+         et `raison`, une ou deux phrases qui disent ce qu'on y trouve. N'invente aucune cible ; `elements: []` si rien ne répond.",
+        crate::skills::corps(&index.racine, &index.config, "wikik-lecture"),
+        if indices.is_empty() {
+            "(aucun)".to_string()
+        } else {
+            indices.join("\n")
+        }
+    );
+    let schema = serde_json::json!({
+        "type": "object", "required": ["elements"],
+        "properties": { "elements": { "type": "array", "items": {
+            "type": "object", "required": ["cible", "raison"],
+            "properties": { "cible": {"type": "string"}, "raison": {"type": "string"} }
+        }}}
+    });
+    Ok((consigne, schema))
 }
 
 /// Entrée de l'index de recherche du site statique (SPEC-16 R1).

@@ -5,6 +5,7 @@
   import Propositions from "./Propositions.svelte";
 
   let { se, mode }: { se: SousEtape; mode: string } = $props();
+  /** Six champs du pitch : clé enregistrée, libellé, aide affichée dans le champ. */
   const CHAMPS: [string, string, string][] = [
     ["probleme", "Problème", "Quel problème, pour qui, aujourd'hui ?"],
     ["cible", "Pour qui", "Les personnes concernées"],
@@ -13,8 +14,11 @@
     ["criteres_succes", "Critères de succès", "Mesurables si possible"],
     ["hors_sujet", "Hors sujet", "Ce que le projet ne fera pas"],
   ];
+  /** Pitch enregistré du projet (artefact `PITCH`). */
   const pitch = $derived(artefact("PITCH"));
+  /** Valeurs du formulaire, par champ. */
   let f = $state<Record<string, string>>({});
+  /** Empreinte du pitch chargé : le formulaire n'est rechargé que si le pitch enregistré change, pas pendant la saisie. */
   let charge = $state("");
   // Le formulaire reprend le pitch enregistré à chaque nouvelle version.
   $effect(() => {
@@ -23,9 +27,12 @@
     charge = cle;
     f = Object.fromEntries(["titre", "description", ...CHAMPS.map((c) => c[0])].map((k) => [k, champ(pitch, k)]));
   });
+  /** Confirmation d'enregistrement. */
   let message = $state("");
+  /** Erreur d'enregistrement. */
   let erreur = $state("");
 
+  /** Enregistre le pitch tel que saisi. */
   async function enregistrer(e: SubmitEvent) {
     e.preventDefault();
     erreur = message = "";

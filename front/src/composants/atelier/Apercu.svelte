@@ -7,8 +7,11 @@
   import { url } from "../../lib/routeur.svelte";
 
   let { id, version = 0 }: { id: string; version?: number } = $props();
+  /** Document rendu en HTML, liens résolus par l'index. */
   let html = $state("");
+  /** Erreur de chargement du document. */
   let erreur = $state("");
+  /** Conteneur du rendu, où l'on dessine les diagrammes Mermaid. */
   let corps = $state<HTMLElement | null>(null);
 
   $effect(() => {
