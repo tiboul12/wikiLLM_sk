@@ -8,8 +8,9 @@
   // version qui a publié sa correction (EF-165).
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
-  // déplie, centré.
-  // @relu 2026-10-24 26c5e0d3
+  // déplie, centré. Les arborescences (pages de réception, cascade besoin → exigences → tests) se replient
+  // nœud par nœud, fermées à l'arrivée (REC-102).
+  // @relu 2026-10-24 9e4d7708
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
@@ -267,12 +268,18 @@
     {#each noeuds as { page: p, enfants } (p.cle)}
       {@const href = url.pageReception(p.cle)}
       {@const n = remarquesDe(p.cle).filter((r) => r.statut === "ouverte").length}
-      <li>
+      {#snippet lien()}
         <a {href} class:actif={cleCourante === p.cle} title={p.route ?? p.nom}>
           {p.nom}
           {#if n}<span class="compteur faible">{n}</span>{/if}
         </a>
-        {#if enfants.length}{@render branche(enfants)}{/if}
+      {/snippet}
+      <li>
+        {#if enfants.length}
+          <details class="noeud"><summary>{@render lien()}</summary>{@render branche(enfants)}</details>
+        {:else}
+          {@render lien()}
+        {/if}
       </li>
     {/each}
   </ul>
@@ -384,7 +391,8 @@
         <ul>
           {#each g.docs as d}
             {@const href = url.document(d.id)}
-            <li>
+            {@const es = d.genre === "besoin" ? projet.documents.filter((e) => e.besoins.includes(d.id)) : []}
+            {#snippet lienDoc()}
               <a {href} class:actif={actif(href)} title={d.titre}>
                 <span class="id">{d.id}</span> {d.titre === d.id ? "" : d.titre}
                 {#if aRelireIds.has(d.id)}<span class="compteur faible" title="à relire">●</span>{/if}
@@ -394,22 +402,32 @@
                   {#if c}<span class="compteur" style="color: {c.couleur}" title={c.libelle}>●</span>{:else if rq?.statut === "ouverte"}<span class="compteur faible" title="ouverte">○</span>{/if}
                 {/if}
               </a>
-              {#if d.genre === "besoin"}
-                {@const es = projet.documents.filter((e) => e.besoins.includes(d.id))}
-                {#if es.length}
+            {/snippet}
+            <li>
+              {#if es.length}
+                <!-- Cascade repliable (REC-102) : besoin → exigences → tests. -->
+                <details class="noeud">
+                  <summary>{@render lienDoc()}</summary>
                   <ul>
                     {#each es as e (e.id)}
                       {@const he = url.document(e.id)}
                       {@const ts = projet.documents.filter((t) => t.genre === "test" && t.exigences.includes(e.id))}
+                      {#snippet lienEx()}<a href={he} class:actif={actif(he)} title={e.titre}><span class="id">{e.id}</span> {e.titre}{#if !ts.length}<span class="compteur" title="sans test">○</span>{/if}</a>{/snippet}
                       <li>
-                        <a href={he} class:actif={actif(he)} title={e.titre}><span class="id">{e.id}</span> {e.titre}{#if !ts.length}<span class="compteur" title="sans test">○</span>{/if}</a>
                         {#if ts.length}
-                          <ul>{#each ts as t (t.id)}{@const ht = url.document(t.id)}<li><a href={ht} class:actif={actif(ht)} title={t.titre}><span class="id">{t.id}</span> {t.titre}<span class="compteur" class:faible={t.validation !== "utilisateur" && t.validation !== "modele"}>{t.validation === "utilisateur" || t.validation === "modele" ? "✓" : t.validation === "echec" ? "✗" : "…"}</span></a></li>{/each}</ul>
+                          <details class="noeud">
+                            <summary>{@render lienEx()}</summary>
+                            <ul>{#each ts as t (t.id)}{@const ht = url.document(t.id)}<li><a href={ht} class:actif={actif(ht)} title={t.titre}><span class="id">{t.id}</span> {t.titre}<span class="compteur" class:faible={t.validation !== "utilisateur" && t.validation !== "modele"}>{t.validation === "utilisateur" || t.validation === "modele" ? "✓" : t.validation === "echec" ? "✗" : "…"}</span></a></li>{/each}</ul>
+                          </details>
+                        {:else}
+                          {@render lienEx()}
                         {/if}
                       </li>
                     {/each}
                   </ul>
-                {/if}
+                </details>
+              {:else}
+                {@render lienDoc()}
               {/if}
             </li>
           {/each}

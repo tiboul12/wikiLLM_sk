@@ -1189,9 +1189,13 @@ mod tests {
 
     #[test]
     fn exemples_des_commentaires_ignores() {
-        let t = sans_commentaires(
-            "/// `{ path: '/x' }`\nconst r = { path: '/vrai', component: Vrai };\n",
-        );
+        // Texte assemblé : écrit en clair, l'exemple serait lui-même pris pour une route par le scan du projet.
+        let route = |r: &str| format!("{{ {}: '{r}', component: Vrai }}", "path");
+        let t = sans_commentaires(&format!(
+            "/// `{}`\nconst r = {};\n",
+            route("/x"),
+            route("/vrai")
+        ));
         assert!(!t.contains("/x"));
         assert!(OBJET_ROUTE.is_match(&t));
         assert_eq!(t.lines().count(), 2);

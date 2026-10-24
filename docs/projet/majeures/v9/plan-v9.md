@@ -45,3 +45,4 @@ Ordre : les corrections rapides d'abord (risque nul), puis la coquille (onglets)
 |---|---|---|
 | 0 BDR, CDC, exigences, plan | ✅ | 2026-10-24 |
 | 1 Corrections rapides | ✅ scan des routes sans les commentaires (plus de page « X ») ; page Cascade retirée ; « Pistes » ; branches sans puce, locales et distantes ouvertes pareil ; onglets plus hauts sans barre de défilement visible (molette) ; fermer l'onglet actif affiche son voisin ; icônes seules dans la barre du téléphone | 2026-10-24 |
+| 2 Onglets et cascades | ✅ onglet d'aperçu en italique remplacé à chaque navigation, fixé par double-clic, écriture, Ctrl+clic ou clic du milieu ; une page déjà ouverte réactive son onglet ; arborescences du volet repliables nœud par nœud | 2026-10-24 |

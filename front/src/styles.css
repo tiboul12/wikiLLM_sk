@@ -523,6 +523,13 @@ kbd { padding: 1px 6px; border: 1px solid var(--bord-fort); border-bottom-width:
 .entete-panneau .replier:hover { background: var(--fond-3); color: var(--texte); }
 a.titre-panneau:hover { color: var(--accent); text-decoration: none; }
 .barre ul ul { margin-left: 10px; padding-left: 6px; border-left: 1px solid var(--bord); }
+/* Nœud repliable d'une arborescence du volet (REC-102) : le triangle replie, le lien ouvre la page. */
+.barre details.noeud { margin: 0; }
+.barre details.noeud > summary { display: flex; align-items: center; padding: 0; list-style: none; font-weight: inherit; font-size: inherit; letter-spacing: 0; }
+.barre details.noeud > summary::-webkit-details-marker { display: none; }
+.barre details.noeud > summary::before { content: "▸"; flex: none; display: inline-grid; place-items: center; width: 14px; height: 14px; line-height: 1; color: var(--texte-2); font-size: 11px; transition: transform 0.1s; }
+.barre details.noeud[open] > summary::before { transform: rotate(90deg); }
+.barre details.noeud > summary > a { flex: 1; min-width: 0; }
 .titre-panneau { margin: 0 6px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texte-2); }
 .barre .puce { display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 50%; background: var(--fond-3); font-size: 10.5px; font-weight: 650; color: var(--texte-2); }
 .barre .puce.etat-faite { background: var(--vert-fond); color: var(--vert); }

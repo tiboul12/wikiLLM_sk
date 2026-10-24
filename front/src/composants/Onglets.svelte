@@ -1,9 +1,10 @@
 <script lang="ts">
-  // Barre d'onglets au-dessus du contenu (EF-151) : un clic affiche l'onglet, × ou clic du milieu le ferme,
+  // Barre d'onglets au-dessus du contenu (EF-151) : un clic affiche l'onglet, un double-clic fixe l'onglet
+  // d'aperçu (titre en italique, EF-169), × ou clic du milieu le ferme,
   // l'icône ↗ le détache dans une fenêtre ; ☆ met la page en favori (EF-157) ; on les réordonne en les
   // glissant. La barre défile à la molette, sans barre de défilement visible qui recouvrirait les titres (REC-088).
   // @relu 2026-10-24 c8888d71
-  import { onglets, activer, fermer, deplacer, detacher } from "../lib/onglets.svelte";
+  import { onglets, activer, fermer, deplacer, detacher, fixer } from "../lib/onglets.svelte";
   import { estFavori, basculerFavori } from "../lib/edition.svelte";
   import { statique } from "../lib/statique";
 
@@ -41,11 +42,12 @@
       <div
         class="onglet"
         class:actif={i === onglets.actif}
+        class:apercu={o.apercu}
         class:cible={cible === i && glisse !== i}
         role="tab"
         tabindex="0"
         aria-selected={i === onglets.actif}
-        title={o.titre}
+        title={o.apercu ? `${o.titre} (aperçu : double-clic pour garder l'onglet)` : o.titre}
         draggable="true"
         ondragstart={(e) => {
           glisse = i;
@@ -63,6 +65,7 @@
         }}
         ondragend={() => (glisse = cible = null)}
         onclick={() => activer(i)}
+        ondblclick={() => fixer(i)}
         onauxclick={(e) => e.button === 1 && fermer(i)}
         onkeydown={(e) => e.key === "Enter" && activer(i)}
       >
@@ -124,6 +127,9 @@
   }
   .onglet.cible {
     box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .apercu .titre-onglet {
+    font-style: italic;
   }
   .titre-onglet {
     overflow: hidden;

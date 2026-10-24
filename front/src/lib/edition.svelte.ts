@@ -6,6 +6,7 @@
 import type { DocumentResume } from "../types/DocumentResume";
 import { poster } from "./terminal.svelte";
 import { statique } from "./statique";
+import { fixerActif } from "./onglets.svelte";
 
 /** `revision` : avance après chaque écriture ; `message` : bandeau bref (« Annulé : … »). */
 export const edition = $state({ revision: 0, message: "", erreur: false });
@@ -20,9 +21,10 @@ export function signaler(message: string, erreur = false) {
   minuterie = setTimeout(() => (edition.message = ""), erreur ? 6000 : 3500);
 }
 
-/** Recharge le projet et redessine la page (après une écriture). */
+/** Recharge le projet et redessine la page (après une écriture) ; l'onglet d'aperçu où l'on a écrit est fixé (EF-169). */
 export function rafraichir() {
   edition.revision++;
+  fixerActif();
 }
 
 /** Change le statut d'un document (« Valider » de la relecture). */
