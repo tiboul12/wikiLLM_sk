@@ -67,11 +67,20 @@ export async function ecrireSkill(nom: string, texte: string | null) {
  * Envoie à l'agent la consigne de traitement de la réception (EF-156) : le skill est d'abord installé
  * dans le projet ; un agent Claude Code le reçoit par son nom (`/wikik-traiter-reception`), un autre agent
  * en reçoit le texte.
+ * @relu 2026-10-24 e63544ec
  */
 export async function traiterAvecAgent(): Promise<string> {
-  const corps = await poster<string>("/api/skills/installer", { nom: "wikik-traiter-reception" });
+  return lancerSkill("wikik-traiter-reception");
+}
+
+/**
+ * Envoie un skill à l'agent du terminal : il est d'abord installé dans le projet ; un agent Claude Code le reçoit
+ * par son nom (`/<nom>`), un autre agent en reçoit le texte.
+ */
+export async function lancerSkill(nom: string): Promise<string> {
+  const corps = await poster<string>("/api/skills/installer", { nom });
   const agent = (terminal.parametres?.agent ?? "claude").trim().split(/\s+/)[0].split("/").pop() ?? "";
-  return envoyer(agent.startsWith("claude") ? "/wikik-traiter-reception" : corps, "consigne");
+  return envoyer(agent.startsWith("claude") ? `/${nom}` : corps, "consigne");
 }
 
 /**

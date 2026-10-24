@@ -5,10 +5,11 @@
   // l'écrit dans `.claude/skills/<nom>/SKILL.md` (ADR-0017), le texte d'origine se rétablit. Écriture réservée
   // au propriétaire (ADR-0013) ; absent du site exporté.
   // @req EF-176
+  // @relu 2026-10-24 def7f184
   import { terminal, chargerParametres, ecrireSkill } from "../lib/terminal.svelte";
   import { statique } from "../lib/statique";
 
-  let { nom, libelle = "Prompt système" }: { nom: string; libelle?: string } = $props();
+  let { nom, libelle = "Prompt système", ouvert = false }: { nom: string; libelle?: string; ouvert?: boolean } = $props();
 
   if (!statique && !terminal.skills.length) chargerParametres();
   /** Le skill affiché, tel que le serveur le décrit ; absent tant que les paramètres ne sont pas chargés. */
@@ -41,7 +42,7 @@
 </script>
 
 {#if !statique && skill}
-  <details class="prompt-systeme" id="skill-{nom}">
+  <details class="prompt-systeme" id="skill-{nom}" open={ouvert}>
     <summary>
       <span class="engrenage" aria-hidden="true">⚙</span> {libelle} : <strong>{skill.titre}</strong>
       {#if skill.modifie}<span class="pastille statut-proposé">modifié</span>{:else if skill.installe}<span class="pastille">dans le projet</span>{:else}<span class="pastille discret">texte d'origine</span>{/if}

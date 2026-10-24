@@ -194,7 +194,7 @@ export function titreDe(route: Route, projet: Projet | null): string {
 }
 
 /** Titre d'onglet des pages sans titre propre, par genre de page.
- * @relu 2026-10-24 03214f0c
+ * @relu 2026-10-24 69724965
  */
 const TITRES: Record<string, string> = {
   accueil: "Accueil",
@@ -208,5 +208,6 @@ const TITRES: Record<string, string> = {
   traitement: "Traitement",
   parametres: "Paramètres",
   git: "Historique git",
+  publication: "Publication git",
 };
 

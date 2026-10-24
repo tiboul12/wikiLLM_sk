@@ -9,8 +9,8 @@ import { statique } from "./statique";
 /** Page à afficher, déduite de l'URL : `produit` et `projet` sont les accueils de section, `relecture` la
  * liste des documents à relire, `clarifications` leur tableau de bord, `ateliers` l'accueil du Design thinking ; `etape` à
  * `clarifier` n'existent que dans l'atelier, `reception` à `traitement` dans le cahier de réception, et
- * `parametres` (pas dans le site exporté).
- * @relu 2026-10-22 53893dde
+ * `parametres` et `git`, `publication` (pas dans le site exporté).
+ * @relu 2026-10-24 ba38368d
  */
 export type Route =
   | { page: "accueil" }
@@ -31,7 +31,8 @@ export type Route =
   | { page: "reception-page"; cle: string }
   | { page: "traitement" }
   | { page: "parametres" }
-  | { page: "git" };
+  | { page: "git" }
+  | { page: "publication" };
 
 /** Chemin, paramètres et ancre de l'URL courante, quel que soit le mode. */
 function lireUrl(): { chemin: string; params: URLSearchParams; ancre: string } {
@@ -50,7 +51,7 @@ function splitUne(t: string, sep: string): [string, string?] {
 }
 
 /** Route de l'URL courante ; une adresse inconnue tombe sur l'accueil.
- * @relu 2026-10-24 c4d32d97
+ * @relu 2026-10-24 e0ebe39f
  */
 function analyser(): Route {
   const { chemin, params, ancre } = lireUrl();
@@ -70,6 +71,7 @@ function analyser(): Route {
   if (chemin.startsWith("/clarifications/")) return { page: "clarification", id: chemin.slice("/clarifications/".length) };
   if (chemin === "/parametres") return { page: "parametres" };
   if (chemin === "/git") return { page: "git" };
+  if (chemin === "/git/publication") return { page: "publication" };
   if (chemin === "/reception") return { page: "reception" };
   if (chemin === "/reception/traitement") return { page: "traitement" };
   if (chemin.startsWith("/reception/page/")) return { page: "reception-page", cle: params.get("cle") ?? "" };
@@ -169,7 +171,7 @@ export function parcoursDeUrl(): string {
  * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`,
  * `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
  * précédées de `#` en mode statique ; pour l'atelier : `/atelier` (accueil), `/atelier?parcours=<id>` (un atelier), `/atelier/<étape>` (avec
- * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarifications/<id>`, `/clarifications/clarifier/<sujet>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres` ; `/git` (historique).
+ * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarifications/<id>`, `/clarifications/clarifier/<sujet>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres` ; `/git` (historique), `/git/publication` (procédure de publication).
  */
 export const url = {
   accueil: () => `${prefixe}/`,
@@ -195,6 +197,7 @@ export const url = {
   traitement: () => `${prefixe}/reception/traitement`,
   parametres: () => `${prefixe}/parametres`,
   // Historique git (EF-166) : un commit ou une branche à montrer voyage en paramètre.
+  publication: () => `${prefixe}/git/publication`,
   git: (q?: { commit?: string; ref?: string }) =>
     `${prefixe}/git${q?.commit ? `?commit=${encodeURIComponent(q.commit)}` : q?.ref ? `?ref=${encodeURIComponent(q.ref)}` : ""}`,
 };

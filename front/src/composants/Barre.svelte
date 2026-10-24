@@ -4,13 +4,13 @@
   // versions (ArbreVersions, EF-174, ADR-0018 : de la demande d'évolution aux tests) et les documents
   // transverses ; en orange, ce qui attend une relecture, compté jusqu'au nœud. Design thinking :
   // les ateliers (numéro, statut, étapes, « + ») puis, à part, les clarifications par sujet (EF-161) et
-  // les artefacts. Git : l'historique, les branches et les tags (EF-166). Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
+  // les artefacts. Git : l'historique, la publication (REC-111), les branches et les tags (EF-166). Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
   // version qui a publié sa correction (EF-165).
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
   // déplie, centré. Les arborescences (pages de réception, cascade besoin → exigences → tests) se replient
   // nœud par nœud, fermées à l'arrivée (REC-102).
-  // @relu 2026-10-24 4f06e7e1
+  // @relu 2026-10-24 4f29a45d
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
@@ -295,7 +295,7 @@
   </div>
 
   {#if section === "git"}
-    <ul class="liens-section"><li><a href={url.git()} class:actif={actif(url.git())}>Historique</a></li></ul>
+    <ul class="liens-section"><li><a href={url.git()} class:actif={actif(url.git())}>Historique</a></li><li><a href={url.publication()} class:actif={actif(url.publication())}>Publication (skill)</a></li></ul>
     {#if refs}
       {#each [["Branches", refs.branches], ["Branches distantes", refs.distantes], ["Tags", refs.tags]] as [titre, liste] (titre)}
         <details open={titre !== "Tags"}>

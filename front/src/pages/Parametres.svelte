@@ -4,6 +4,7 @@
   // généraux (skills du projet, un par sous-accordéon, ADR-0017). Les prompts propres à une tâche sont sur la
   // page de cette tâche (composant PromptSysteme) : ils sont seulement listés ici, avec leur lien. Écrit dans
   // wikik.toml et `.claude/skills/` ; réservé au propriétaire (ADR-0013). `#skill-<nom>` ouvre un skill.
+  // @relu 2026-10-24 6808f34f
   import { tick } from "svelte";
   import type { Parametres } from "../types/Parametres";
   import type { Modele } from "../types/Modele";
@@ -126,10 +127,12 @@
   /**
    * Skills propres à une page (EF-176, REC-104.3) : réglés sur la page qui s'en sert, pas ici. Pour chacun, l'endroit où
    * il se trouve ; les skills de structure sont sur la page de chaque document du genre.
+   * @relu 2026-10-24 9c40b989
    */
   const SUR_PAGE: Record<string, [string, () => string]> = {
     "wikik-traiter-reception": ["Réception › Traitement des remarques", url.traitement],
     "wikik-clarification": ["Design thinking › chaque clarification", url.clarifications],
+    "wikik-publication-git": ["Git › Publication", url.publication],
   };
   /** Skill général, montré dans ce bloc ; les autres sont sur leur page. */
   const estGeneral = (nom: string) => !SUR_PAGE[nom] && !nom.startsWith("wikik-structure-");

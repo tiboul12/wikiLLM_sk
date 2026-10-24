@@ -185,6 +185,7 @@ pub struct CommitVue {
 }
 
 /// Historique du dépôt et sa situation (EF-166).
+/// @relu 2026-10-24 a5583451
 #[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
 #[ts(export)]
 pub struct Historique {
@@ -196,11 +197,71 @@ pub struct Historique {
     pub tags: Vec<String>,
     /// Fichiers modifiés et non commités.
     pub modifies: u32,
+    /// Ces fichiers, chacun avec son état (REC-108) : la section Git en fait des liens.
+    pub fichiers_modifies: Vec<FichierModifie>,
+    /// Branche principale (`main` ou `master`), et où en est chaque branche locale par rapport à elle (REC-110).
+    pub principale: String,
+    pub etat_branches: Vec<EtatBranche>,
+    /// La branche courante a une branche distante (sinon elle n'a jamais été poussée).
+    pub poussee: bool,
     /// Commits de la branche pas encore poussés, et commits distants pas encore récupérés.
     pub en_avance: u32,
     pub en_retard: u32,
     /// L'historique a été coupé à la limite demandée.
     pub tronque: bool,
+}
+
+/// Une branche locale par rapport à la branche principale (REC-110) : d'où elle part, son avance, si elle est fusionnée.
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct EtatBranche {
+    pub nom: String,
+    /// Branche dont elle part : la plus proche des autres branches locales contenues dans son histoire.
+    pub partie_de: Option<String>,
+    /// Commits qu'elle a et que la principale n'a pas.
+    pub avance: u32,
+    /// Commits de la principale qu'elle n'a pas (la principale a avancé depuis).
+    pub retard: u32,
+    /// Toute son histoire est dans la principale.
+    pub fusionnee: bool,
+}
+
+/// Un fichier modifié et pas encore commité, tel que `git status --porcelain` le donne.
+#[derive(Debug, Clone, serde::Serialize, ts_rs::TS)]
+#[ts(export)]
+pub struct FichierModifie {
+    pub chemin: String,
+    /// `M` modifié, `A` ajouté à l'index, `D` supprimé, `R` renommé, `?` nouveau (pas suivi).
+    pub statut: String,
+}
+
+/// Lignes de `git status --porcelain` en fichiers : la colonne de l'index l'emporte, sinon celle de l'arbre ; un
+/// renommage garde le nouveau chemin, les guillemets d'un chemin à espaces sont retirés. La sortie de git arrive
+/// rognée : la première ligne peut avoir perdu l'espace de sa colonne d'index (« M a.rs » pour «  M a.rs »).
+fn fichiers_modifies(porcelain: &str) -> Vec<FichierModifie> {
+    porcelain
+        .lines()
+        .filter(|l| l.len() > 2)
+        .map(|l| {
+            let l = if l.as_bytes().get(2) == Some(&b' ') {
+                l.to_string()
+            } else {
+                format!(" {l}")
+            };
+            let (xy, chemin) = l.split_at(3);
+            let xy = xy.trim();
+            let statut = if xy == "??" {
+                "?".to_string()
+            } else {
+                xy.chars().next().unwrap_or('M').to_string()
+            };
+            let chemin = chemin.rsplit(" -> ").next().unwrap_or(chemin);
+            FichierModifie {
+                chemin: chemin.trim_matches('"').to_string(),
+                statut,
+            }
+        })
+        .collect()
 }
 
 /// Un fichier touché par un commit.
@@ -233,6 +294,7 @@ fn hash_valide(h: &str) -> bool {
 impl Depot {
     /// Historique de toutes les branches, du plus récent au plus ancien (ordre des dates, parents après
     /// leurs enfants), `limite` commits au plus.
+    /// @relu 2026-10-24 23343af5
     pub fn historique(&self, limite: usize) -> Historique {
         let n = limite.max(1);
         let texte = self
@@ -292,19 +354,69 @@ impl Depot {
             ),
             None => (0, 0),
         };
+        let statut = self.git(&["status", "--porcelain"]).unwrap_or_default();
+        let branches = liste(&["branch", "--format=%(refname:short)"]);
+        let principale = ["main", "master"]
+            .into_iter()
+            .find(|b| branches.iter().any(|x| x == b))
+            .unwrap_or_default()
+            .to_string();
+        let etat_branches = if principale.is_empty() {
+            vec![]
+        } else {
+            self.etat_branches(&branches, &principale)
+        };
         Historique {
             commits,
             branche,
-            branches: liste(&["branch", "--format=%(refname:short)"]),
+            principale,
+            etat_branches,
+            branches,
             distantes: liste(&["branch", "-r", "--format=%(refname:short)"]),
             tags: liste(&["tag", "--sort=-creatordate"]),
-            modifies: self
-                .git(&["status", "--porcelain"])
-                .map_or(0, |t| t.lines().count() as u32),
+            modifies: statut.lines().count() as u32,
+            fichiers_modifies: fichiers_modifies(&statut),
+            poussee: amont.is_some(),
             en_avance,
             en_retard,
             tronque,
         }
+    }
+
+    /// Situation de chaque branche locale par rapport à la principale ; `partie_de` est l'autre branche, contenue dans son
+    /// histoire, dont elle s'éloigne le moins (la principale si aucune autre ne convient).
+    fn etat_branches(&self, branches: &[String], principale: &str) -> Vec<EtatBranche> {
+        let compte = |de: &str, a: &str| -> u32 {
+            self.git(&["rev-list", "--count", &format!("{de}..{a}")])
+                .and_then(|t| t.parse().ok())
+                .unwrap_or(0)
+        };
+        let ancetre = |a: &str, b: &str| {
+            Command::new("git")
+                .arg("-C")
+                .arg(&self.racine_git)
+                .args(["merge-base", "--is-ancestor", a, b])
+                .status()
+                .is_ok_and(|s| s.success())
+        };
+        branches
+            .iter()
+            .filter(|b| b.as_str() != principale)
+            .map(|b| {
+                let partie_de = branches
+                    .iter()
+                    .filter(|o| *o != b && ancetre(o, b))
+                    .min_by_key(|o| compte(o, b))
+                    .cloned();
+                EtatBranche {
+                    nom: b.clone(),
+                    partie_de,
+                    avance: compte(principale, b),
+                    retard: compte(b, principale),
+                    fusionnee: ancetre(b, principale),
+                }
+            })
+            .collect()
     }
 
     /// Message complet et fichiers touchés d'un commit (par rapport à son premier parent).
@@ -411,6 +523,24 @@ fn analyser_porcelain(texte: &str) -> Vec<LigneBlame> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn porcelain_en_fichiers() {
+        let f = fichiers_modifies("M a.rs\n?? docs/b c.md\nR  vieux.md -> neuf.md\nD  x.ts\n");
+        let v: Vec<(&str, &str)> = f
+            .iter()
+            .map(|x| (x.chemin.as_str(), x.statut.as_str()))
+            .collect();
+        assert_eq!(
+            v,
+            [
+                ("a.rs", "M"),
+                ("docs/b c.md", "?"),
+                ("neuf.md", "R"),
+                ("x.ts", "D")
+            ]
+        );
+    }
 
     #[test]
     fn porcelain() {
