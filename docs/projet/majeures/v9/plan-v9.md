@@ -39,7 +39,8 @@ Ordre : les corrections rapides d'abord (risque nul), puis la coquille (onglets)
 - **REC-114** : « il ne faut plus que clarifier » : sur une page du Projet, « clarifier » est le seul renvoi vers le Design thinking (« ouvrir dans le Design thinking » ne reste que sur les artefacts de l'atelier).
 - **REC-082** : la version d'une correction est celle du tag qui la publie, sinon celle de la branche `vN-…` où elle est faite (v7 à v9 n'ont pas encore de tag : tout paraissait « poussé, pas publié ») ; pastille « v8 » dans la teinte de sa version, pleine si publiée, en contour si poussée, en tirets si seulement commitée.
 - **REC-110** : l'historique paraissait linéaire parce que `v7-retours` et `v8-retours` ne sont pas fusionnées ; le dessin des branches le montre.
-- **REC-097** : ADR-0019 avant le code.
+- **REC-097** : ADR-0020 avant le code.
+- **REC-098, REC-094** : ADR-0019 : fiche corrigée par atelier dans `<dossier>/.techniques/`, mode choisi pour tout l'atelier.
 
 ## Suivi
 
@@ -52,3 +53,4 @@ Ordre : les corrections rapides d'abord (risque nul), puis la coquille (onglets)
 | 4 Projet par version | ✅ ADR-0018 ; volet et accueil rangés par version (demande d'évolution = sources de la BDR analyse, analyse, définition, cahier des charges → besoins → exigences → tests, ENF, ADR, specs, plan, autres), transverses à part ; état de suivi par version à l'accueil ; « à traiter » sur la boîte Projet de l'accueil ; « clarifier » seul renvoi des pages Projet | 2026-10-24 |
 | 5 Réception | ✅ pastille de version (tag, sinon branche) partout, légende ; un seul composant de remarque, avec curseur ouverte → traitée → validée, reporter et rejeter à côté ; tuile capture du téléphone : presse-papiers direct en https, sinon zone où coller par appui long et raccourcis du téléphone | 2026-10-24 |
 | 6 Graphe | ✅ zoom à la molette ×1,6 au premier cran puis de plus en plus fin dans le même geste, jusqu'à ×12 ; double-clic : zoom sur le nœud (le clic simple attend 260 ms) ; appui long : le reste gris et sans titre, les nœuds liés cerclés de leur couleur, listés sous le graphe | 2026-10-24 |
+| 7 Design thinking | ✅ ADR-0019 ; accueil du Design thinking (cartes des ateliers, création, clarifications), un atelier sur `/atelier?parcours=` ; mode express ou complet pour tout l'atelier, techniques cochées en express ; ✎ Modifier l'atelier aussi hors du poste du propriétaire ; fiche de chaque technique corrigible pour l'atelier (`.techniques/`) ; axe en pause, proposition de l'axe au-dessus de l'écriture ; clarification : recherche dynamique floue du sujet, fiche du sujet réaffichée et envoyée en entier au LLM | 2026-10-24 |

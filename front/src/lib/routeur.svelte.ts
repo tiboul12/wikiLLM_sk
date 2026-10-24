@@ -7,7 +7,7 @@
 
 import { statique } from "./statique";
 /** Page à afficher, déduite de l'URL : `produit` et `projet` sont les accueils de section, `relecture` la
- * liste des documents à relire, `clarifications` leur tableau de bord ; `etape` à
+ * liste des documents à relire, `clarifications` leur tableau de bord, `ateliers` l'accueil du Design thinking ; `etape` à
  * `clarifier` n'existent que dans l'atelier, `reception` à `traitement` dans le cahier de réception, et
  * `parametres` (pas dans le site exporté).
  * @relu 2026-10-22 53893dde
@@ -21,6 +21,7 @@ export type Route =
   | { page: "document"; id: string; ancre: string }
   | { page: "recherche"; q: string }
   | { page: "graphe"; centre: string }
+  | { page: "ateliers" }
   | { page: "atelier" }
   | { page: "etape"; etape: string }
   | { page: "clarification"; id: string }
@@ -49,7 +50,7 @@ function splitUne(t: string, sep: string): [string, string?] {
 }
 
 /** Route de l'URL courante ; une adresse inconnue tombe sur l'accueil.
- * @relu 2026-10-24 188dd008
+ * @relu 2026-10-24 c4d32d97
  */
 function analyser(): Route {
   const { chemin, params, ancre } = lireUrl();
@@ -60,6 +61,8 @@ function analyser(): Route {
   if (chemin.startsWith("/projet/")) return { page: "document", id: chemin.slice("/projet/".length), ancre };
   if (chemin === "/recherche") return { page: "recherche", q: params.get("q") ?? "" };
   if (chemin === "/graphe") return { page: "graphe", centre: params.get("centre") ?? "" };
+  // `/atelier` seul est l'accueil du Design thinking (REC-091) ; `?parcours=` ouvre un atelier.
+  if (chemin === "/atelier" && !params.has("parcours")) return { page: "ateliers" };
   if (chemin === "/atelier") return { page: "atelier" };
   if (chemin.startsWith("/atelier/")) return { page: "etape", etape: chemin.slice("/atelier/".length) };
   if (chemin === "/clarifications") return { page: "clarifications" };
@@ -165,7 +168,7 @@ export function parcoursDeUrl(): string {
 /**
  * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`,
  * `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
- * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>` (avec
+ * précédées de `#` en mode statique ; pour l'atelier : `/atelier` (accueil), `/atelier?parcours=<id>` (un atelier), `/atelier/<étape>` (avec
  * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarifications/<id>`, `/clarifications/clarifier/<sujet>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres` ; `/git` (historique).
  */
 export const url = {
@@ -179,7 +182,8 @@ export const url = {
   recherche: (q: string) => `${prefixe}/recherche?q=${encodeURIComponent(q)}`,
   graphe: (centre?: string) => (centre ? `${prefixe}/graphe?centre=${encodeURIComponent(centre)}` : `${prefixe}/graphe`),
   // Le parcours voyage en paramètre ; le parcours par défaut n'en a pas (adresses d'avant la v7).
-  atelier: (parcours?: string) => `${prefixe}/atelier${avecParcours(parcours)}`,
+  ateliers: () => `${prefixe}/atelier`,
+  atelier: (parcours?: string) => `${prefixe}/atelier?parcours=${encodeURIComponent(parcours || "PARCOURS")}`,
   etape: (etape: string, parcours?: string) => `${prefixe}/atelier/${encodeURIComponent(etape)}${avecParcours(parcours)}`,
   clarifications: () => `${prefixe}/clarifications`,
   // Les clarifications sont rangées sous leur tableau (REC-074).

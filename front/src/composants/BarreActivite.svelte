@@ -4,6 +4,7 @@
   // décisions attendues en Projet) ; en bas les outils
   // (Code, avec son graphe : EF-150 ; Git : EF-166), les paramètres et, pour le propriétaire, l'arrêt du serveur
   // (ADR-0014). Sur téléphone, elle passe en barre du bas.
+  // @relu 2026-10-24 5f3ee6a4
   import { SECTIONS, OUTILS, NOMS, type Section } from "../lib/sections.svelte";
   import { url } from "../lib/routeur.svelte";
   import { atelier } from "../lib/atelier.svelte";
@@ -18,12 +19,14 @@
   }
 
   let { active }: { active: Section | null } = $props();
-  /** Adresse de l'accueil de chaque section ; l'atelier rouvre le parcours affiché. */
+  /** Adresse de l'accueil de chaque section ; le Design thinking s'ouvre sur son accueil (REC-091).
+   * @relu 2026-10-24 8f56f588
+   */
   const LIENS: Record<Section, () => string> = {
     accueil: url.accueil,
     produit: url.produit,
     projet: url.projet,
-    atelier: () => url.atelier(atelier.parcours),
+    atelier: url.ateliers,
     reception: url.reception,
     parametres: url.parametres,
     git: () => url.git(),

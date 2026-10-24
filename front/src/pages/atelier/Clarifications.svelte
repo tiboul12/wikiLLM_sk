@@ -2,13 +2,14 @@
   // Clarifications (EF-144, EF-162), présentées comme la relecture (REC-063) : un tableau, une ligne par
   // clarification avec son état, son sujet, sa question et ses pistes gardées ; filtres par état et par
   // sujet ; « Reprendre » et « Supprimer » sur chaque ligne, « Supprimer le sujet » pour toutes celles
-  // d'un sujet ; lancer la clarification d'un autre document.
+  // d'un sujet ; lancer la clarification d'un autre document, trouvé par une recherche dynamique (REC-113).
   // @relu 2026-10-24 6b60b4bb
   import type { Projet } from "../../types/Projet";
   import type { ArtefactResume } from "../../types/ArtefactResume";
   import { atelier, champ, sujets, ecrire } from "../../lib/atelier.svelte";
   import { aller, url, routeur } from "../../lib/routeur.svelte";
   import { signaler, rafraichir } from "../../lib/edition.svelte";
+  import ChampFloue from "../../composants/ChampFloue.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
   /** Titre d'un document par identifiant, pour nommer les sujets. */
@@ -54,8 +55,7 @@
 </p>
 
 <form class="actions" onsubmit={(e) => { e.preventDefault(); if (nouveau.trim()) aller(url.clarifier(nouveau.trim())); }}>
-  <input list="sujets-possibles" bind:value={nouveau} placeholder="B-001, EF-140…" aria-label="Document à clarifier" />
-  <datalist id="sujets-possibles">{#each candidats as d (d.id)}<option value={d.id}>{d.titre}</option>{/each}</datalist>
+  <ChampFloue elements={candidats.map((d) => ({ id: d.id, libelle: d.titre, detail: d.genre }))} bind:valeur={nouveau} choisir={(c) => aller(url.clarifier(typeof c === "string" ? c : c.id))} placeholder="Chercher un besoin, une exigence… (ef-140, météo)" libelle="Document à clarifier" />
   <button class="principal" type="submit" disabled={!nouveau.trim()}>Clarifier</button>
 </form>
 

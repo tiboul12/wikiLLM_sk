@@ -1,6 +1,7 @@
 <script lang="ts">
   // Accueil du projet (EF-131, EF-140, EF-150) : une tuile par section avec son état, dans l'ordre de la barre
   // (les outils, comme le code, en dernier) ; la boîte Projet dit combien de documents attendent l'utilisateur (EF-175).
+  // @relu 2026-10-24 1fc4aec9
   import type { Projet } from "../types/Projet";
   import { url } from "../lib/routeur.svelte";
   import { SECTIONS } from "../lib/sections.svelte";
@@ -36,7 +37,7 @@
       <span class="discret">{docs("projet", "besoin")} besoins · {docs("projet", "exigence")} exigences · {docs("projet", "adr")} décisions</span>
     </a>
     {#if SECTIONS.includes("atelier")}
-      <a class="section-tuile" href={url.atelier()}>
+      <a class="section-tuile" href={url.ateliers()}>
         <span class="entete-tuile"><Icone nom="atelier" taille={26} /> <strong>Design thinking</strong></span>
         <span class="chiffre">{etapesFaites} / {atelier.etat?.etapes.length ?? 11} <small>étapes</small></span>
         <span class="discret">{atelier.etat?.projet ? `« ${atelier.etat.projet} »` : "Définir le besoin : commencer par le pitch"}{enCours ? ` · en cours : ${enCours}` : ""}</span>

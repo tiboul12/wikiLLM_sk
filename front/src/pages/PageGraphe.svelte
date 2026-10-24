@@ -147,11 +147,12 @@
     cy.on("pan zoom", () => (survol = null));
   });
 
+  /** Geste de molette en cours : heure du dernier cran et nombre de crans enchaînés. */
+  let geste = { dernier: 0, crans: 0 };
   /**
    * Zoom à la molette (REC-002) : rapide au premier cran d'un geste, vers le point visé, puis de plus en plus fin
    * tant que le geste continue (crans à moins de 300 ms d'intervalle) ; un pavé tactile (petits deltas) zoome en continu.
    */
-  let geste = { dernier: 0, crans: 0 };
   function molette(e: WheelEvent) {
     if (!cy) return;
     e.preventDefault();

@@ -7,7 +7,7 @@
   // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153) ;
   // Ctrl+Z / Ctrl+Y annulent ou rétablissent la dernière écriture, puis tout est relu (EF-159). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
-  // @relu 2026-10-24 aece7903
+  // @relu 2026-10-24 13eac870
   import { untrack } from "svelte";
   import { api } from "./lib/api";
   import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
@@ -26,6 +26,7 @@
   import Recherche from "./pages/Recherche.svelte";
   import PageGraphe from "./pages/PageGraphe.svelte";
   import DesignThinking from "./pages/atelier/DesignThinking.svelte";
+  import AccueilAtelier from "./pages/atelier/AccueilAtelier.svelte";
   import Etape from "./pages/atelier/Etape.svelte";
   import Clarification from "./pages/atelier/Clarification.svelte";
   import Clarifier from "./pages/atelier/Clarifier.svelte";
@@ -237,6 +238,8 @@
       {#if atelier.etat}<Clarifications {projet} />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "clarifier"}
       {#if atelier.etat}{#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "ateliers"}
+      {#if atelier.etat}<AccueilAtelier />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "atelier"}
       {#if atelier.etat}<DesignThinking />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "reception-page"}

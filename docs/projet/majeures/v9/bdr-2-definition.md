@@ -46,7 +46,7 @@ Les remarques sont au statut « traitée » ; `make check` et `wikik check` pass
 ## Hypothèses et risques
 
 - Le classement par version s'appuie sur le champ `version` déjà présent dans le frontmatter (ADR-0018).
-- La recherche sémantique demande un modèle d'embeddings local : elle reste facultative et l'outil marche sans (ADR-0019).
+- La recherche sémantique demande un modèle d'embeddings local : elle reste facultative et l'outil marche sans (ADR-0020).
 
 ## Décision de lancement
 

@@ -194,14 +194,15 @@ export function titreDe(route: Route, projet: Projet | null): string {
 }
 
 /** Titre d'onglet des pages sans titre propre, par genre de page.
- * @relu 2026-10-24 57401fbf
+ * @relu 2026-10-24 03214f0c
  */
 const TITRES: Record<string, string> = {
   accueil: "Accueil",
   produit: "Code",
   projet: "Projet",
   relecture: "À relire",
-  atelier: "Design thinking",
+  ateliers: "Design thinking",
+  atelier: "Atelier",
   clarifications: "Clarifications",
   reception: "Cahier de réception",
   traitement: "Traitement",

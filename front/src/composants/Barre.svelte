@@ -10,7 +10,7 @@
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
   // déplie, centré. Les arborescences (pages de réception, cascade besoin → exigences → tests) se replient
   // nœud par nœud, fermées à l'arrivée (REC-102).
-  // @relu 2026-10-24 90cb7a37
+  // @relu 2026-10-24 4f06e7e1
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
@@ -94,8 +94,10 @@
    * transverses (sans version), le reste étant dans l'arbre des versions.
    */
   const groupes = $derived(grouper(rangement ? rangement.transverses : docsDe(section === "atelier" ? "atelier" : "reception")));
-  /** Accueil de chaque section, sur lequel mène le titre du panneau. */
-  const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception, git: () => url.git() };
+  /** Accueil de chaque section, sur lequel mène le titre du panneau.
+   * @relu 2026-10-24 09b47684
+   */
+  const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: url.ateliers, reception: url.reception, git: () => url.git() };
 
   // Section Git (EF-166) : branches, branches distantes et tags ; un clic montre leur commit.
   /** Références git listées dans la section Git (EF-166) : branche courante, branches locales et distantes, tags. */

@@ -65,6 +65,7 @@ pub struct Lot {
 }
 
 /// État d'une étape.
+/// @relu 2026-10-24 10be1d99
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct EtatEtape {
@@ -76,11 +77,14 @@ pub struct EtatEtape {
     /// Sélection par sous-étape.
     pub selections: BTreeMap<String, Vec<String>>,
     pub lots: Vec<Lot>,
+    /// Vrai si l'atelier utilise sa copie corrigée de la fiche (ADR-0019).
+    pub fiche_propre: bool,
 }
 
 /// État complet de l'atelier pour un parcours, servi à l'interface : étapes, artefacts, clarifications
 /// (communes à tous les parcours) et leurs propositions, fournisseur, consommation de l'abonnement, liste
 /// des parcours.
+/// @relu 2026-10-24 feada3a6
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct EtatAtelier {
@@ -99,6 +103,10 @@ pub struct EtatAtelier {
     /// Parcours affiché, et tous les parcours du projet (EF-145).
     pub parcours: String,
     pub tous_parcours: Vec<ResumeParcours>,
+    /// Mode de tout l'atelier (`express` ou `complet`, REC-094).
+    pub mode: String,
+    /// Axes du free writing mis en pause (REC-095).
+    pub pauses: Vec<String>,
 }
 
 /// Un parcours du projet, pour la liste du volet et de l'accueil : un atelier, une session (EF-161).
@@ -402,6 +410,138 @@ fn mode_de(p: &Map<String, Value>, etape: &str) -> String {
         .to_string()
 }
 
+// ---------------------------------------------------------------- fiches propres à un atelier (ADR-0019)
+
+/// Fichier de la fiche `etape` corrigée pour l'atelier `pid` : `<dossier de l'atelier>/.techniques/<etape>.md`,
+/// caché pour ne pas être indexé (deux ateliers auraient deux `free-writing`). La technique doit exister.
+fn chemin_fiche(index: &Index, pid: &str, etape: &str) -> Result<PathBuf> {
+    fiches::fiche(etape)?;
+    let relatif = chemin_parcours(index, pid)?;
+    let dossier = Path::new(&relatif).parent().unwrap_or(Path::new(""));
+    Ok(index
+        .racine
+        .join(dossier)
+        .join(".techniques")
+        .join(format!("{etape}.md")))
+}
+
+/// Texte complet (frontmatter compris) d'un document du projet ou de l'atelier, par identifiant ; `None` s'il est
+/// inconnu ou illisible.
+fn texte_document(index: &Index, id: &str) -> Option<String> {
+    let chemin: String = index
+        .conn
+        .query_row("SELECT chemin FROM documents WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })
+        .ok()?;
+    std::fs::read_to_string(index.racine.join(chemin)).ok()
+}
+
+/// Fiche de la technique telle que l'atelier `pid` l'utilise : sa copie corrigée si elle existe et s'analyse,
+/// sinon la fiche embarquée. C'est elle qui donne les consignes envoyées au LLM (EF-178).
+/// @req EF-178
+/// @adr 19
+pub fn fiche_de(index: &Index, pid: &str, etape: &str) -> Result<Fiche> {
+    let origine = fiches::fiche(etape)?;
+    if let Ok(texte) = std::fs::read_to_string(chemin_fiche(index, pid, etape)?)
+        && let Ok(mut f) = fiches::analyser(&texte)
+        && f.id == origine.id
+    {
+        // Ce qui range la technique dans le parcours reste celui d'origine.
+        f.ordre = origine.ordre;
+        f.hors_parcours = origine.hors_parcours;
+        return Ok(f);
+    }
+    Ok(origine.clone())
+}
+
+/// Texte de la fiche pour l'atelier, et vrai s'il s'agit de sa copie corrigée (sinon le texte d'origine).
+pub fn texte_fiche(index: &Index, pid: &str, etape: &str) -> Result<(String, bool)> {
+    match std::fs::read_to_string(chemin_fiche(index, pid, etape)?) {
+        Ok(t) => Ok((t, true)),
+        Err(_) => Ok((fiches::texte_origine(etape)?.to_string(), false)),
+    }
+}
+
+/// Écrit la fiche corrigée de l'atelier, ou la supprime (`None` : retour au texte d'origine). Une fiche qui ne
+/// s'analyse pas, ou qui change d'identifiant, est refusée avec la raison.
+pub fn ecrire_fiche(index: &Index, pid: &str, etape: &str, texte: Option<&str>) -> Result<()> {
+    verifier_parcours(index, pid)?;
+    let chemin = chemin_fiche(index, pid, etape)?;
+    let Some(texte) = texte else {
+        if chemin.exists() {
+            std::fs::remove_file(&chemin)?;
+        }
+        return Ok(());
+    };
+    let f = fiches::analyser(texte).context("fiche invalide")?;
+    if f.id != etape {
+        bail!(
+            "la fiche doit garder l'identifiant « {etape} » (trouvé « {} »)",
+            f.id
+        );
+    }
+    std::fs::create_dir_all(chemin.parent().unwrap())?;
+    std::fs::write(&chemin, texte)?;
+    Ok(())
+}
+
+/// Mode de tout l'atelier (REC-094, ADR-0019) : `express` ne garde que les techniques cochées (les autres sont
+/// sautées, sauf celles déjà faites), `complet` les reprend toutes ; le mode propre à une étape disparaît.
+/// @req EF-177
+pub fn choisir_mode(index: &Index, pid: &str, mode: &str, techniques: &[String]) -> Result<()> {
+    verifier_parcours(index, pid)?;
+    if !matches!(mode, "express" | "complet") {
+        bail!("mode inconnu : {mode}");
+    }
+    for t in techniques {
+        fiches::fiche(t)?;
+    }
+    let mut p = charger_parcours(index, pid);
+    p.insert("mode".into(), json!(mode));
+    p.insert("techniques".into(), json!(techniques));
+    for f in fiches::fiches().iter().filter(|f| !f.hors_parcours) {
+        let etat = p
+            .get("etapes")
+            .and_then(|e| e.get(&f.id))
+            .and_then(|e| e.get("etat"))
+            .and_then(Value::as_str)
+            .unwrap_or("a_faire")
+            .to_string();
+        let gardee = mode == "complet" || techniques.contains(&f.id);
+        let nouvel = match (gardee, etat.as_str()) {
+            (false, "faite") => "faite",
+            (false, _) => "sautee",
+            (true, "sautee") => "a_faire",
+            (true, e) => e,
+        }
+        .to_string();
+        marquer(&mut p, &f.id, &nouvel);
+        if let Some(e) = p
+            .get_mut("etapes")
+            .and_then(|e| e.get_mut(&f.id))
+            .and_then(Value::as_object_mut)
+        {
+            e.remove("mode");
+        }
+    }
+    sauver_parcours(index, pid, &p)
+}
+
+/// Met un axe du free writing en pause, ou le reprend (REC-095) : un axe en pause n'est pas proposé à l'écriture.
+/// @req EF-179
+pub fn pause_axe(index: &Index, pid: &str, axe: &str, pause: bool) -> Result<()> {
+    verifier_parcours(index, pid)?;
+    let mut p = charger_parcours(index, pid);
+    let mut liste: Vec<String> = chaines(p.get("pauses"));
+    liste.retain(|a| a != axe);
+    if pause {
+        liste.push(axe.to_string());
+    }
+    p.insert("pauses".into(), json!(liste));
+    sauver_parcours(index, pid, &p)
+}
+
 /// Fixe l'état d'une étape dans le frontmatter du parcours, en créant l'entrée au besoin.
 fn marquer(p: &mut Map<String, Value>, etape: &str, etat: &str) {
     let etapes = p.entry("etapes").or_insert_with(|| json!({}));
@@ -579,12 +719,15 @@ fn selection(p: &Map<String, Value>, docs: &[Doc], fiche: &Fiche, se: &SousEtape
 
 /// État d'un parcours pour l'interface : chaque étape avec ses artefacts, sélections et lots ; un
 /// parcours inconnu est refusé.
+/// @relu 2026-10-24 68c1a7b4
 pub fn etat(index: &Index, pid: &str, fournisseur: &str) -> Result<EtatAtelier> {
     verifier_parcours(index, pid)?;
     let p = charger_parcours(index, pid);
     let docs = documents_de(index, pid)?;
     let mut etapes = vec![];
-    for f in fiches::fiches().iter().filter(|f| !f.hors_parcours) {
+    for origine in fiches::fiches().iter().filter(|f| !f.hors_parcours) {
+        let f = &fiche_de(index, pid, &origine.id)?;
+        let fiche_propre = chemin_fiche(index, pid, &origine.id)?.exists();
         let artefacts = docs
             .iter()
             .filter(|d| {
@@ -612,6 +755,7 @@ pub fn etat(index: &Index, pid: &str, fournisseur: &str) -> Result<EtatAtelier> 
             artefacts,
             selections,
             lots,
+            fiche_propre,
         });
     }
     let projet = docs
@@ -640,6 +784,12 @@ pub fn etat(index: &Index, pid: &str, fournisseur: &str) -> Result<EtatAtelier> 
         consommation: derniere_consommation(index),
         parcours: pid.to_string(),
         tous_parcours: lister_parcours(index)?,
+        mode: p
+            .get("mode")
+            .and_then(Value::as_str)
+            .unwrap_or("express")
+            .to_string(),
+        pauses: chaines(p.get("pauses")),
     })
 }
 
@@ -728,6 +878,7 @@ pub fn piloter(
 }
 
 /// Enregistre la sélection d'une sous-étape `selection`, parmi les artefacts du parcours.
+/// @relu 2026-10-24 b08437d4
 pub fn selectionner(
     index: &Index,
     pid: &str,
@@ -736,7 +887,7 @@ pub fn selectionner(
     ids: &[String],
 ) -> Result<()> {
     verifier_parcours(index, pid)?;
-    let fiche = fiches::fiche(etape)?;
+    let fiche = &fiche_de(index, pid, etape)?;
     let se = fiche.sous_etape(sous)?;
     if se.genre != "selection" {
         bail!("{etape}/{sous} n'est pas une sélection");
@@ -812,8 +963,8 @@ fn verifier_cible<'d>(
 }
 
 /// Construit la demande au LLM pour une sous-étape d'un parcours (sous verrou ; l'appel se fait ensuite
-/// sans). Une clarification, hors parcours, peut viser un document de n'importe quel parcours.
-/// @relu 2026-10-22 3804c376
+/// sans). Une clarification, hors parcours, peut viser un document de n'importe quel parcours, et reçoit le texte
+/// complet de son sujet (REC-115). Les consignes viennent de la fiche de l'atelier ([`fiche_de`], ADR-0019).
 pub fn preparer(
     index: &Index,
     pid: &str,
@@ -822,7 +973,7 @@ pub fn preparer(
     cible: Option<&str>,
     entree: Option<&str>,
 ) -> Result<Preparation> {
-    let fiche = fiches::fiche(etape)?;
+    let fiche = &fiche_de(index, pid, etape)?;
     let se = fiche.sous_etape(sous)?;
     if se.genre != "propositions" && !se.brouillon {
         bail!("{etape}/{sous} n'appelle pas le LLM");
@@ -880,6 +1031,16 @@ pub fn preparer(
             "Élément visé : {} « {} » ({}) : lis-le avec l'outil document.\n",
             d.id, d.titre, d.genre
         ));
+        // Une clarification reprend tout son sujet (REC-115) : le texte complet de la fiche, pas seulement son titre.
+        if fiche.id == "clarification"
+            && let Some(sujet) = d.fm.get("sujet").and_then(Value::as_str)
+            && let Some(texte_sujet) = texte_document(index, sujet)
+        {
+            c.push_str(&format!(
+                "\nSujet à clarifier, {sujet}, texte complet :\n<<<\n{}\n>>>\n",
+                texte_sujet.trim()
+            ));
+        }
     }
     if etape == "pitch" {
         let description = entree
@@ -1014,6 +1175,7 @@ pub fn journaliser(
 
 /// Garde (éventuellement corrigée) ou rejette la proposition `i` d'un lot du parcours ; renvoie l'artefact
 /// créé ou complété.
+/// @relu 2026-10-24 143a182b
 #[allow(clippy::too_many_arguments)]
 pub fn decider(
     index: &Index,
@@ -1025,7 +1187,7 @@ pub fn decider(
     decision: &str,
     corrigee: Option<Value>,
 ) -> Result<Option<String>> {
-    let fiche = fiches::fiche(etape)?;
+    let fiche = &fiche_de(index, pid, etape)?;
     let se = fiche.sous_etape(sous)?;
     let mut lot = charger_lot(index, pid, etape, sous, cible);
     let element = lot
@@ -1531,6 +1693,7 @@ pub(crate) fn corps_clarification(fm: &Map<String, Value>, ancien: &str) -> Stri
 // ---------------------------------------------------------------- saisies
 
 /// Enregistre une saisie de Tibo : pitch, texte libre, tri des besoins.
+/// @relu 2026-10-24 0686f405
 pub fn saisir(
     index: &Index,
     pid: &str,
@@ -1539,7 +1702,7 @@ pub fn saisir(
     cible: Option<&str>,
     d: &Value,
 ) -> Result<Option<String>> {
-    let fiche = fiches::fiche(etape)?;
+    let fiche = &fiche_de(index, pid, etape)?;
     let se = fiche.sous_etape(sous)?;
     if se.genre != "saisie" {
         bail!("{etape}/{sous} n'est pas une saisie");
@@ -1610,9 +1773,10 @@ fn ecrire_genere(index: &Index, relatif: &str, fm: Map<String, Value>, corps: &s
 /// Assemble l'artefact de synthèse d'une sous-étape d'un parcours ; renvoie les fichiers écrits. BDR et
 /// cahier des charges suivent les rubriques des gabarits de `templates/`, dans le dossier de la version
 /// du parcours ; les irritants du BDR 1 citent les verbatims du free writing.
+/// @relu 2026-10-24 73e823ee
 pub fn synthetiser(index: &Index, pid: &str, etape: &str, sous: &str) -> Result<Vec<String>> {
     verifier_parcours(index, pid)?;
-    let fiche = fiches::fiche(etape)?;
+    let fiche = &fiche_de(index, pid, etape)?;
     let se = fiche.sous_etape(sous)?;
     if se.genre != "synthese" {
         bail!("{etape}/{sous} n'est pas une synthèse");
