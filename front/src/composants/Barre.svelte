@@ -10,20 +10,21 @@
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
   // déplie, centré. Les arborescences (pages de réception, cascade besoin → exigences → tests) se replient
   // nœud par nœud, fermées à l'arrivée (REC-102).
-  // @relu 2026-10-24 b8c94c1f
+  // @relu 2026-10-24 90cb7a37
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
   import { NOMS, type Section } from "../lib/sections.svelte";
   import { atelier, ETATS, ecrire, sujets, STATUTS_ATELIER } from "../lib/atelier.svelte";
   import { aller } from "../lib/routeur.svelte";
-  import { reception, remarquesDe, arbrePages, visible, couleurCommit, type Noeud } from "../lib/reception.svelte";
+  import { reception, remarquesDe, arbrePages, visible, type Noeud } from "../lib/reception.svelte";
   import { statique } from "../lib/statique";
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { aRelire as aRelireDe, tachesBacklog, favoris, basculerFavori, edition } from "../lib/edition.svelte";
   import { rangerParVersion } from "../lib/versions";
   import ArbreVersions from "./ArbreVersions.svelte";
+  import PastilleVersion from "./reception/PastilleVersion.svelte";
 
   let { projet, section }: { projet: Projet; section: Section } = $props();
   /** Documents d'une zone pour les groupes du panneau ; parcours et clarifications ont leur propre arbre et n'y sont pas répétés. */
@@ -400,8 +401,7 @@
                 {#if aRelireIds.has(d.id)}<span class="compteur faible" title="à relire">●</span>{/if}
                 {#if d.genre === "remarque"}
                   {@const rq = reception.etat?.remarques.find((x) => x.id === d.id)}
-                  {@const c = couleurCommit(rq?.commit)}
-                  {#if c}<span class="compteur" style="color: {c.couleur}" title={c.libelle}>●</span>{:else if rq?.statut === "ouverte"}<span class="compteur faible" title="ouverte">○</span>{/if}
+                  {#if rq?.commit}<PastilleVersion commit={rq.commit} />{:else if rq?.statut === "ouverte"}<span class="compteur faible" title="ouverte">○</span>{/if}
                 {/if}
               </a>
             {/snippet}

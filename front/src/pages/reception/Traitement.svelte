@@ -1,9 +1,10 @@
 <script lang="ts">
   // Traitement des remarques (SPEC-23 R5) : les confier à l'agent dans le terminal (EF-148), ou filtrer
-  // par statut, gravité et page, puis passer chacune à traitée, reportée ou rejetée avec une explication.
+  // par statut, gravité et page, puis faire avancer chacune sur son curseur d'états (ouverte, traitée, validée ;
+  // reportée ou rejetée à côté), avec le même composant que la carte d'une page (EF-181).
   // « À valider » : les remarques traitées que tu n'as pas encore validées (EF-165) ; la légende dit la
   // couleur de chaque version publiée. Le skill donné à l'agent se règle dans l'encart « Prompt de l'agent » (EF-176).
-  // @relu 2026-10-24 ed529e13
+  // @relu 2026-10-24 ea4b111c
   import { reception, actuelles, GRAVITES, STATUTS, chargerGit } from "../../lib/reception.svelte";
   import LegendeVersions from "../../composants/reception/LegendeVersions.svelte";
   import { url } from "../../lib/routeur.svelte";
@@ -61,4 +62,4 @@
   {liste.length} remarque(s). L'agent de code les lit aussi avec l'outil MCP <code>reception</code> et enregistre ce qu'il a fait avec <code>reception_traiter</code>.
 </p>
 <LegendeVersions />
-{#each liste as r (r.id)}<CarteRemarque {r} traitement={r.statut !== "traitee" || statut !== "a_valider"} avecPage />{/each}
+{#each liste as r (r.id)}<CarteRemarque {r} avecPage />{/each}

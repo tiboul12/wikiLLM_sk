@@ -67,30 +67,54 @@ export async function chargerGit() {
   }
 }
 
-/** Versions publiées (tags) citées, de la plus ancienne à la plus récente. */
+/** Couleur et état d'une correction, tels que les pastilles et la légende les montrent (REC-082). */
+export type EtatCorrection = {
+  /** Teinte de la version (ou rouge si le commit est introuvable). */
+  couleur: string;
+  /** Phrase complète : « v8, publié en v8.0-rc1 », « v9, poussé, pas encore publié »… */
+  libelle: string;
+  /** Version de la correction (`v8`) : celle du tag qui la publie, sinon celle de la branche `vN-…` où elle est faite. */
+  version: string | null;
+  /** `publie` (dans un tag), `pousse`, `local` (pas poussé), `introuvable`. */
+  etat: "publie" | "pousse" | "local" | "introuvable";
+};
+
+/** Majeure d'un tag (`v8.0-rc1` → `v8`) ou de la première branche de version qui contient le commit (`v8-retours` → `v8`). */
+function versionCorrection(e: EtatCommit): string | null {
+  const m = /^v(\d+)/.exec(e.version ?? "");
+  if (m) return `v${m[1]}`;
+  const ns = e.branches.map((b) => /^(?:origin\/)?v(\d+)/.exec(b)?.[1]).filter((n): n is string => !!n).map(Number);
+  return ns.length ? `v${Math.min(...ns)}` : null;
+}
+
+/** Versions des corrections citées par les remarques, de la plus ancienne à la plus récente. */
 export function versionsCitees(): string[] {
   const v = new Set<string>();
-  for (const e of Object.values(git.commits)) if (e.version) v.add(e.version);
+  for (const e of Object.values(git.commits)) {
+    const x = e.existe ? versionCorrection(e) : null;
+    if (x) v.add(x);
+  }
   return [...v].sort((a, b) => a.localeCompare(b, "fr", { numeric: true }));
 }
 
-/** Teintes (HSL) des versions publiées, attribuées dans l'ordre des versions citées par les remarques, assez éloignées pour se distinguer. */
-const TEINTES = [150, 210, 280, 30, 330, 90, 190, 250, 0, 120];
+/** Teintes (HSL) des versions, une par majeure (stable d'un écran à l'autre), assez éloignées pour se distinguer ; pas de rouge, réservé au commit introuvable. */
+const TEINTES = [200, 150, 210, 280, 30, 330, 90, 190, 250, 50, 120];
+/** Teinte d'une version : `v8` a toujours la même couleur. */
+export const couleurVersion = (v: string | null) => (v ? `hsl(${TEINTES[Number(v.slice(1)) % TEINTES.length]} 60% 42%)` : "var(--texte-2)");
+
 /**
- * Couleur d'une correction (REC-082) : une teinte par version publiée ; « poussé, pas encore publié » en
- * bleu, « commité, pas poussé » en orange, commit introuvable en rouge.
+ * Couleur et état d'une correction (REC-082) : la teinte dit dans quelle version elle est faite (tag qui la
+ * publie, sinon branche `vN-…`), l'état dit si elle est publiée, poussée, seulement commitée, ou introuvable.
  */
-export function couleurCommit(commit: string | null | undefined): { couleur: string; libelle: string } | null {
+export function couleurCommit(commit: string | null | undefined): EtatCorrection | null {
   if (!commit) return null;
   const e = git.commits[commit];
-  if (!e) return git.charge ? { couleur: "var(--rouge)", libelle: "commit introuvable" } : null;
-  if (!e.existe) return { couleur: "var(--rouge)", libelle: "commit introuvable" };
-  if (e.version) {
-    const i = versionsCitees().indexOf(e.version);
-    return { couleur: `hsl(${TEINTES[i % TEINTES.length]} 55% 45%)`, libelle: `publié en ${e.version}` };
-  }
-  if (e.pousse) return { couleur: "var(--accent)", libelle: "poussé, pas encore publié" };
-  return { couleur: "var(--orange)", libelle: `commité sur ${e.branches.join(", ") || "?"}, pas poussé` };
+  if (!e || !e.existe) return e || git.charge ? { couleur: "var(--rouge)", libelle: "commit introuvable", version: null, etat: "introuvable" } : null;
+  const version = versionCorrection(e);
+  const v = version ? `${version}, ` : "";
+  if (e.version) return { couleur: couleurVersion(version), libelle: `${v}publié en ${e.version}`, version, etat: "publie" };
+  if (e.pousse) return { couleur: couleurVersion(version), libelle: `${v}poussé, pas encore publié`, version, etat: "pousse" };
+  return { couleur: couleurVersion(version), libelle: `${v}commité sur ${e.branches.join(", ") || "?"}, pas poussé`, version, etat: "local" };
 }
 
 /** Relit l'état du cahier (après une écriture faite ailleurs, ou Ctrl+Z). */
