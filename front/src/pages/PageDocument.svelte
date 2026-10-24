@@ -8,7 +8,7 @@
   // Mermaid se modifie avec son aperçu (EF-167). L'encart ⚙ Structure montre le skill qui dit comment ce genre
   // de document est rédigé, et le corrige sur place (EF-176).
   // @ecrans /projet/:id Page d'un document
-  // @relu 2026-10-24 b2590faa
+  // @relu 2026-10-24 07867e19
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -149,7 +149,7 @@
     {/each}
     <a class="action" href={url.graphe(page.id)} title="Graphe local">◎ graphe</a>
     {#if page.genre === "clarification" && lienAtelier("/")}<a class="bouton principal reprendre" href={url.clarification(page.id)}>Reprendre la clarification →</a>
-    {:else if ouvrir}<a class="action atelier" href={ouvrir}>ouvrir dans le Design thinking</a>{/if}
+    {:else if ouvrir && technique}<a class="action atelier" href={ouvrir}>ouvrir dans le Design thinking</a>{/if}
     {#if clarifier}<a class="action atelier" href={clarifier}>clarifier</a>{/if}
     {#if terminal.proprietaire && !statique}
       <span class="gestes-document">

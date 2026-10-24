@@ -40,7 +40,7 @@ pub struct FichierResume {
 }
 
 /// Document de la zone Projet ou de l'atelier dans la barre latérale.
-/// @relu 2026-10-22 14e0d01e
+/// @relu 2026-10-24 29155a8a
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct DocumentResume {
@@ -59,6 +59,8 @@ pub struct DocumentResume {
     pub validation: Option<String>,
     /// Version (`v8`) du frontmatter.
     pub version: Option<String>,
+    /// Sources (champ `sources`) : la demande d'évolution d'une version, citée par sa BDR analyse (ADR-0018).
+    pub sources: Vec<String>,
 }
 
 /// Lien vers un symbole ou un document, prêt à afficher.
@@ -205,7 +207,7 @@ fn u(v: i64) -> u32 {
 }
 
 /// Accueil : fichiers avec leur rôle, documents avec leur zone (Projet, atelier, réception), statistiques.
-/// @relu 2026-10-22 789d77ac
+/// @relu 2026-10-24 8329936f
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -278,6 +280,7 @@ pub fn projet(index: &Index) -> Result<Projet> {
                     .and_then(|v| v.as_str())
                     .map(str::to_string),
                 version: r.get(6)?,
+                sources: liste("sources"),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

@@ -36,6 +36,7 @@ Ordre : les corrections rapides d'abord (risque nul), puis la coquille (onglets)
 - **REC-069** : onglet d'aperçu à la VS Code : un clic remplace l'aperçu (titre en italique), double-clic sur l'onglet, modification, Ctrl+clic ou clic du milieu le fixe.
 - **REC-084** : la page « X » venait de l'exemple `'/x'` d'un bloc de doc du scan des routes ; le scan ignore les commentaires.
 - **REC-101.2** : arbre par version (ADR-0018) : demande d'évolution, BDR analyse, BDR définition, cahier des charges → besoins → exigences → tests ; ADR, specs, plan de la version à côté ; ce qui n'a pas de version reste dans « Transverse ».
+- **REC-114** : « il ne faut plus que clarifier » : sur une page du Projet, « clarifier » est le seul renvoi vers le Design thinking (« ouvrir dans le Design thinking » ne reste que sur les artefacts de l'atelier).
 - **REC-110** : l'historique paraissait linéaire parce que `v7-retours` et `v8-retours` ne sont pas fusionnées ; le dessin des branches le montre.
 - **REC-097** : ADR-0019 avant le code.
 
@@ -47,3 +48,4 @@ Ordre : les corrections rapides d'abord (risque nul), puis la coquille (onglets)
 | 1 Corrections rapides | ✅ scan des routes sans les commentaires (plus de page « X ») ; page Cascade retirée ; « Pistes » ; branches sans puce, locales et distantes ouvertes pareil ; onglets plus hauts sans barre de défilement visible (molette) ; fermer l'onglet actif affiche son voisin ; icônes seules dans la barre du téléphone | 2026-10-24 |
 | 2 Onglets et cascades | ✅ onglet d'aperçu en italique remplacé à chaque navigation, fixé par double-clic, écriture, Ctrl+clic ou clic du milieu ; une page déjà ouverte réactive son onglet ; arborescences du volet repliables nœud par nœud | 2026-10-24 |
 | 3 Paramètres et prompts de page | ✅ deux blocs : Connexion (LLM de wikik, agent du terminal, réglages avancés repliés) et Prompts système généraux ; modèle en vraie liste (avec « autre »), aligné sur l'effort ; « Application reçue » retirée ; encart ⚙ du skill sur la page qui s'en sert (documents, clarification, réception) ; ⚙ du volet retirés | 2026-10-24 |
+| 4 Projet par version | ✅ ADR-0018 ; volet et accueil rangés par version (demande d'évolution = sources de la BDR analyse, analyse, définition, cahier des charges → besoins → exigences → tests, ENF, ADR, specs, plan, autres), transverses à part ; état de suivi par version à l'accueil ; « à traiter » sur la boîte Projet de l'accueil ; « clarifier » seul renvoi des pages Projet | 2026-10-24 |

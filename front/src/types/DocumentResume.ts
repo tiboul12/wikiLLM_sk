@@ -2,7 +2,7 @@
 
 /**
  * Document de la zone Projet ou de l'atelier dans la barre latérale.
- * @relu 2026-10-22 14e0d01e
+ * @relu 2026-10-24 29155a8a
  */
 export type DocumentResume = { id: string, chemin: string, genre: string, titre: string, statut: string | null, 
 /**
@@ -24,4 +24,8 @@ validation: string | null,
 /**
  * Version (`v8`) du frontmatter.
  */
-version: string | null, };
+version: string | null, 
+/**
+ * Sources (champ `sources`) : la demande d'évolution d'une version, citée par sa BDR analyse (ADR-0018).
+ */
+sources: Array<string>, };

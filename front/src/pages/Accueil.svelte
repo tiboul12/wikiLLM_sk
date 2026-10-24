@@ -1,12 +1,13 @@
 <script lang="ts">
   // Accueil du projet (EF-131, EF-140, EF-150) : une tuile par section avec son état, dans l'ordre de la barre
-  // (les outils, comme le code, en dernier).
+  // (les outils, comme le code, en dernier) ; la boîte Projet dit combien de documents attendent l'utilisateur (EF-175).
   import type { Projet } from "../types/Projet";
   import { url } from "../lib/routeur.svelte";
   import { SECTIONS } from "../lib/sections.svelte";
   import { atelier } from "../lib/atelier.svelte";
   import { reception, actuelles } from "../lib/reception.svelte";
   import Icone from "../composants/Icone.svelte";
+  import { aRelire as aRelireDe } from "../lib/edition.svelte";
 
   let { projet }: { projet: Projet | null } = $props();
   /** Part des symboles documentés, pour la tuile du code. */
@@ -19,6 +20,8 @@
   const enCours = $derived(atelier.etat?.etapes.find((e) => e.etat === "en_cours")?.fiche.titre);
   /** Remarques ouvertes de la réception en cours. */
   const ouvertes = $derived(reception.etat ? actuelles().filter((r) => r.statut === "ouverte").length : 0);
+  /** Documents du projet qui attendent une décision de l'utilisateur (REC-083) : la boîte Projet les signale. */
+  const aTraiter = $derived(aRelireDe(projet?.documents ?? []).length);
   /** Pages visibles de la carte, hors « Général ». */
   const pages = $derived(reception.etat?.pages.filter((p) => !p.masque && p.cle !== "general").length ?? 0);
 </script>
@@ -27,8 +30,8 @@
   <h1>{projet.nom}</h1>
   <p class="discret">Le code, ses documents, la définition du besoin et la réception de l'application, au même endroit.</p>
   <div class="sections-accueil">
-    <a class="section-tuile" href={url.projet()}>
-      <span class="entete-tuile"><Icone nom="projet" taille={26} /> <strong>Projet</strong></span>
+    <a class="section-tuile" class:attention={aTraiter > 0} href={url.projet()}>
+      <span class="entete-tuile"><Icone nom="projet" taille={26} /> <strong>Projet</strong>{#if aTraiter}<span class="a-traiter" title="documents qui attendent ta relecture">{aTraiter} à traiter</span>{/if}</span>
       <span class="chiffre">{docs("projet")} <small>documents</small></span>
       <span class="discret">{docs("projet", "besoin")} besoins · {docs("projet", "exigence")} exigences · {docs("projet", "adr")} décisions</span>
     </a>
@@ -56,3 +59,15 @@
 {:else}
   <p class="discret">Chargement…</p>
 {/if}
+
+<style>
+  .a-traiter {
+    margin-left: auto;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--orange) 18%, transparent);
+    color: var(--orange);
+    font-size: 12.5px;
+    font-weight: 650;
+  }
+</style>

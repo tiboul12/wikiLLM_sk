@@ -1,8 +1,8 @@
 <script lang="ts">
   // Panneau latéral de la section active (EF-131, EF-140). Code : l'arbre des fichiers et le graphe.
-  // Projet : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), les plans, puis un
-  // groupe par type (le skill de structure est sur la page de chaque document, EF-176) et, en orange, ce qui attend une relecture, compté jusqu'à
-  // l'accordéon ; les besoins en cascade avec leurs exigences et leurs tests (EF-160). Design thinking :
+  // Projet : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), puis l'arbre des
+  // versions (ArbreVersions, EF-174, ADR-0018 : de la demande d'évolution aux tests) et les documents
+  // transverses ; en orange, ce qui attend une relecture, compté jusqu'au nœud. Design thinking :
   // les ateliers (numéro, statut, étapes, « + ») puis, à part, les clarifications par sujet (EF-161) et
   // les artefacts. Git : l'historique, les branches et les tags (EF-166). Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
   // version qui a publié sa correction (EF-165).
@@ -10,7 +10,7 @@
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
   // déplie, centré. Les arborescences (pages de réception, cascade besoin → exigences → tests) se replient
   // nœud par nœud, fermées à l'arrivée (REC-102).
-  // @relu 2026-10-24 9e4d7708
+  // @relu 2026-10-24 b8c94c1f
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
@@ -22,6 +22,8 @@
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { aRelire as aRelireDe, tachesBacklog, favoris, basculerFavori, edition } from "../lib/edition.svelte";
+  import { rangerParVersion } from "../lib/versions";
+  import ArbreVersions from "./ArbreVersions.svelte";
 
   let { projet, section }: { projet: Projet; section: Section } = $props();
   /** Documents d'une zone pour les groupes du panneau ; parcours et clarifications ont leur propre arbre et n'y sont pas répétés. */
@@ -84,8 +86,13 @@
     }
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
   };
-  /** Groupes de documents de la zone qui correspond à la section affichée. */
-  const groupes = $derived(grouper(docsDe(section === "atelier" ? "atelier" : section === "reception" ? "reception" : "projet")));
+  /** Zone Projet rangée par version (EF-174, ADR-0018) : les versions, et ce qui n'en a pas. */
+  const rangement = $derived(section === "projet" ? rangerParVersion(projet.documents) : null);
+  /**
+   * Groupes de documents de la zone qui correspond à la section affichée ; en Projet, seulement les documents
+   * transverses (sans version), le reste étant dans l'arbre des versions.
+   */
+  const groupes = $derived(grouper(rangement ? rangement.transverses : docsDe(section === "atelier" ? "atelier" : "reception")));
   /** Accueil de chaque section, sur lequel mène le titre du panneau. */
   const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception, git: () => url.git() };
 
@@ -365,10 +372,17 @@
         {@render branche(arbre)}
       </details>
     {/if}
-    {#if section === "projet" && !groupes.some(([nom]) => nom === "Gestion")}{@render gestion([])}{/if}
+    {#if rangement}
+      {@render gestion(groupes.find(([nom]) => nom === "Gestion")?.[1].docs ?? [])}
+      <details class="arbre" open>
+        <summary>Versions <small>{rangement.versions.length}</small></summary>
+        <ArbreVersions versions={rangement.versions} {aRelireIds} />
+      </details>
+      {#if groupes.some(([nom]) => nom !== "Gestion")}<p class="titre-transverse">Transverse</p>{/if}
+    {/if}
     {#each groupes as [nom, g]}
       {#if nom === "Gestion" && section === "projet"}
-        {@render gestion(g.docs)}
+        <!-- déjà rendue en tête, avant les versions -->
       {:else}
       {@const attente = g.docs.filter((d) => aRelireIds.has(d.id)).length}
       <details>

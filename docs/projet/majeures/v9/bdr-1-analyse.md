@@ -4,7 +4,7 @@ type: bdr-analyse
 titre: "Analyse du besoin v9 (retours de la réception de la v8)"
 statut: proposé
 version: v9
-sources: [BDR-v8-2, REC-062, REC-069, REC-098, REC-099, REC-101.2, REC-104.3]
+sources: [BDR-v8-2, REC-002, REC-003, REC-062, REC-069, REC-082, REC-083, REC-084, REC-085, REC-086, REC-087, REC-088, REC-089, REC-090, REC-091, REC-092, REC-093, REC-094, REC-095, REC-096, REC-097, REC-098, REC-099, REC-100, REC-101.2, REC-102, REC-103, REC-104.3, REC-105, REC-106, REC-107, REC-108, REC-109, REC-110, REC-111, REC-112, REC-113, REC-114, REC-115]
 ---
 
 # BDR v9, partie 1 : analyse du besoin
