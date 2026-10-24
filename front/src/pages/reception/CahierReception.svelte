@@ -3,10 +3,10 @@
   // trouvées dans le code, groupées, chacune avec sa
   // carte de réception (ses remarques) et son lien dans l'application ; scanner à nouveau, chercher les
   // écrans manquants par le LLM (annulable, écrans ajoutés listés avec leur raison, EF-146), renommer,
-  // masquer, regrouper, ajouter une route. L'adresse de l'application est déduite du projet
-  // ou réglée dans les paramètres : pas de saisie ici (REC-029). Chaque correction a la couleur de la
+  // masquer, regrouper, ajouter une route. L'adresse de l'application est déduite du projet : pas de saisie
+  // (REC-029, REC-107). Le skill donné à l'agent se règle dans l'encart « Prompt de l'agent » (EF-176). Chaque correction a la couleur de la
   // version qui l'a publiée, avec sa légende ; les remarques traitées attendent ta validation (EF-165).
-  // @relu 2026-10-19 619d237e
+  // @relu 2026-10-24 700376fb
   import type { Page } from "../../types/Page";
   import type { Ajout } from "../../types/Ajout";
   import { annulerLLM } from "../../lib/atelier.svelte";
@@ -15,6 +15,7 @@
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
   import EnvoiAgent from "../../composants/reception/EnvoiAgent.svelte";
+  import PromptSysteme from "../../composants/PromptSysteme.svelte";
 
   /** État de la réception ; la page n'est affichée que lorsqu'il est chargé. */
   const etat = $derived(reception.etat!);
@@ -126,6 +127,7 @@
   {#if masquees}<label class="discret"><input type="checkbox" bind:checked={voirMasquees} /> afficher les {masquees} page(s) masquée(s) ou disparue(s) du code</label>{/if}
   {#if message}<span class="succes">{message}</span>{/if}
 </div>
+<PromptSysteme nom="wikik-traiter-reception" libelle="Prompt de l'agent" />
 <p class="discret aide-completer">
   « Scanner à nouveau » relit le code (routes, composants de pages). « Chercher les écrans manquants » demande au LLM les écrans sans
   route que le scan ne voit pas (vues par état, onglets, fenêtres) ; il n'ajoute que ceux dont il cite le composant, et dit pourquoi.

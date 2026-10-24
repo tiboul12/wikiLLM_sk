@@ -1,7 +1,7 @@
 <script lang="ts">
   // Panneau latéral de la section active (EF-131, EF-140). Code : l'arbre des fichiers et le graphe.
   // Projet : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), les plans, puis un
-  // groupe par type avec ⚙ (skill de structure) et, en orange, ce qui attend une relecture, compté jusqu'à
+  // groupe par type (le skill de structure est sur la page de chaque document, EF-176) et, en orange, ce qui attend une relecture, compté jusqu'à
   // l'accordéon ; les besoins en cascade avec leurs exigences et leurs tests (EF-160). Design thinking :
   // les ateliers (numéro, statut, étapes, « + ») puis, à part, les clarifications par sujet (EF-161) et
   // les artefacts. Git : l'historique, les branches et les tags (EF-166). Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
@@ -128,17 +128,6 @@
   /** Total de ce qui attend l'utilisateur : tâches, relectures, clarifications, remarques ; affiché sur « À traiter ». */
   const enAttente = $derived(taches.length + aRelire.length + ouvertes + remarquesAValider);
 
-  /** ⚙ d'un groupe : le skill qui dit comment ses documents sont structurés (REC-054, ADR-0017). */
-  const SKILL_DE: Record<string, string> = {
-    BDR: "wikik-structure-bdr",
-    "Cahier des charges": "wikik-structure-cahier-des-charges",
-    Besoins: "wikik-structure-besoin",
-    Exigences: "wikik-structure-exigence",
-    "Exigences non fonctionnelles": "wikik-structure-exigence",
-    "Décisions (ADR)": "wikik-structure-adr",
-    Specs: "wikik-structure-spec",
-    Tests: "wikik-structure-test",
-  };
   /** Identifiants à relire, pour colorer chaque lien du panneau sans reparcourir la liste. */
   const aRelireIds = $derived(new Set(aRelire.map((d) => d.id)));
 
@@ -386,7 +375,6 @@
         <summary>
           {nom} <small>{g.docs.length}</small>
           {#if attente}<span class="compteur faible" title="{attente} à relire">{attente}</span>{/if}
-          {#if section === "projet" && SKILL_DE[nom] && !statique}<a class="reglage" href={url.parametres() + "#skill-" + SKILL_DE[nom]} title="Comment sont structurés ces documents (skill {SKILL_DE[nom]})" aria-label="Structure de la section">⚙</a>{/if}
         </summary>
         <ul>
           {#each g.docs as d}

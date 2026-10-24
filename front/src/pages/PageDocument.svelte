@@ -5,9 +5,10 @@
   // Un plan ou le backlog s'ouvre en tableau à colonnes. Le propriétaire peut le valider ou l'éditer en
   // entier (EF-158) ; `?editer=1` ouvre directement l'éditeur (« Corriger » de la relecture). Une exigence
   // montre ses tests (« ＋ créer un test »), un test son ticket de validation (EF-160) ; un diagramme
-  // Mermaid se modifie avec son aperçu (EF-167).
+  // Mermaid se modifie avec son aperçu (EF-167). L'encart ⚙ Structure montre le skill qui dit comment ce genre
+  // de document est rédigé, et le corrige sur place (EF-176).
   // @ecrans /projet/:id Page d'un document
-  // @relu 2026-10-22 2e86c67e
+  // @relu 2026-10-24 b2590faa
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -25,6 +26,8 @@
   import { GENRES_A_RELIRE, changerStatut, signaler, VALIDATIONS, validerTest, nouveauDocument } from "../lib/edition.svelte";
   import { connus } from "../lib/connus.svelte";
   import { statique } from "../lib/statique";
+  import PromptSysteme from "../composants/PromptSysteme.svelte";
+  import { SKILL_STRUCTURE } from "../lib/edition.svelte";
 
   let { id, ancre }: { id: string; ancre: string } = $props();
   /** Document chargé (frontmatter, corps, liens résolus, rétroliens). */
@@ -156,6 +159,7 @@
       </span>
     {/if}
   </div>
+  {#if SKILL_STRUCTURE[page.genre]}<PromptSysteme nom={SKILL_STRUCTURE[page.genre]} libelle="Structure" />{/if}
   {#if edite}<Editeur id={page.id} fermer={() => (edite = false)} />{/if}
   {#if diagramme}<EditeurMermaid id={page.id} fermer={() => (diagramme = false)} />{/if}
   {#if ticket}

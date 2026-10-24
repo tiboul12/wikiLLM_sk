@@ -2,11 +2,14 @@
   // Clarification d'un sujet (SPEC-21 R4, EF-144) : le sujet, la question, les pistes que le LLM propose en
   // lisant le projet par MCP (demandées d'office à l'ouverture) ; garder, corriger ou rejeter fait la
   // réponse ; « Clarifié » la clôt avec les pistes gardées. Se reprend, se rouvre, se supprime. Une question
-  // jugée hors sujet par le LLM est signalée en tête (EF-162).
+  // jugée hors sujet par le LLM est signalée en tête (EF-162). Le skill de clarification se règle dans son encart
+  // (EF-176).
   // @ecrans /clarifications/:id Clarification d'un sujet
+  // @relu 2026-10-24 49765b7b
   import { atelier, artefact, champ, ecrire } from "../../lib/atelier.svelte";
   import { aller, url } from "../../lib/routeur.svelte";
   import Propositions from "../../composants/atelier/Propositions.svelte";
+  import PromptSysteme from "../../composants/PromptSysteme.svelte";
 
   let { id }: { id: string } = $props();
   /** Clarification affichée : l'artefact, ou à défaut l'entrée de la liste des clarifications. */
@@ -56,6 +59,7 @@
     <span class="pastille" class:statut-retenu={close}>{close ? "clarifiée" : "en cours"}</span>
   </div>
   <blockquote class="question">{champ(c, "question")}</blockquote>
+  <PromptSysteme nom="wikik-clarification" />
 
   <h2>Pistes</h2>
   <p class="discret">Le LLM lit le sujet, ses sources et le projet. Garde, corrige ou rejette : les pistes gardées font la réponse.</p>

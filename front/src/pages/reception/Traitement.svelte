@@ -2,12 +2,14 @@
   // Traitement des remarques (SPEC-23 R5) : les confier à l'agent dans le terminal (EF-148), ou filtrer
   // par statut, gravité et page, puis passer chacune à traitée, reportée ou rejetée avec une explication.
   // « À valider » : les remarques traitées que tu n'as pas encore validées (EF-165) ; la légende dit la
-  // couleur de chaque version publiée.
+  // couleur de chaque version publiée. Le skill donné à l'agent se règle dans l'encart « Prompt de l'agent » (EF-176).
+  // @relu 2026-10-24 ed529e13
   import { reception, actuelles, GRAVITES, STATUTS, chargerGit } from "../../lib/reception.svelte";
   import LegendeVersions from "../../composants/reception/LegendeVersions.svelte";
   import { url } from "../../lib/routeur.svelte";
   import CarteRemarque from "../../composants/reception/CarteRemarque.svelte";
   import EnvoiAgent from "../../composants/reception/EnvoiAgent.svelte";
+  import PromptSysteme from "../../composants/PromptSysteme.svelte";
 
   /** Filtre de statut (ou de validation) ; les remarques ouvertes par défaut. */
   let statut = $state("ouverte");
@@ -38,6 +40,7 @@
 <p class="fil"><a href={url.reception()}>Cahier de réception</a> · traitement</p>
 <h1>Traitement des remarques</h1>
 <div class="actions"><EnvoiAgent /></div>
+<PromptSysteme nom="wikik-traiter-reception" libelle="Prompt de l'agent" />
 <div class="filtres">
   <span class="bascule" role="group" aria-label="Statut">
     {#each Object.entries(STATUTS) as [v, nom]}<button class:actif={statut === v} onclick={() => (statut = v)}>{nom} <small>{compte(v)}</small></button>{/each}

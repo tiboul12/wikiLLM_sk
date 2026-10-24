@@ -65,6 +65,19 @@ export async function nouveauDocument(genre: string, titre: string, exigences: s
   return id;
 }
 
+/** Skill qui dit comment sont structurés les documents d'un genre (ADR-0017) : son encart est sur la page du document (EF-176). */
+export const SKILL_STRUCTURE: Record<string, string> = {
+  besoin: "wikik-structure-besoin",
+  exigence: "wikik-structure-exigence",
+  "exigence-nf": "wikik-structure-exigence",
+  test: "wikik-structure-test",
+  adr: "wikik-structure-adr",
+  spec: "wikik-structure-spec",
+  "bdr-analyse": "wikik-structure-bdr",
+  "bdr-definition": "wikik-structure-bdr",
+  "cahier-des-charges": "wikik-structure-cahier-des-charges",
+};
+
 /** Libellé et classe d'un ticket de validation de test. */
 export const VALIDATIONS: Record<string, [string, string]> = {
   a_valider: ["à valider", "attente"],
