@@ -129,6 +129,8 @@ struct Source {
 }
 
 /// Fichiers sources du projet (marcheur de l'index, donc `.gitignore` respecté) ; ceux de plus d'1 Mo sont sautés.
+/// Leurs lignes de commentaire sont effacées (`sans_commentaires`, EF-182).
+/// @relu 2026-10-24 6388e81a
 fn sources(index: &Index) -> Result<Vec<Source>> {
     let mut v = vec![];
     for e in index.marcheur()? {
@@ -163,10 +165,29 @@ fn sources(index: &Index) -> Result<Vec<Source>> {
         let Ok(texte) = std::fs::read_to_string(e.path()) else {
             continue;
         };
+        let texte = sans_commentaires(&texte);
         v.push(Source { chemin, ext, texte });
     }
     v.sort_by(|a, b| a.chemin.cmp(&b.chemin));
     Ok(v)
+}
+
+/// Texte sans ses lignes de commentaire (`//`, `///`, `/*`, `*`), remplacées par des lignes vides :
+/// les exemples des blocs de doc (`{ path: '/x' }`) ne deviennent pas des pages (EF-182, REC-084).
+/// Les lignes sont gardées pour que les positions restent celles du fichier.
+fn sans_commentaires(texte: &str) -> String {
+    texte
+        .lines()
+        .map(|l| {
+            let t = l.trim_start();
+            if t.starts_with("//") || t.starts_with("/*") || t.starts_with("* ") || t == "*" {
+                ""
+            } else {
+                l
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// « TemplatePage » → « Template page », « mes-cv » → « Mes cv ».
@@ -1164,6 +1185,16 @@ mod tests {
         assert_eq!(humaniser("search-optim"), "Search optim");
         assert_eq!(route_normale("configurer"), "/configurer");
         assert_eq!(route_normale(""), "/");
+    }
+
+    #[test]
+    fn exemples_des_commentaires_ignores() {
+        let t = sans_commentaires(
+            "/// `{ path: '/x' }`\nconst r = { path: '/vrai', component: Vrai };\n",
+        );
+        assert!(!t.contains("/x"));
+        assert!(OBJET_ROUTE.is_match(&t));
+        assert_eq!(t.lines().count(), 2);
     }
 
     #[test]

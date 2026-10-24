@@ -3,6 +3,7 @@
   // clarification avec son état, son sujet, sa question et ses pistes gardées ; filtres par état et par
   // sujet ; « Reprendre » et « Supprimer » sur chaque ligne, « Supprimer le sujet » pour toutes celles
   // d'un sujet ; lancer la clarification d'un autre document.
+  // @relu 2026-10-24 6b60b4bb
   import type { Projet } from "../../types/Projet";
   import type { ArtefactResume } from "../../types/ArtefactResume";
   import { atelier, champ, sujets, ecrire } from "../../lib/atelier.svelte";
@@ -69,7 +70,7 @@
 </div>
 
 <table class="relecture">
-  <thead><tr><th>État</th><th>Clarification</th><th>Sujet</th><th>Pistes gardées</th><th></th></tr></thead>
+  <thead><tr><th>État</th><th>Clarification</th><th>Sujet</th><th>Pistes</th><th></th></tr></thead>
   <tbody>
     {#each lignes as { g, c } (c.id)}
       <tr>

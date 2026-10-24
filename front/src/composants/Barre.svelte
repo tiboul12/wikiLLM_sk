@@ -9,7 +9,7 @@
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
   // déplie, centré.
-  // @relu 2026-10-19 eb4d041f
+  // @relu 2026-10-24 26c5e0d3
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
@@ -292,9 +292,9 @@
     <ul class="liens-section"><li><a href={url.git()} class:actif={actif(url.git())}>Historique</a></li></ul>
     {#if refs}
       {#each [["Branches", refs.branches], ["Branches distantes", refs.distantes], ["Tags", refs.tags]] as [titre, liste] (titre)}
-        <details open={titre === "Branches"}>
+        <details open={titre !== "Tags"}>
           <summary>{titre} <small>{(liste as string[]).length}</small></summary>
-          <ul>{#each liste as string[] as r (r)}<li><a href={url.git({ ref: r })} title={r}>{r === refs.branche ? "● " : ""}{r}</a></li>{/each}</ul>
+          <ul>{#each liste as string[] as r (r)}<li><a href={url.git({ ref: r })} title={r === refs.branche ? `${r} (branche courante)` : r}>{r}</a></li>{/each}</ul>
         </details>
       {/each}
     {/if}
@@ -382,7 +382,6 @@
           {#if section === "projet" && SKILL_DE[nom] && !statique}<a class="reglage" href={url.parametres() + "#skill-" + SKILL_DE[nom]} title="Comment sont structurés ces documents (skill {SKILL_DE[nom]})" aria-label="Structure de la section">⚙</a>{/if}
         </summary>
         <ul>
-          {#if nom === "Besoins" && section === "projet"}<li><a href={url.cascade()} class:actif={actif(url.cascade())} class="lien-cascade">Cascade : besoins → exigences → tests</a></li>{/if}
           {#each g.docs as d}
             {@const href = url.document(d.id)}
             <li>

@@ -19,9 +19,9 @@ La v9 était réservée au front en Rust / WebAssembly (REC-009.2). Cette récep
 
 | Phase | Lot | Remarques | Exigences |
 |---|---|---|---|
-| 1 | Corrections rapides | REC-084, 103, 107, 112, 109, 088, 089, 100 | EF-182, EF-170, EF-176, EF-180, EF-183, EF-169, EF-171 |
+| 1 | Corrections rapides | REC-084, 103, 112, 109, 088, 089, 100 | EF-182, EF-170, EF-180, EF-183, EF-169, EF-171 |
 | 2 | Onglets et cascades | REC-069, 102 | EF-169, EF-170 |
-| 3 | Paramètres et prompts de page | REC-062, 104.3, 105, 106 | EF-176 |
+| 3 | Paramètres et prompts de page | REC-062, 104.3, 105, 106, 107 | EF-176 |
 | 4 | Projet par version | REC-101.2, 090, 083, 099, 114 | EF-174, EF-175, EF-171, EF-180 |
 | 5 | Réception | REC-082, 085, 086, 092 | EF-181 |
 | 6 | Graphe | REC-002, 003 | EF-184 |
@@ -44,3 +44,4 @@ Ordre : les corrections rapides d'abord (risque nul), puis la coquille (onglets)
 | Phase | État | Date |
 |---|---|---|
 | 0 BDR, CDC, exigences, plan | ✅ | 2026-10-24 |
+| 1 Corrections rapides | ✅ scan des routes sans les commentaires (plus de page « X ») ; page Cascade retirée ; « Pistes » ; branches sans puce, locales et distantes ouvertes pareil ; onglets plus hauts sans barre de défilement visible (molette) ; fermer l'onglet actif affiche son voisin ; icônes seules dans la barre du téléphone | 2026-10-24 |

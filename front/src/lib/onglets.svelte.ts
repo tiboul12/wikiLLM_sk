@@ -93,8 +93,12 @@ export function activer(i: number) {
   aller(onglets.liste[i].url);
 }
 
-/** Ferme l'onglet `i` ; fermer le dernier ramène à l'accueil. */
+/**
+ * Ferme l'onglet `i` ; fermer le dernier ramène à l'accueil. Fermer l'onglet actif affiche son voisin (celui de droite,
+ * ou de gauche s'il était le dernier) : sa page est rechargée, sinon le contenu de l'onglet fermé resterait affiché (REC-089).
+ */
 export function fermer(i: number) {
+  const etaitActif = i === onglets.actif;
   onglets.liste.splice(i, 1);
   if (!onglets.liste.length) {
     onglets.actif = 0;
@@ -102,11 +106,11 @@ export function fermer(i: number) {
     aller("/");
     return;
   }
-  if (i < onglets.actif || onglets.actif >= onglets.liste.length) onglets.actif = Math.max(0, onglets.actif - 1);
-  else if (i === onglets.actif) {
+  if (etaitActif) {
     activer(Math.min(i, onglets.liste.length - 1));
     return;
   }
+  if (i < onglets.actif) onglets.actif--;
   garder();
 }
 
@@ -156,13 +160,14 @@ export function titreDe(route: Route, projet: Projet | null): string {
   }
 }
 
-/** Titre d'onglet des pages sans titre propre, par genre de page. */
+/** Titre d'onglet des pages sans titre propre, par genre de page.
+ * @relu 2026-10-24 57401fbf
+ */
 const TITRES: Record<string, string> = {
   accueil: "Accueil",
   produit: "Code",
   projet: "Projet",
   relecture: "À relire",
-  cascade: "Cascade",
   atelier: "Design thinking",
   clarifications: "Clarifications",
   reception: "Cahier de réception",

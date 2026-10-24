@@ -7,7 +7,7 @@
 
 import { statique } from "./statique";
 /** Page à afficher, déduite de l'URL : `produit` et `projet` sont les accueils de section, `relecture` la
- * liste des documents à relire, `cascade` les besoins jusqu'aux tests, `clarifications` leur tableau de bord ; `etape` à
+ * liste des documents à relire, `clarifications` leur tableau de bord ; `etape` à
  * `clarifier` n'existent que dans l'atelier, `reception` à `traitement` dans le cahier de réception, et
  * `parametres` (pas dans le site exporté).
  * @relu 2026-10-22 53893dde
@@ -17,7 +17,6 @@ export type Route =
   | { page: "produit" }
   | { page: "projet" }
   | { page: "relecture" }
-  | { page: "cascade" }
   | { page: "fichier"; chemin: string; ancre: string }
   | { page: "document"; id: string; ancre: string }
   | { page: "recherche"; q: string }
@@ -49,13 +48,14 @@ function splitUne(t: string, sep: string): [string, string?] {
   return i < 0 ? [t] : [t.slice(0, i), t.slice(i + 1)];
 }
 
-/** Route de l'URL courante ; une adresse inconnue tombe sur l'accueil. */
+/** Route de l'URL courante ; une adresse inconnue tombe sur l'accueil.
+ * @relu 2026-10-24 188dd008
+ */
 function analyser(): Route {
   const { chemin, params, ancre } = lireUrl();
   if (chemin === "/produit" || chemin === "/produit/") return { page: "produit" };
   if (chemin === "/projet" || chemin === "/projet/") return { page: "projet" };
   if (chemin === "/projet/relecture") return { page: "relecture" };
-  if (chemin === "/projet/cascade") return { page: "cascade" };
   if (chemin.startsWith("/produit/")) return { page: "fichier", chemin: chemin.slice("/produit/".length), ancre };
   if (chemin.startsWith("/projet/")) return { page: "document", id: chemin.slice("/projet/".length), ancre };
   if (chemin === "/recherche") return { page: "recherche", q: params.get("q") ?? "" };
@@ -163,7 +163,7 @@ export function parcoursDeUrl(): string {
 }
 
 /**
- * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`, `/projet/cascade`,
+ * Fabrique des URL stables : `/` (accueil), `/produit` et `/projet` (accueils de section), `/projet/relecture`,
  * `/produit/<chemin>#<symbole>`, `/projet/<id>`, `/recherche`, `/graphe`,
  * précédées de `#` en mode statique ; pour l'atelier : `/atelier`, `/atelier/<étape>` (avec
  * `?parcours=` hors du parcours par défaut), `/clarifications`, `/clarifications/<id>`, `/clarifications/clarifier/<sujet>` ; pour la réception : `/reception`, `/reception/page/?cle=<clé>`, `/reception/traitement` ; `/parametres` ; `/git` (historique).
@@ -173,7 +173,6 @@ export const url = {
   produit: () => `${prefixe}/produit`,
   projet: () => `${prefixe}/projet`,
   relecture: () => `${prefixe}/projet/relecture`,
-  cascade: () => `${prefixe}/projet/cascade`,
   fichier: (chemin: string, ancre?: string) =>
     `${prefixe}/produit/${chemin.split("/").map(encodeURIComponent).join("/")}${ancre ? "#" + encodeURIComponent(ancre) : ""}`,
   document: (id: string) => `${prefixe}/projet/${encodeURIComponent(id)}`,

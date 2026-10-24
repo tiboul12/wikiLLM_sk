@@ -1,8 +1,8 @@
 <script lang="ts">
   // Barre d'onglets au-dessus du contenu (EF-151) : un clic affiche l'onglet, × ou clic du milieu le ferme,
   // l'icône ↗ le détache dans une fenêtre ; ☆ met la page en favori (EF-157) ; on les réordonne en les
-  // glissant.
-  // @relu 2026-10-22 27037316
+  // glissant. La barre défile à la molette, sans barre de défilement visible qui recouvrirait les titres (REC-088).
+  // @relu 2026-10-24 c8888d71
   import { onglets, activer, fermer, deplacer, detacher } from "../lib/onglets.svelte";
   import { estFavori, basculerFavori } from "../lib/edition.svelte";
   import { statique } from "../lib/statique";
@@ -13,6 +13,21 @@
   $effect(() => {
     const i = onglets.actif;
     barre?.querySelectorAll(".onglet")[i]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  });
+  /**
+   * La barre n'a pas de barre de défilement visible, qui recouvrait les titres (REC-088) : la molette la fait défiler
+   * de côté, et l'onglet actif est toujours ramené dans la vue.
+   */
+  function defiler(e: WheelEvent) {
+    if (!barre || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    barre.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }
+  // Écouteur non passif, pour que la molette ne fasse pas aussi défiler la page.
+  $effect(() => {
+    const b = barre;
+    b?.addEventListener("wheel", defiler, { passive: false });
+    return () => b?.removeEventListener("wheel", defiler);
   });
   /** Rang de l'onglet en cours de glisser. */
   let glisse = $state<number | null>(null);
@@ -79,7 +94,10 @@
     position: sticky;
     top: 54px;
     z-index: 8;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+  }
+  .onglets::-webkit-scrollbar {
+    display: none;
   }
   .onglet {
     display: flex;
@@ -87,7 +105,8 @@
     gap: 4px;
     max-width: 240px;
     min-width: 0;
-    padding: 6px 6px 6px 12px;
+    min-height: 36px;
+    padding: 8px 6px 8px 12px;
     font-size: 13px;
     color: var(--texte-2);
     border-right: 1px solid var(--bord);

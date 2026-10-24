@@ -7,7 +7,7 @@
   // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153) ;
   // Ctrl+Z / Ctrl+Y annulent ou rétablissent la dernière écriture, puis tout est relu (EF-159). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
-  // @relu 2026-10-22 f3e2b7ca
+  // @relu 2026-10-24 aece7903
   import { untrack } from "svelte";
   import { api } from "./lib/api";
   import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
@@ -21,7 +21,6 @@
   import ProduitAccueil from "./pages/ProduitAccueil.svelte";
   import ProjetAccueil from "./pages/ProjetAccueil.svelte";
   import Relecture from "./pages/Relecture.svelte";
-  import Cascade from "./pages/Cascade.svelte";
   import PageFichier from "./pages/PageFichier.svelte";
   import PageDocument from "./pages/PageDocument.svelte";
   import Recherche from "./pages/Recherche.svelte";
@@ -222,8 +221,6 @@
       <ProjetAccueil {projet} />
     {:else if routeur.route.page === "relecture"}
       <Relecture {projet} />
-    {:else if routeur.route.page === "cascade"}
-      <Cascade {projet} />
     {:else if routeur.route.page === "accueil"}
       <Accueil {projet} />
     {:else if routeur.route.page === "parametres"}

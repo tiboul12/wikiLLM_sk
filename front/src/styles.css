@@ -546,16 +546,17 @@ a.titre-panneau:hover { color: var(--accent); text-decoration: none; }
 
 @media (max-width: 820px) {
   .barre-activite {
-    position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: 58px; z-index: 11;
+    position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: 52px; z-index: 11;
     flex-direction: row; padding: 0 4px; border-right: 0; border-top: 1px solid var(--bord);
   }
-  .barre-activite a { flex: 1; height: 58px; border-left: 0; border-top: 2px solid transparent; align-content: center; gap: 2px; }
+  .barre-activite a { flex: 1; height: 52px; border-left: 0; border-top: 2px solid transparent; align-content: center; gap: 2px; }
   .barre-activite a.actif { border-top-color: var(--accent); }
-  .barre-activite .libelle { display: block; font-size: 10.5px; }
+  /* Icônes seules sur téléphone (REC-100) : les noms des sections passaient sur deux lignes ; le nom reste en info-bulle et pour les lecteurs d'écran. */
+  .barre-activite .libelle { display: none; }
   .barre-activite .espace { display: none; }
   .barre-activite .badge { top: 4px; right: calc(50% - 22px); }
   .contenu { padding-bottom: 90px; }
-  .barre { bottom: 58px; height: auto; }
+  .barre { bottom: 52px; height: auto; }
 }
 .bascule { flex-wrap: wrap; }
 .meta-page { flex: 1 1 200px; }
@@ -612,7 +613,7 @@ a.reprendre { margin-left: auto; }
 .alerte-acces { padding: 8px 12px; border-left: 3px solid var(--orange); background: var(--orange-fond); border-radius: 0 6px 6px 0; font-size: 14px; }
 @media (max-width: 820px) {
   .cadre.avec-terminal { margin-right: 0; }
-  .panneau-terminal { left: 0; width: auto !important; bottom: 58px; }
+  .panneau-terminal { left: 0; width: auto !important; bottom: 52px; }
   .poignee-terminal { display: none; }
   .bouton-terminal span { display: none; }
 }
@@ -623,8 +624,7 @@ a.reprendre { margin-left: auto; }
 .barre-activite button.arret .libelle { display: none; }
 .serveur-arrete { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: color-mix(in srgb, var(--fond) 92%, transparent); text-align: center; padding: 16px; }
 @media (max-width: 820px) {
-  .barre-activite button.arret { flex: 1; height: 58px; border-left: 0; align-content: center; gap: 2px; }
-  .barre-activite button.arret .libelle { display: block; font-size: 10.5px; }
+  .barre-activite button.arret { flex: 1; height: 52px; border-left: 0; align-content: center; gap: 2px; }
 }
 
 /* Message bref après une écriture ou Ctrl+Z (EF-159). */

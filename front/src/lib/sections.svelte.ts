@@ -34,7 +34,7 @@ export const NOMS: Record<Section, string> = {
 };
 
 /** Section d'une page ; `null` pour une page commune à toutes (recherche) ; le graphe est dans Code.
- * @relu 2026-10-22 33cc94a2
+ * @relu 2026-10-24 3a646021
  */
 export function sectionDe(route: Route, projet: Projet | null): Section | null {
   switch (route.page) {
@@ -46,7 +46,6 @@ export function sectionDe(route: Route, projet: Projet | null): Section | null {
       return "produit";
     case "projet":
     case "relecture":
-    case "cascade":
       return "projet";
     case "clarification":
     case "clarifier":
