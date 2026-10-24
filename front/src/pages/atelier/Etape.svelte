@@ -1,10 +1,9 @@
 <script lang="ts">
-  // Écran d'une étape : rôle et règles de la fiche, mode, puis chaque sous-étape avec son écran
-  // (dédié pour le mode Express, générique sinon).
+  // Écran d'une étape du parcours affiché : « en bref » (à quoi elle sert, ce qu'on fait, ce qu'elle produit), règles de la
+  // fiche, mode, puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon).
   import type { SousEtape } from "../../types/SousEtape";
   import { atelier, deType, ecrire, PHASES, ETATS } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
-  import { rendre } from "../../lib/markdown";
   import Propositions from "../../composants/atelier/Propositions.svelte";
   import Selection from "../../composants/atelier/Selection.svelte";
   import Synthese from "../../composants/atelier/Synthese.svelte";
@@ -12,6 +11,7 @@
   import FreeWriting from "../../composants/atelier/FreeWriting.svelte";
   import Tri from "../../composants/atelier/Tri.svelte";
   import Planche from "../../composants/atelier/Planche.svelte";
+  import EnBref from "../../composants/atelier/EnBref.svelte";
 
   let { etape }: { etape: string } = $props();
   const index = $derived(atelier.etat?.etapes.findIndex((e) => e.fiche.id === etape) ?? -1);
@@ -49,7 +49,7 @@
 {#if !e}
   <p class="discret">{atelier.etat ? `Étape inconnue : ${etape}` : "Chargement…"}</p>
 {:else}
-  <p class="fil"><a href={url.atelier()}>Atelier</a> · {PHASES[e.fiche.phase] ?? e.fiche.phase} · étape {index + 1} / {atelier.etat!.etapes.length}</p>
+  <p class="fil"><a href={url.atelier(atelier.parcours)}>Design thinking</a> · {atelier.etat?.tous_parcours.find((p) => p.id === atelier.parcours)?.titre ?? ""} · {PHASES[e.fiche.phase] ?? e.fiche.phase} · étape {index + 1} / {atelier.etat!.etapes.length}</p>
   <h1>{e.fiche.titre}</h1>
   <div class="meta">
     <span class="pastille etat-{e.etat}">{ETATS[e.etat] ?? e.etat}</span>
@@ -60,7 +60,7 @@
     </span>
     <span class="discret">origine : {e.fiche.origine.join(", ")}</span>
   </div>
-  <div class="prose role">{@html rendre(e.fiche.role, () => null)}</div>
+  <EnBref fiche={e.fiche} mode={e.mode} />
   {#if e.fiche.regles.length}
     <details class="regles"><summary>Règles de la technique</summary><ul>{#each e.fiche.regles as r}<li>{r}</li>{/each}</ul></details>
   {/if}
@@ -104,6 +104,6 @@
     {#if e.fiche.optionnelle && e.etat !== "sautee" && e.etat !== "faite"}
       <button onclick={() => piloter("sauter")}>Sauter (optionnelle)</button>
     {/if}
-    {#if suivante}<a class="bouton" href={url.etape(suivante.fiche.id)}>Étape suivante : {suivante.fiche.titre} →</a>{/if}
+    {#if suivante}<a class="bouton" href={url.etape(suivante.fiche.id, atelier.parcours)}>Étape suivante : {suivante.fiche.titre} →</a>{/if}
   </div>
 {/if}

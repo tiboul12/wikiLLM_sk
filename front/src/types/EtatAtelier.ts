@@ -4,11 +4,12 @@ import type { Consommation } from "./Consommation";
 import type { EtatEtape } from "./EtatEtape";
 import type { Fiche } from "./Fiche";
 import type { Lot } from "./Lot";
+import type { ResumeParcours } from "./ResumeParcours";
 
 /**
- * État complet de l'atelier, servi à l'interface : étapes, artefacts, clarifications et leurs
- * propositions, fournisseur, consommation de l'abonnement.
- * @relu 2026-10-19 aa54f2c7
+ * État complet de l'atelier pour un parcours, servi à l'interface : étapes, artefacts, clarifications
+ * (communes à tous les parcours) et leurs propositions, fournisseur, consommation de l'abonnement, liste
+ * des parcours.
  */
 export type EtatAtelier = { 
 /**
@@ -26,4 +27,8 @@ fiche_clarification: Fiche,
 /**
  * Propositions des clarifications (une par clarification).
  */
-lots_clarification: Array<Lot>, fournisseur: string, consommation: Consommation | null, };
+lots_clarification: Array<Lot>, fournisseur: string, consommation: Consommation | null, 
+/**
+ * Parcours affiché, et tous les parcours du projet (EF-145).
+ */
+parcours: string, tous_parcours: Array<ResumeParcours>, };

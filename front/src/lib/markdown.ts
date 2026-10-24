@@ -50,13 +50,33 @@ export type Resolveur = (brute: string) => string | null;
 
 type JetonLien = { type: "lienWiki"; raw: string; cible: string; libelle?: string; ancre?: string };
 
+/** Début possible d'un identifiant de document dans du texte (`EF-140`, `PLAN-v4`, `REC-001.2`). */
+const ID_DEBUT = /\b[A-Z][A-Z0-9]*-[A-Za-z0-9]/;
+const ID = /^[A-Z][A-Z0-9]*(?:-[A-Za-z0-9]+)+(?:\.\d+)?/;
+
 /**
  * Markdown → HTML assaini.
  * `refBase` : préfixe des hooks ⚓ posés sur les titres (`@wiki:projet/doc`), ou rien pour ne pas en poser.
  * `cheminDoc` : chemin du document ; ses images relatives (captures d'une remarque) sont servies par
  * `/api/image`, comme GitHub les affiche à partir du même Markdown.
+ * `auto` : lien d'un identifiant, d'un chemin ou d'un symbole cité sans [[...]] (texte ou `code`), ou
+ * null ; jamais à l'intérieur d'un lien (EF-143).
  */
-export function rendre(md: string, resoudre: Resolveur = () => null, refBase?: string, cheminDoc?: string): string {
+export function rendre(md: string, resoudre: Resolveur = () => null, refBase?: string, cheminDoc?: string, auto?: Resolveur): string {
+  const idConnu: TokenizerAndRendererExtension = {
+    name: "idConnu",
+    level: "inline",
+    start: (src: string) => (auto ? (ID_DEBUT.exec(src)?.index ?? -1) : -1),
+    tokenizer(src: string) {
+      if (!auto || this.lexer.state.inLink) return undefined;
+      const m = ID.exec(src);
+      const href = m && auto(m[0]);
+      return href ? { type: "idConnu", raw: m![0], href } : undefined;
+    },
+    renderer(t) {
+      return `<a class="lien-auto" href="${echapper((t as unknown as { href: string }).href)}">${echapper(t.raw)}</a>`;
+    },
+  };
   const lienWiki: TokenizerAndRendererExtension = {
     name: "lienWiki",
     level: "inline",
@@ -77,12 +97,21 @@ export function rendre(md: string, resoudre: Resolveur = () => null, refBase?: s
   };
   const m = new Marked({
     gfm: true,
-    extensions: [lienWiki],
+    extensions: [lienWiki, idConnu],
+    // Un `code` dans le texte d'un lien reste tel quel : pas de lien dans un lien.
+    walkTokens(t) {
+      if (t.type === "link") for (const x of t.tokens ?? []) if (x.type === "codespan") (x as { dansLien?: boolean }).dansLien = true;
+    },
     renderer: {
       code({ text, lang }: Tokens.Code) {
         const l = (lang ?? "").split(/\s/)[0];
         if (l === "mermaid") return `<pre class="mermaid">${echapper(text)}</pre>`;
         return `<pre><code class="hljs">${colorer(text, l || "plaintext")}</code></pre>`;
+      },
+      codespan(t: Tokens.Codespan) {
+        const code = `<code>${echapper(t.text)}</code>`;
+        const href = (t as { dansLien?: boolean }).dansLien ? null : auto?.(t.text);
+        return href ? `<a class="lien-auto" href="${echapper(href)}">${code}</a>` : code;
       },
       image({ href, text }: Tokens.Image) {
         const src = cheminDoc && !statique && !/^([a-z]+:|\/)/i.test(href) ? `/api/image?chemin=${encodeURIComponent(resoudreChemin(cheminDoc, href))}` : href;

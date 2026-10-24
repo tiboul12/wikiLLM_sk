@@ -14,6 +14,7 @@ pub mod index;
 pub mod init;
 pub mod lang;
 pub mod modele;
+pub mod parametres;
 pub mod projet;
 pub mod query;
 pub mod reception;

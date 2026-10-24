@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use ts_rs::TS;
 
@@ -23,13 +24,17 @@ pub struct Consommation {
     pub sept_jours: f64,
 }
 
-/// Une demande de propositions.
+/// Une demande de propositions, avec son jeton d'annulation.
 pub struct Demande<'a> {
     pub consigne: &'a str,
     /// Schéma JSON de la réponse (objet `{ elements: [...] }`).
     pub schema: &'a Value,
     /// Exemple de la fiche, renvoyé par le fournisseur factice.
     pub exemple: Option<&'a Value>,
+    /// Jeton d'annulation pris à l'arrivée de la requête ([`Fournisseur::jeton`]) : une annulation
+    /// demandée pendant la préparation (scan, index) arrête quand même l'appel. `None` : celui du début
+    /// de l'appel.
+    pub jeton: Option<u64>,
 }
 
 /// Réponse validée.
@@ -40,12 +45,19 @@ pub struct Reponse {
     pub duree_ms: u128,
 }
 
-/// Fournisseur de propositions.
+/// Fournisseur de propositions, dont les appels en cours peuvent être annulés (SPEC-19 R7).
 pub trait Fournisseur: Send + Sync {
     /// Nom affiché (`claude`, `factice`).
     fn nom(&self) -> String;
     /// Demande au LLM ; la réponse est validée contre le schéma.
     fn proposer(&self, demande: &Demande) -> Result<Reponse>;
+    /// Arrête les appels en cours (REC-030) : ils échouent avec « appel au LLM annulé ». Sans effet pour
+    /// un fournisseur qui répond tout de suite.
+    fn annuler(&self) {}
+    /// Jeton d'annulation courant : un appel lancé avec ce jeton s'arrête à la prochaine annulation.
+    fn jeton(&self) -> u64 {
+        0
+    }
 }
 
 /// Fournisseur factice : renvoie l'exemple de la fiche, sans réseau (SPEC-19 R3).
@@ -70,15 +82,18 @@ impl Fournisseur for Factice {
     }
 }
 
-/// Fournisseur par ligne de commande (SPEC-19 R2).
+/// Fournisseur par ligne de commande (SPEC-19 R2) ; un appel s'arrête au délai ou à l'annulation (R7).
 pub struct Cli {
     pub config: ConfigLlm,
     /// Fichier `--mcp-config` écrit par l'atelier (`{mcp}`).
     pub mcp: PathBuf,
+    /// Avance à chaque annulation : un appel lancé avant s'arrête.
+    annulations: AtomicU64,
 }
 
 impl Cli {
     /// Prépare le fournisseur et écrit la configuration MCP qui pointe sur le binaire courant et `racine`.
+    /// @relu 2026-10-19 d4900ae3
     pub fn preparer(config: ConfigLlm, racine: &Path, dossier_travail: &Path) -> Result<Cli> {
         std::fs::create_dir_all(dossier_travail)?;
         let exe = std::env::current_exe().context("chemin du binaire wikik")?;
@@ -88,10 +103,14 @@ impl Cli {
             "args": ["--racine", racine.to_string_lossy(), "mcp"],
         }}});
         std::fs::write(&mcp, serde_json::to_string_pretty(&contenu)?)?;
-        Ok(Cli { config, mcp })
+        Ok(Cli {
+            config,
+            mcp,
+            annulations: AtomicU64::new(0),
+        })
     }
 
-    fn un_appel(&self, d: &Demande) -> Result<(Option<Value>, Option<Consommation>)> {
+    fn un_appel(&self, d: &Demande, depart: u64) -> Result<(Option<Value>, Option<Consommation>)> {
         let schema = serde_json::to_string(d.schema)?;
         let args: Vec<String> = self
             .config
@@ -103,7 +122,11 @@ impl Cli {
                     .replace("{mcp}", &self.mcp.to_string_lossy())
             })
             .collect();
-        let mut enfant = Command::new(&self.config.commande)
+        let mut commande = Command::new(&self.config.commande);
+        // Son propre groupe de processus : l'arrêter arrête aussi ce qu'il a lancé (serveur MCP, shell).
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut commande, 0);
+        let mut enfant = commande
             .args(&args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -130,8 +153,12 @@ impl Cli {
                 return Ok((donnees, conso));
             }
             if Instant::now() > limite {
-                let _ = enfant.kill();
+                arreter(&mut enfant);
                 bail!("le LLM n'a pas répondu en {} s", self.config.delai);
+            }
+            if self.annulations.load(Ordering::SeqCst) != depart {
+                arreter(&mut enfant);
+                bail!("appel au LLM annulé");
             }
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -179,10 +206,13 @@ impl Fournisseur for Cli {
 
     fn proposer(&self, d: &Demande) -> Result<Reponse> {
         let debut = Instant::now();
+        let depart = d
+            .jeton
+            .unwrap_or_else(|| self.annulations.load(Ordering::SeqCst));
         let mut derniere = String::new();
         // Une relance si la réponse manque ou ne respecte pas le schéma (SPEC-19 R4).
         for _ in 0..2 {
-            let (donnees, consommation) = self.un_appel(d)?;
+            let (donnees, consommation) = self.un_appel(d, depart)?;
             match donnees {
                 Some(v) => match valider(d.schema, &v, "réponse") {
                     Ok(()) => {
@@ -204,6 +234,24 @@ impl Fournisseur for Cli {
         }
         bail!("le LLM n'a pas rendu une réponse valide après une relance : {derniere}")
     }
+
+    fn annuler(&self) {
+        self.annulations.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn jeton(&self) -> u64 {
+        self.annulations.load(Ordering::SeqCst)
+    }
+}
+
+/// Arrête le CLI et tout son groupe de processus (sous Unix), puis attend sa fin.
+fn arreter(enfant: &mut std::process::Child) {
+    #[cfg(unix)]
+    let _ = Command::new("kill")
+        .args(["-TERM", &format!("-{}", enfant.id())])
+        .status();
+    let _ = enfant.kill();
+    let _ = enfant.wait();
 }
 
 /// Construit le fournisseur décrit par la configuration.
@@ -258,6 +306,7 @@ echo '{"type":"result","is_error":false,"structured_output":{"elements":[{"titre
                 consigne: "x",
                 schema: &s,
                 exemple: None,
+                jeton: None,
             })
             .unwrap();
         assert_eq!(r.elements[0]["titre"], "Alerte");
@@ -289,6 +338,7 @@ echo '{{"type":"result","is_error":false}}'"#,
                 consigne: "x",
                 schema: &s,
                 exemple: None,
+                jeton: None,
             })
             .unwrap_err();
         assert!(e.to_string().contains("après une relance"), "{e}");
@@ -296,5 +346,33 @@ echo '{{"type":"result","is_error":false}}'"#,
             std::fs::read_to_string(compteur).unwrap().lines().count(),
             2
         );
+    }
+
+    /// Un appel annulé s'arrête tout de suite, sans attendre le délai ni relancer.
+    #[test]
+    fn annulation() {
+        let d = tempfile::tempdir().unwrap();
+        let config = faux_cli(d.path(), "sleep 4; echo fini");
+        let cli = std::sync::Arc::new(
+            Cli::preparer(config, d.path(), &d.path().join("travail")).unwrap(),
+        );
+        let c2 = cli.clone();
+        let t = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            c2.annuler();
+        });
+        let debut = Instant::now();
+        let s = schema();
+        let e = cli
+            .proposer(&Demande {
+                consigne: "x",
+                schema: &s,
+                exemple: None,
+                jeton: None,
+            })
+            .unwrap_err();
+        t.join().unwrap();
+        assert!(e.to_string().contains("annulé"), "{e}");
+        assert!(debut.elapsed() < Duration::from_secs(2));
     }
 }

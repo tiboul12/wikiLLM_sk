@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Accueil du projet (EF-131) : une tuile par section avec son état, pour aller où il faut d'un clic.
+  // Accueil du projet (EF-131, EF-140) : une tuile par section avec son état, dans l'ordre de la barre.
   import type { Projet } from "../types/Projet";
   import { url } from "../lib/routeur.svelte";
   import { SECTIONS } from "../lib/sections.svelte";
@@ -20,12 +20,6 @@
   <h1>{projet.nom}</h1>
   <p class="discret">Le code, ses documents, la définition du besoin et la réception de l'application, au même endroit.</p>
   <div class="sections-accueil">
-    <a class="section-tuile" href={url.produit()}>
-      <span class="entete-tuile"><Icone nom="produit" taille={26} /> <strong>Produit</strong></span>
-      <span class="chiffre">{projet.fichiers.length} <small>fichiers</small></span>
-      <span class="discret">{projet.symboles} symboles · {taux} % documentés</span>
-      <span class="jauge"><span style="width: {taux}%"></span></span>
-    </a>
     <a class="section-tuile" href={url.projet()}>
       <span class="entete-tuile"><Icone nom="projet" taille={26} /> <strong>Projet</strong></span>
       <span class="chiffre">{docs("projet")} <small>documents</small></span>
@@ -33,11 +27,17 @@
     </a>
     {#if SECTIONS.includes("atelier")}
       <a class="section-tuile" href={url.atelier()}>
-        <span class="entete-tuile"><Icone nom="atelier" taille={26} /> <strong>Atelier</strong></span>
+        <span class="entete-tuile"><Icone nom="atelier" taille={26} /> <strong>Design thinking</strong></span>
         <span class="chiffre">{etapesFaites} / {atelier.etat?.etapes.length ?? 11} <small>étapes</small></span>
         <span class="discret">{atelier.etat?.projet ? `« ${atelier.etat.projet} »` : "Définir le besoin : commencer par le pitch"}{enCours ? ` · en cours : ${enCours}` : ""}</span>
       </a>
     {/if}
+    <a class="section-tuile" href={url.produit()}>
+      <span class="entete-tuile"><Icone nom="produit" taille={26} /> <strong>Produit</strong></span>
+      <span class="chiffre">{projet.fichiers.length} <small>fichiers</small></span>
+      <span class="discret">{projet.symboles} symboles · {taux} % documentés</span>
+      <span class="jauge"><span style="width: {taux}%"></span></span>
+    </a>
     {#if SECTIONS.includes("reception")}
       <a class="section-tuile" class:attention={ouvertes > 0} href={url.reception()}>
         <span class="entete-tuile"><Icone nom="reception" taille={26} /> <strong>Réception</strong></span>

@@ -1,6 +1,8 @@
 <script lang="ts">
-  // Page document (EF-042) : frontmatter, corps Markdown (images relatives servies par `/api/image`),
-  // liens résolus, ce qui le cite ; liens vers l'atelier pour un besoin, une exigence ou un artefact (SPEC-21).
+  // Page document (EF-042, EF-143) : frontmatter, corps Markdown (images relatives servies par
+  // `/api/image`), liens résolus, identifiants et chemins cités liés d'office, ce qui le cite ; liens vers
+  // l'atelier pour un besoin, une exigence ou un artefact (SPEC-21), « Reprendre » pour une clarification.
+  // Un plan ou le backlog s'ouvre en tableau à colonnes.
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { rendre, rendreMermaid } from "../lib/markdown";
@@ -9,6 +11,9 @@
   import type { PageDocument } from "../types/PageDocument";
   import Lien from "../composants/Lien.svelte";
   import { lienAtelier } from "../lib/atelier.svelte";
+  import { autoLien } from "../lib/connus.svelte";
+  import { colonnesPlan, colonnesBacklog } from "../lib/gestion";
+  import Kanban from "../composants/Kanban.svelte";
 
   let { id, ancre }: { id: string; ancre: string } = $props();
   let page = $state<PageDocument | null>(null);
@@ -36,8 +41,11 @@
       },
       reference(page.id),
       page.chemin,
+      autoLien,
     );
   });
+  const colonnes = $derived(page?.genre === "plan" ? colonnesPlan(page.corps) : page?.genre === "backlog" ? colonnesBacklog(page.corps) : null);
+  let vue = $state<"tableau" | "document">("tableau");
 
   $effect(() => {
     if (!corps || !html) return;
@@ -74,10 +82,18 @@
       {/each}
     {/each}
     <a class="action" href={url.graphe(page.id)} title="Graphe local">◎ graphe</a>
-    {#if ouvrir}<a class="action atelier" href={ouvrir}>ouvrir dans l'atelier</a>{/if}
+    {#if page.genre === "clarification" && lienAtelier("/")}<a class="bouton principal reprendre" href={url.clarification(page.id)}>Reprendre la clarification →</a>
+    {:else if ouvrir}<a class="action atelier" href={ouvrir}>ouvrir dans le Design thinking</a>{/if}
     {#if clarifier}<a class="action atelier" href={clarifier}>clarifier</a>{/if}
   </div>
-  <article class="prose document" bind:this={corps}>{@html html}</article>
+  {#if colonnes}
+    <div class="bascule vue-gestion" role="group" aria-label="Affichage">
+      <button class:actif={vue === "tableau"} onclick={() => (vue = "tableau")}>Tableau</button>
+      <button class:actif={vue === "document"} onclick={() => (vue = "document")}>Document</button>
+    </div>
+    {#if vue === "tableau"}<Kanban {colonnes} resoudre={autoLien} />{/if}
+  {/if}
+  <article class="prose document" class:cache={colonnes && vue === "tableau"} bind:this={corps}>{@html html}</article>
   {#if page.cite_par.length || page.references.length}
     <section class="cite-par">
       {#if page.cite_par.length}

@@ -5,7 +5,8 @@ use wikik_core::Index;
 use wikik_core::atelier::fournisseur::{Demande, Factice, Fournisseur};
 use wikik_core::atelier::parcours as p;
 
-/// Demande, range la réponse factice et garde toutes les propositions ; renvoie les artefacts créés.
+/// Demande, range la réponse factice et garde toutes les propositions du parcours par défaut ; renvoie
+/// les artefacts créés.
 fn garder_tout(
     i: &mut Index,
     etape: &str,
@@ -13,18 +14,32 @@ fn garder_tout(
     cible: Option<&str>,
     entree: Option<&str>,
 ) -> Vec<String> {
-    let prep = p::preparer(i, etape, sous, cible, entree).unwrap();
+    garder_dans(i, p::DEFAUT, etape, sous, cible, entree)
+}
+
+/// Comme [`garder_tout`], dans un parcours donné.
+/// @relu 2026-10-19 56e78508
+fn garder_dans(
+    i: &mut Index,
+    pid: &str,
+    etape: &str,
+    sous: &str,
+    cible: Option<&str>,
+    entree: Option<&str>,
+) -> Vec<String> {
+    let prep = p::preparer(i, pid, etape, sous, cible, entree).unwrap();
     let r = Factice
         .proposer(&Demande {
             consigne: &prep.consigne,
             schema: &prep.schema,
             exemple: prep.exemple.as_ref(),
+            jeton: None,
         })
         .unwrap();
     let lot = p::enregistrer(i, &prep, &r, "factice").unwrap();
     let mut ids = vec![];
     for n in 0..lot.elements.len() {
-        if let Some(id) = p::decider(i, etape, sous, cible, n, "garder", None).unwrap() {
+        if let Some(id) = p::decider(i, pid, etape, sous, cible, n, "garder", None).unwrap() {
             ids.push(id);
         }
     }
@@ -47,7 +62,7 @@ fn parcours_complet_factice() {
     let mut i = Index::ouvrir(d.path()).unwrap();
 
     assert!(
-        p::preparer(&i, "pitch", "pitch", None, None).is_err(),
+        p::preparer(&i, p::DEFAUT, "pitch", "pitch", None, None).is_err(),
         "pas de brouillon sans description"
     );
     assert_eq!(
@@ -71,6 +86,7 @@ fn parcours_complet_factice() {
                  Il faudrait une alerte si la météo tourne.";
     let fw = p::saisir(
         &i,
+        p::DEFAUT,
         "free-writing",
         "ecriture",
         Some("AXE-001"),
@@ -90,7 +106,7 @@ fn parcours_complet_factice() {
 
     garder_tout(&mut i, "carte-mentale", "branches", None, None);
     garder_tout(&mut i, "carte-mentale", "liens", None, None);
-    p::synthetiser(&i, "carte-mentale", "carte").unwrap();
+    p::synthetiser(&i, p::DEFAUT, "carte-mentale", "carte").unwrap();
     i.mettre_a_jour().unwrap();
     assert!(lire(d.path(), "docs/atelier/carte.md").contains("mindmap"));
 
@@ -98,29 +114,29 @@ fn parcours_complet_factice() {
     garder_tout(&mut i, "analogies", "analogies", Some(&pb[0]), None);
     garder_tout(&mut i, "analogies", "solutions", Some(&pb[0]), None);
 
-    p::selectionner(&i, "5w1h", "idees", &["IDEE-001".into()]).unwrap();
+    p::selectionner(&i, p::DEFAUT, "5w1h", "idees", &["IDEE-001".into()]).unwrap();
     assert!(
-        p::selectionner(&i, "5w1h", "idees", &["US-001".into()]).is_err(),
+        p::selectionner(&i, p::DEFAUT, "5w1h", "idees", &["US-001".into()]).is_err(),
         "une unité n'est pas une idée"
     );
     assert!(
-        p::preparer(&i, "5w1h", "questions", Some("IDEE-002"), None).is_err(),
+        p::preparer(&i, p::DEFAUT, "5w1h", "questions", Some("IDEE-002"), None).is_err(),
         "hors sélection"
     );
     garder_tout(&mut i, "5w1h", "questions", Some("IDEE-001"), None);
     garder_tout(&mut i, "cubing", "faces", Some("IDEE-001"), None);
-    p::selectionner(&i, "scamper", "sujets", &["IDEE-001".into()]).unwrap();
+    p::selectionner(&i, p::DEFAUT, "scamper", "sujets", &["IDEE-001".into()]).unwrap();
     assert_eq!(
         garder_tout(&mut i, "scamper", "leviers", Some("IDEE-001"), None).len(),
         7
     );
-    p::synthetiser(&i, "scamper", "rapport").unwrap();
+    p::synthetiser(&i, p::DEFAUT, "scamper", "rapport").unwrap();
 
     let sb = garder_tout(&mut i, "storyboard", "scenarios", None, None);
     for sous in ["cadre", "vignettes", "artefacts"] {
         garder_tout(&mut i, "storyboard", sous, Some(&sb[0]), None);
     }
-    p::synthetiser(&i, "storyboard", "recit").unwrap();
+    p::synthetiser(&i, p::DEFAUT, "storyboard", "recit").unwrap();
     let story = lire(d.path(), "docs/atelier/storyboards/SB-001.md");
     assert!(
         story.contains("## Vignettes")
@@ -133,19 +149,20 @@ fn parcours_complet_factice() {
     assert_eq!(besoins, ["B-001", "B-002"]);
     p::saisir(
         &i,
+        p::DEFAUT,
         "bilan",
         "tri",
         None,
         &json!({ "besoins": [{ "id": "B-002", "priorite": "should" }] }),
     )
     .unwrap();
-    p::synthetiser(&i, "bilan", "bdr").unwrap();
+    p::synthetiser(&i, p::DEFAUT, "bilan", "bdr").unwrap();
     i.mettre_a_jour().unwrap();
     let ef = garder_tout(&mut i, "exigences", "exigences", Some("B-001"), None);
     assert_eq!(ef, ["EF-001"]);
-    p::synthetiser(&i, "exigences", "cahier").unwrap();
+    p::synthetiser(&i, p::DEFAUT, "exigences", "cahier").unwrap();
     garder_tout(&mut i, "roadmap", "horizons", None, None);
-    p::synthetiser(&i, "roadmap", "roadmap").unwrap();
+    p::synthetiser(&i, p::DEFAUT, "roadmap", "roadmap").unwrap();
     i.mettre_a_jour().unwrap();
 
     // Sources réelles seulement : l'exemple cite US-003, IDEE-001 et SB-001, qui existent ici.
@@ -211,21 +228,14 @@ fn parcours_complet_factice() {
     let (clar, _) = wikik_core::atelier::rappel(&i, "EF-001", "Pourquoi 200 m ?").unwrap();
     i.mettre_a_jour().unwrap();
     garder_tout(&mut i, "clarification", "reponse", Some(&clar), None);
-    p::saisir(
-        &i,
-        "clarification",
-        "conclusion",
-        Some(&clar),
-        &json!({ "conclusion": "200 m, d'après SB-001." }),
-    )
-    .unwrap();
+    wikik_core::atelier::clore(&i, &clar).unwrap();
     let c = lire(d.path(), "docs/atelier/clarifications/CLAR-001.md");
     assert!(
         c.contains("## Pistes") && c.contains("## Conclusion") && c.contains("etat: \"close\""),
         "{c}"
     );
 
-    let e = p::etat(&i, "factice").unwrap();
+    let e = p::etat(&i, p::DEFAUT, "factice").unwrap();
     assert_eq!(
         e.projet.as_deref(),
         Some(json_titre(&lire(d.path(), "docs/atelier/pitch.md")).as_str())
@@ -235,7 +245,7 @@ fn parcours_complet_factice() {
         "toutes les étapes ont été ouvertes"
     );
     // Une proposition déjà décidée ne l'est pas deux fois.
-    assert!(p::decider(&i, "bilan", "besoins", None, 0, "garder", None).is_err());
+    assert!(p::decider(&i, p::DEFAUT, "bilan", "besoins", None, 0, "garder", None).is_err());
 }
 
 fn json_titre(t: &str) -> String {
@@ -259,6 +269,7 @@ fn verbatim_invente_ecarte() {
     garder_tout(&mut i, "free-writing", "axes", None, None);
     let fw = p::saisir(
         &i,
+        p::DEFAUT,
         "free-writing",
         "ecriture",
         Some("AXE-001"),
@@ -267,15 +278,145 @@ fn verbatim_invente_ecarte() {
     .unwrap()
     .unwrap();
     i.mettre_a_jour().unwrap();
-    let prep = p::preparer(&i, "free-writing", "recolte", Some(&fw), None).unwrap();
+    let prep = p::preparer(&i, p::DEFAUT, "free-writing", "recolte", Some(&fw), None).unwrap();
     let r = Factice
         .proposer(&Demande {
             consigne: &prep.consigne,
             schema: &prep.schema,
             exemple: prep.exemple.as_ref(),
+            jeton: None,
         })
         .unwrap();
     let lot = p::enregistrer(&i, &prep, &r, "factice").unwrap();
     assert_eq!(lot.elements.len(), 1);
     assert_eq!(lot.ecartees.len(), 2);
+}
+
+/// Deux parcours avancent sans se mélanger : chacun son pitch, ses artefacts, ses étapes (EF-145).
+///
+/// @req EF-145
+#[test]
+fn deux_parcours_separes() {
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(d.path().join("docs/projet")).unwrap();
+    let mut i = Index::ouvrir(d.path()).unwrap();
+    garder_tout(
+        &mut i,
+        "pitch",
+        "pitch",
+        None,
+        Some("Randonner sans se perdre."),
+    );
+    assert!(
+        p::creer_parcours(&i, " ", "v2").is_err(),
+        "un titre est exigé"
+    );
+    let p2 = p::creer_parcours(&i, "Appli météo", "v2").unwrap();
+    assert_eq!(p2, "PARCOURS-2");
+    i.mettre_a_jour().unwrap();
+    assert_eq!(
+        garder_dans(
+            &mut i,
+            &p2,
+            "pitch",
+            "pitch",
+            None,
+            Some("La météo pour investir.")
+        ),
+        ["PITCH-2"]
+    );
+    let pitch2 = lire(d.path(), "docs/atelier/parcours-2/pitch.md");
+    assert!(pitch2.contains("parcours: \"PARCOURS-2\""), "{pitch2}");
+    let axes = garder_dans(&mut i, &p2, "free-writing", "axes", None, None);
+    assert!(lire(d.path(), &format!("docs/atelier/axes/{}.md", axes[0])).contains("PARCOURS-2"));
+    p::piloter(&i, &p2, "pitch", "terminer", None).unwrap();
+    i.mettre_a_jour().unwrap();
+
+    let e1 = p::etat(&i, p::DEFAUT, "factice").unwrap();
+    let e2 = p::etat(&i, &p2, "factice").unwrap();
+    let fw = |e: &p::EtatAtelier| {
+        e.etapes
+            .iter()
+            .find(|x| x.fiche.id == "free-writing")
+            .unwrap()
+            .artefacts
+            .len()
+    };
+    assert_eq!((fw(&e1), fw(&e2)), (0, axes.len()));
+    let pitch = |e: &p::EtatAtelier| {
+        e.etapes
+            .iter()
+            .find(|x| x.fiche.id == "pitch")
+            .unwrap()
+            .etat
+            .clone()
+    };
+    assert_eq!(
+        (pitch(&e1).as_str(), pitch(&e2).as_str()),
+        ("en_cours", "faite")
+    );
+    let id_pitch = |e: &p::EtatAtelier| {
+        e.etapes[0]
+            .artefacts
+            .iter()
+            .map(|a| a.id.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        (id_pitch(&e1), id_pitch(&e2)),
+        (vec!["PITCH".to_string()], vec!["PITCH-2".to_string()])
+    );
+    assert_eq!(e2.tous_parcours.len(), 2);
+    assert_eq!(
+        (
+            e2.tous_parcours[1].titre.as_str(),
+            e2.tous_parcours[1].faites
+        ),
+        ("Appli météo", 1)
+    );
+    assert!(p::etat(&i, "PARCOURS-9", "factice").is_err());
+    assert!(p::etat(&i, "../x", "factice").is_err());
+}
+
+/// Lancer une clarification sans question reprend celle qui est ouverte ; on la clôt par ses pistes
+/// gardées, on la supprime (EF-144).
+///
+/// @req EF-144
+#[test]
+fn clarification_sans_question() {
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(d.path().join("docs/projet/besoins")).unwrap();
+    std::fs::write(
+        d.path().join("docs/projet/besoins/B-001.md"),
+        "---\nid: B-001\ntype: besoin\ntitre: Randonner\nstatut: proposé\n---\n\n# B-001\n",
+    )
+    .unwrap();
+    let mut i = Index::ouvrir(d.path()).unwrap();
+    i.mettre_a_jour().unwrap();
+    let (c1, _) = wikik_core::atelier::rappel(&i, "B-001", "").unwrap();
+    i.mettre_a_jour().unwrap();
+    let (c2, _) = wikik_core::atelier::rappel(&i, "B-001", "").unwrap();
+    assert_eq!(c1, c2, "la clarification ouverte est reprise");
+    assert!(lire(d.path(), "docs/atelier/clarifications/CLAR-001.md").contains("reste flou"));
+    assert!(
+        wikik_core::atelier::clore(&i, &c1).is_err(),
+        "rien de gardé"
+    );
+    garder_tout(&mut i, "clarification", "reponse", Some(&c1), None);
+    wikik_core::atelier::clore(&i, &c1).unwrap();
+    let c = lire(d.path(), "docs/atelier/clarifications/CLAR-001.md");
+    assert!(
+        c.contains("etat: \"close\"") && c.contains("## Conclusion"),
+        "{c}"
+    );
+    i.mettre_a_jour().unwrap();
+    let (c3, _) = wikik_core::atelier::rappel(&i, "B-001", "").unwrap();
+    assert_eq!(c3, "CLAR-002", "une close n'est pas reprise");
+    i.mettre_a_jour().unwrap();
+    wikik_core::atelier::supprimer(&i, &c3).unwrap();
+    assert!(
+        !d.path()
+            .join("docs/atelier/clarifications/CLAR-002.md")
+            .exists()
+    );
 }

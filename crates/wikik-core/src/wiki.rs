@@ -28,12 +28,13 @@ pub struct Projet {
     pub documentes: u32,
 }
 
-/// Fichier de code dans l'arbre de la zone Produit.
+/// Fichier de code dans l'arbre de la zone Produit et le tableau fichier par fichier (EF-142).
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct FichierResume {
     pub chemin: String,
     pub role: Option<String>,
+    pub lignes: u32,
     pub symboles: u32,
     pub documentes: u32,
 }
@@ -142,14 +143,19 @@ pub struct PageDocument {
     pub references: Vec<Lien>,
 }
 
-/// Nœud du graphe.
+/// Nœud du graphe, avec sa catégorie et son titre de survol (EF-141).
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct Noeud {
     pub id: String,
     pub libelle: String,
-    /// `symbole`, `document`, `topic`, `absent`.
+    /// `symbole`, `fichier`, `document`, `page`, `topic`, `absent`.
     pub genre: String,
+    /// Catégorie affichée (une couleur, une puce, EF-141) : `code`, `exigences`, `decisions`, `projet`,
+    /// `atelier`, `pages`, `reception`, `absent`.
+    pub categorie: String,
+    /// Titre montré au survol (titre du document, route de la page, chemin du fichier).
+    pub titre: String,
     pub fichier: Option<String>,
     pub centre: bool,
 }
@@ -189,6 +195,7 @@ fn u(v: i64) -> u32 {
 }
 
 /// Accueil : fichiers avec leur rôle, documents avec leur zone (Projet, atelier, réception), statistiques.
+/// @relu 2026-10-19 48f30d62
 pub fn projet(index: &Index) -> Result<Projet> {
     let c = &index.conn;
     let mut st = c.prepare(
@@ -206,6 +213,7 @@ pub fn projet(index: &Index) -> Result<Projet> {
                     chemin: r.get(0)?,
                     role: entete
                         .and_then(|e| resume(&e.lines().map(str::to_string).collect::<Vec<_>>())),
+                    lignes: u(r.get(2)?),
                     symboles: u(r.get(3)?),
                     documentes: u(r.get(4)?),
                 },
@@ -259,11 +267,13 @@ pub fn projet(index: &Index) -> Result<Projet> {
     })
 }
 
-/// Fabrique des liens à partir d'identifiants (symboles ou documents).
+/// Fabrique des liens à partir d'identifiants (symboles ou documents) et classe les nœuds du graphe.
 struct Resolveur {
     symboles: HashMap<String, (String, String)>,
     documents: HashMap<String, String>,
     fichiers: BTreeSet<String>,
+    /// Catégorie de graphe de chaque document (EF-141).
+    categories: HashMap<String, &'static str>,
 }
 
 impl Resolveur {
@@ -281,11 +291,95 @@ impl Resolveur {
         let fichiers = st
             .query_map([], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
+        let atelier = format!("{}/", index.config.atelier.dossier.trim_end_matches('/'));
+        let reception = format!("{}/", index.config.reception.dossier.trim_end_matches('/'));
+        let mut st = c.prepare("SELECT id, chemin, genre FROM documents")?;
+        let categories = st
+            .query_map([], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .map(|(id, chemin, genre)| {
+                let cat = if chemin.starts_with(&reception) {
+                    "reception"
+                } else if chemin.starts_with(&atelier) {
+                    "atelier"
+                } else {
+                    match genre.as_str() {
+                        "besoin" | "exigence" | "exigence-nf" => "exigences",
+                        "adr" => "decisions",
+                        _ => "projet",
+                    }
+                };
+                (id, cat)
+            })
+            .collect();
         Ok(Resolveur {
             symboles,
             documents,
             fichiers,
+            categories,
         })
+    }
+
+    /// Nœud d'un identifiant : symbole, fichier, page (`page:<clé>`), document, sujet ou absent, avec sa
+    /// catégorie et son titre de survol.
+    fn noeud(&self, id: String, centre: bool, pages: &HashMap<String, (String, String)>) -> Noeud {
+        if let Some((nom, route)) = pages.get(&id) {
+            return Noeud {
+                libelle: nom.clone(),
+                titre: route.clone(),
+                genre: "page".into(),
+                categorie: "pages".into(),
+                fichier: None,
+                centre,
+                id,
+            };
+        }
+        let l = self.lien(&id, "", "");
+        let (genre, categorie) = if self.symboles.contains_key(&id) {
+            ("symbole", "code")
+        } else if l.fichier.is_some() {
+            ("fichier", "code")
+        } else if id.starts_with("topic:") {
+            ("topic", "projet")
+        } else if l.existe {
+            (
+                "document",
+                self.categories.get(&id).copied().unwrap_or("projet"),
+            )
+        } else {
+            ("absent", "absent")
+        };
+        let (libelle, titre) = match genre {
+            "document" => (
+                id.clone(),
+                self.documents.get(&id).cloned().unwrap_or_default(),
+            ),
+            "fichier" => (id.rsplit('/').next().unwrap_or(&id).to_string(), id.clone()),
+            _ => (
+                l.libelle
+                    .rsplit("::")
+                    .next()
+                    .unwrap_or(&l.libelle)
+                    .to_string(),
+                l.libelle.clone(),
+            ),
+        };
+        Noeud {
+            centre,
+            id,
+            libelle,
+            titre,
+            genre: genre.into(),
+            categorie: categorie.into(),
+            fichier: l.fichier,
+        }
     }
 
     fn lien(&self, id: &str, genre: &str, confiance: &str) -> Lien {
@@ -572,10 +666,14 @@ pub fn document(index: &Index, id: &str) -> Result<PageDocument> {
     })
 }
 
-/// Graphe local autour de `centre` (symbole ou document), ou graphe de tous les documents.
+/// Graphe local autour de `centre` (symbole ou document), ou graphe global : documents, code ramené au
+/// fichier, pages de l'application et remarques (EF-141).
+///
+/// @req EF-043, EF-141
 pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<Graphe> {
     let res = Resolveur::charger(index)?;
     let mut ar: BTreeMap<(String, String, String), String> = BTreeMap::new();
+    let mut pages: HashMap<String, (String, String)> = HashMap::new();
     match centre {
         Some(c0) => {
             let mut frontiere = vec![c0.to_string()];
@@ -607,17 +705,61 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
             }
         }
         None => {
+            // Graphe global (EF-141) : documents et leurs liens, code ramené au fichier, pages de
+            // l'application et remarques de réception.
+            let fichier_de = |id: &str| -> String {
+                res.symboles
+                    .get(id)
+                    .map_or_else(|| id.to_string(), |(f, _)| f.clone())
+            };
             let mut st = index.conn.prepare(
-                "SELECT source, cible, genre, confiance FROM aretes WHERE genre = 'lien'",
+                "SELECT source, cible, genre, confiance FROM aretes WHERE genre IN ('lien', 'req', 'adr')",
             )?;
             let v: Vec<(String, String, String, String)> = st
                 .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
                 .collect::<rusqlite::Result<_>>()?;
             for (s, c, g, conf) in v {
-                ar.insert((s, c, g), conf);
+                let (s, c) = (fichier_de(&s), fichier_de(&c));
+                if s != c {
+                    ar.insert((s, c, g), conf);
+                }
             }
             for id in res.documents.keys() {
                 ar.entry((id.clone(), id.clone(), "_".into())).or_default();
+            }
+            let carte = crate::reception::carte::fusionner(
+                &crate::reception::carte::lire(index),
+                crate::reception::carte::detecter(index).unwrap_or_default(),
+            );
+            for p in carte.iter().filter(|p| !p.masque) {
+                let id = format!("page:{}", p.cle);
+                pages.insert(
+                    id.clone(),
+                    (p.nom.clone(), p.route.clone().unwrap_or_default()),
+                );
+                ar.entry((id.clone(), id.clone(), "_".into())).or_default();
+                if let Some(f) = p
+                    .symboles
+                    .first()
+                    .map(|s| fichier_de(s))
+                    .or(p.fichier.clone())
+                {
+                    ar.insert((id.clone(), f, "rend".into()), "certain".into());
+                }
+                for e in &p.exigences {
+                    ar.insert((id.clone(), e.clone(), "req".into()), "certain".into());
+                }
+            }
+            for r in crate::reception::remarques::lister(index).unwrap_or_default() {
+                // Une version remplacée par une modification n'est plus une remarque à part.
+                if r.statut == "remplacee" {
+                    ar.retain(|k, _| k.0 != r.id && k.1 != r.id);
+                    continue;
+                }
+                ar.insert(
+                    (r.id.clone(), format!("page:{}", r.page), "remarque".into()),
+                    "certain".into(),
+                );
             }
         }
     }
@@ -638,32 +780,8 @@ pub fn graphe(index: &Index, centre: Option<&str>, profondeur: usize) -> Result<
     let noeuds = ids
         .into_iter()
         .map(|id| {
-            let l = res.lien(&id, "", "");
-            let genre = if l.fichier.is_some() {
-                "symbole"
-            } else if id.starts_with("topic:") {
-                "topic"
-            } else if l.existe {
-                "document"
-            } else {
-                "absent"
-            };
-            let libelle = if genre == "document" {
-                id.clone()
-            } else {
-                l.libelle
-                    .rsplit("::")
-                    .next()
-                    .unwrap_or(&l.libelle)
-                    .to_string()
-            };
-            Noeud {
-                centre: Some(id.as_str()) == centre,
-                id,
-                libelle,
-                genre: genre.into(),
-                fichier: l.fichier,
-            }
+            let c = Some(id.as_str()) == centre;
+            res.noeud(id, c, &pages)
         })
         .collect();
     Ok(Graphe { noeuds, aretes })
@@ -714,6 +832,7 @@ pub struct EntreeRecherche {
 /// Tous les nœuds et toutes les arêtes : le site statique en tire les graphes locaux.
 ///
 /// @req EF-080
+/// @relu 2026-10-19 163c1ae1
 pub fn graphe_complet(index: &Index) -> Result<Graphe> {
     let res = Resolveur::charger(index)?;
     let mut st = index.conn.prepare(
@@ -735,36 +854,10 @@ pub fn graphe_complet(index: &Index) -> Result<Graphe> {
         ids.insert(a.source.clone());
         ids.insert(a.cible.clone());
     }
+    let pages = HashMap::new();
     let noeuds = ids
         .into_iter()
-        .map(|id| {
-            let l = res.lien(&id, "", "");
-            let genre = if l.fichier.is_some() {
-                "symbole"
-            } else if id.starts_with("topic:") {
-                "topic"
-            } else if l.existe {
-                "document"
-            } else {
-                "absent"
-            };
-            let libelle = if genre == "document" {
-                id.clone()
-            } else {
-                l.libelle
-                    .rsplit("::")
-                    .next()
-                    .unwrap_or(&l.libelle)
-                    .to_string()
-            };
-            Noeud {
-                id,
-                libelle,
-                genre: genre.into(),
-                fichier: l.fichier,
-                centre: false,
-            }
-        })
+        .map(|id| res.noeud(id, false, &pages))
         .collect();
     Ok(Graphe { noeuds, aretes })
 }

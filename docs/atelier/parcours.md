@@ -3,7 +3,7 @@ id: "PARCOURS"
 type: "parcours"
 titre: "Parcours de l'atelier"
 statut: "brouillon"
-etapes: {"clarification":{"etat":"en_cours"},"pitch":{"etat":"en_cours","mode":"express"}}
+etapes: {"clarification":{"etat":"en_cours"},"exigences":{"etat":"en_cours","mode":"express"},"pitch":{"etat":"en_cours","mode":"express"}}
 horizons: null
 liens_carte: []
 mode: "express"
@@ -23,5 +23,5 @@ selections: {}
 | SCAMPER | a_faire | express |
 | Storyboard | a_faire | express |
 | Bilan des besoins | a_faire | express |
-| Exigences | a_faire | express |
+| Exigences | en_cours | express |
 | Roadmap | a_faire | express |

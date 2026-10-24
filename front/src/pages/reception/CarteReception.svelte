@@ -1,16 +1,16 @@
 <script lang="ts">
-  // Une page de l'application : le lien qui l'ouvre dans un nouvel onglet (adresse saisie ou déduite du
+  // Carte de réception d'une page de l'application (EF-140) : le lien qui l'ouvre dans un nouvel onglet (adresse saisie ou déduite du
   // projet ; saisie sur place si rien n'est déduit), ce que le code en dit (route,
   // composant, exigences), ses remarques, et la carte pour en ajouter une ; on passe à la page suivante
   // sans revenir à la carte.
-  import { reception, remarquesDe, lienApplication, ecrireReception, SOURCES } from "../../lib/reception.svelte";
+  import { reception, remarquesDe, lienApplication, ecrireReception, visible, SOURCES } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Code from "../../composants/reception/Code.svelte";
   import CarteRemarque from "../../composants/reception/CarteRemarque.svelte";
   import NouvelleRemarque from "../../composants/reception/NouvelleRemarque.svelte";
 
   let { cle }: { cle: string } = $props();
-  const visibles = $derived(reception.etat?.pages.filter((p) => !p.masque) ?? []);
+  const visibles = $derived(reception.etat?.pages.filter(visible) ?? []);
   const i = $derived(visibles.findIndex((p) => p.cle === cle));
   const p = $derived(reception.etat?.pages.find((x) => x.cle === cle));
   const rs = $derived(remarquesDe(cle));
@@ -26,7 +26,7 @@
 {#if !p}
   <p class="discret">{reception.etat ? `Page inconnue : ${cle}` : "Chargement…"}</p>
 {:else}
-  <p class="fil"><a href={url.reception()}>Réception</a>{i >= 0 ? ` · page ${i + 1} / ${visibles.length}` : ""}</p>
+  <p class="fil"><a href={url.reception()}>Cahier de réception</a> · carte de réception{i >= 0 ? ` ${i + 1} / ${visibles.length}` : ""}</p>
   <h1>{p.nom}</h1>
   <div class="meta">
     {#if p.route}<code>{p.route}</code>{/if}

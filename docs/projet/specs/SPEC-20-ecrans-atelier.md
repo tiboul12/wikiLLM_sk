@@ -28,7 +28,7 @@ Même front que le wiki (Svelte 5 + TypeScript, embarqué) ; l'atelier est la se
 | Bilan | Tri des besoins par glisser-déposer en catégories et priorités MoSCoW |
 | Exigences | Tableau énoncé / critère / besoins / priorité, éditable |
 | Roadmap | Trois colonnes Maintenant / Ensuite / Plus tard, objectif et récit par horizon |
-| Clarification | Fil question / réponses, bouton « conclure » qui écrit la conclusion |
+| Clarification | Section Projet (EF-144) : sujet, question, pistes demandées d'office à l'ouverture ; garder / corriger / rejeter fait la réponse ; « Clarifié : terminer » la clôt, « Rouvrir », « Supprimer ». Tableau de bord `/clarifications` : clarifications rangées par sujet, avec l'état du sujet |
 
 Les écrans non listés (Analogies, 5W1H, Cubing) utilisent l'écran générique en v4.
 
@@ -38,14 +38,18 @@ Servie par le serveur du projet (`wikik`), avec l'API de lecture du wiki et cell
 
 | Route | Corps | Effet |
 |---|---|---|
-| `GET /api/atelier/etat` | | étapes (fiche, état, mode, artefacts, sélections, lots), tous les artefacts, clarifications, fournisseur, consommation |
+| `GET /api/atelier/etat?parcours=` | | pour un parcours (EF-145, `PARCOURS` par défaut) : étapes (fiche, état, mode, artefacts, sélections, lots), artefacts, clarifications, fournisseur, consommation, liste des parcours |
+| `POST /api/atelier/parcours` | `titre`, `version` | nouveau parcours `PARCOURS-n` |
+| `POST /api/atelier/clarification` | `id`, `action` (`clore`, `rouvrir`, `supprimer`) | clarification close (pistes gardées en conclusion), rouverte ou supprimée |
 | `POST /api/atelier/piloter` | `etape`, `action` (`ouvrir`, `terminer`, `sauter`, `rouvrir`, `mode`), `mode` | état ou mode d'une étape |
 | `POST /api/atelier/selection` | `etape`, `sous_etape`, `ids` | sélection d'une sous-étape `selection` |
 | `POST /api/atelier/proposer` | `etape`, `sous_etape`, `cible`, `entree` | appel au LLM, propositions ajoutées au lot |
 | `POST /api/atelier/decider` | `etape`, `sous_etape`, `cible`, `indice`, `decision` (`garder`, `rejeter`), `donnees` (correction) | artefact créé ou complété |
-| `POST /api/atelier/saisir` | `etape`, `sous_etape`, `cible`, `donnees` | pitch, texte libre, tri des besoins, conclusion |
+| `POST /api/atelier/saisir` | `etape`, `sous_etape`, `cible`, `donnees` | pitch, texte libre, tri des besoins |
 | `POST /api/atelier/synthetiser` | `etape`, `sous_etape` | rapport assemblé ; renvoie les fichiers écrits |
-| `POST /api/atelier/rappel` | `sujet`, `question` | clarification `CLAR-xxx` |
+| `POST /api/atelier/rappel` | `sujet`, `question` (facultative) | clarification `CLAR-xxx` ; sans question, celle qui est ouverte sur le sujet est reprise |
+
+Les écritures d'un parcours (`piloter`, `selection`, `proposer`, `decider`, `saisir`, `synthetiser`) portent `parcours` (défaut `PARCOURS`).
 
 ## Critères d'acceptation
 

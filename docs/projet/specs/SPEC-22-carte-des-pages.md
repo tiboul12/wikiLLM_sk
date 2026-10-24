@@ -26,7 +26,7 @@ decisions: [ADR-0010, ADR-0011]
 
 3. **R3 Page.** `cle` (route, sinon nom du composant ou du fichier, en minuscules), `nom` (libellé, sinon composant découpé en mots), `route`, `symboles` (identifiants de l'index, au moins le composant trouvé par son nom), `exigences` (arêtes `req` de ces symboles), `fichier`, `source` (détecteur), `masque`, `groupe`.
 4. **R4 Persistance et corrections.** Une page retrouvée sous une autre clé (sa route est maintenant connue) est reconnue à son composant et garde sa clé d'origine, à laquelle ses remarques sont rattachées. La carte est `docs/reception/carte.md` (frontmatter : `pages`). Un nouveau scan fusionne par `cle` : `nom`, `masque` et `groupe` modifiés par Tibo sont gardés (`corrige: true`), le reste est rafraîchi ; une page qui n'est plus trouvée est marquée `disparue` sans être supprimée si des remarques la citent.
-5. **R5 LLM** (`completer`) : le fournisseur de l'atelier reçoit la carte actuelle et la consigne de trouver les écrans manquants en lisant le projet par MCP ; réponse `{ elements: [{ nom, route, symbole, raison }] }` ; un `symbole` inconnu de l'index est écarté ; source `llm`.
+5. **R5 LLM** (`completer`) : le fournisseur de l'atelier reçoit la carte actuelle et la consigne de trouver les écrans manquants en lisant le projet par MCP ; réponse `{ elements: [{ nom, route, symbole, raison }] }` ; un `symbole` inconnu de l'index est écarté ; source `llm`. Le bouton s'appelle « Chercher les écrans manquants (LLM) », une phrase dit son rôle à côté de « Scanner à nouveau » ; il se change en « Annuler la recherche » pendant l'appel ; à la fin, la liste des écrans ajoutés avec la raison du LLM (ou « rien ne manque ») (EF-146).
 
 ## Alternatives écartées
 

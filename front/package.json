@@ -9,6 +9,8 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@xterm/addon-fit": "0.10.0",
+    "@xterm/xterm": "5.5.0",
     "cytoscape": "3.34.4",
     "dompurify": "3.4.17",
     "highlight.js": "11.12.0",

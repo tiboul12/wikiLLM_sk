@@ -18,7 +18,7 @@ Tibo veut un volet avec un terminal et l'agent qui développe le projet (REC-022
 - Le serveur ouvre un **pseudo-terminal** (shell de l'utilisateur, dossier du projet) et le relie au navigateur par **WebSocket** ; le front l'affiche avec xterm.js dans un volet droit. Un seul terminal par serveur, gardé ouvert quand le volet se ferme.
 - **Accès** : une requête de la machine locale passe ; une requête du réseau doit porter la **clé du serveur**, tirée au hasard au premier lancement, gardée dans `.wikik/cle` (non versionné) et affichée dans l'adresse du message de lancement (`http://10.0.0.21:8484/?cle=…`). La première visite avec la clé pose un cookie `HttpOnly`, `SameSite=Strict`. Même origine exigée comme pour les écritures.
 - **Envoi du traitement** : le serveur tape la consigne de traitement (paramètre `[ia] consigne_traitement`) dans le terminal ; il n'exécute rien d'autre.
-- Les réglages (IA, consignes, adresse de l'application) sont écrits dans `wikik.toml`, en gardant ses commentaires.
+- Les réglages (LLM, consignes, agent) sont écrits dans `wikik.toml`, en gardant ses commentaires ; leur écriture est réservée au propriétaire, comme le terminal : la commande du LLM est exécutée par le serveur. L'adresse de l'application reste dans la carte de réception (`url_application`, SPEC-23 R7), réglée depuis la même page.
 
 ## Conséquences
 

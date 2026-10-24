@@ -1,10 +1,10 @@
 <script lang="ts">
-  // Traitement des remarques (SPEC-23 R5) : filtrer par statut, gravité et page, puis passer chacune à
-  // traitée, reportée ou rejetée avec une explication.
-  // @relu 2026-10-18 13e4b381
+  // Traitement des remarques (SPEC-23 R5) : les confier à l'agent dans le terminal (EF-148), ou filtrer
+  // par statut, gravité et page, puis passer chacune à traitée, reportée ou rejetée avec une explication.
   import { reception, actuelles, GRAVITES, STATUTS } from "../../lib/reception.svelte";
   import { url } from "../../lib/routeur.svelte";
   import CarteRemarque from "../../composants/reception/CarteRemarque.svelte";
+  import EnvoiAgent from "../../composants/reception/EnvoiAgent.svelte";
 
   let statut = $state("ouverte");
   let gravite = $state("");
@@ -19,8 +19,9 @@
   const compte = (s: string) => actuelles().filter((r) => r.statut === s).length;
 </script>
 
-<p class="fil"><a href={url.reception()}>Réception</a> · traitement</p>
+<p class="fil"><a href={url.reception()}>Cahier de réception</a> · traitement</p>
 <h1>Traitement des remarques</h1>
+<div class="actions"><EnvoiAgent /></div>
 <div class="filtres">
   <span class="bascule" role="group" aria-label="Statut">
     {#each Object.entries(STATUTS) as [v, nom]}<button class:actif={statut === v} onclick={() => (statut = v)}>{nom} <small>{compte(v)}</small></button>{/each}

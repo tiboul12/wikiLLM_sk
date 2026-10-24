@@ -234,3 +234,28 @@ fn adresse_et_route() {
         .unwrap();
     assert_eq!(p.route.as_deref(), Some("/bibli"));
 }
+
+/// Graphe global : chaque page de l'application est un nœud de la catégorie `pages`, relié au fichier
+/// de son composant (catégorie `code`).
+///
+/// @req EF-141
+#[test]
+fn pages_dans_le_graphe_global() {
+    let (_d, i) = fixture();
+    let g = wikik_core::wiki::graphe(&i, None, 1).unwrap();
+    let panier = g.noeuds.iter().find(|n| n.id == "page:/panier").unwrap();
+    assert_eq!(
+        (panier.categorie.as_str(), panier.genre.as_str()),
+        ("pages", "page")
+    );
+    let a = g
+        .aretes
+        .iter()
+        .find(|a| a.source == "page:/panier" && a.genre == "rend")
+        .unwrap();
+    let f = g.noeuds.iter().find(|n| n.id == a.cible).unwrap();
+    assert_eq!(
+        (f.id.as_str(), f.categorie.as_str()),
+        ("react/src/App.tsx", "code")
+    );
+}

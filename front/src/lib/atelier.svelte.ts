@@ -1,18 +1,23 @@
-// État de l'atelier (SPEC-20) : chargé depuis `/api/atelier/etat`, rechargé après chaque écriture.
+// État de l'atelier (SPEC-20) : chargé depuis `/api/atelier/etat` pour le parcours affiché (EF-145),
+// rechargé après chaque écriture.
 //
 // Le serveur du projet sert toujours l'atelier (ADR-0012) ; le site exporté ne l'a pas.
 //
-// @req EF-100, EF-101
+// @req EF-100, EF-101, EF-145
 import type { EtatAtelier } from "../types/EtatAtelier";
 import type { ArtefactResume } from "../types/ArtefactResume";
 import { statique } from "./statique";
 
+/** Parcours par défaut (`docs/atelier/parcours.md`). */
+export const DEFAUT = "PARCOURS";
+
 /**
- * État partagé : `actif` quand le serveur sert l'atelier, `etat` (null sinon),
+ * État partagé : `actif` quand le serveur sert l'atelier, `etat` (null sinon), `parcours` affiché,
  * `occupe` : appels au LLM en cours.
  */
 export const atelier = $state({
   actif: false,
+  parcours: DEFAUT,
   etat: null as EtatAtelier | null,
   occupe: 0,
   depuis: 0,
@@ -20,7 +25,7 @@ export const atelier = $state({
 });
 
 async function lireEtat(): Promise<EtatAtelier> {
-  const r = await fetch("/api/atelier/etat");
+  const r = await fetch(`/api/atelier/etat?parcours=${encodeURIComponent(atelier.parcours)}`);
   if (!r.ok) throw new Error(String(r.status));
   return r.json();
 }
@@ -42,8 +47,23 @@ export async function recharger() {
   atelier.etat = await lireEtat();
 }
 
-/** POST JSON vers une route de l'atelier ; l'état est rechargé ensuite ; l'erreur du serveur est levée. */
-export async function ecrire<T = unknown>(route: string, corps: unknown, llm = false): Promise<T> {
+/** Affiche un autre parcours ; un parcours inconnu ramène au parcours par défaut. */
+export async function choisirParcours(pid: string) {
+  if (pid === atelier.parcours && atelier.etat) return;
+  atelier.parcours = pid;
+  try {
+    await recharger();
+  } catch {
+    atelier.parcours = DEFAUT;
+    await recharger();
+  }
+}
+
+/**
+ * POST JSON vers une route de l'atelier, dans le parcours affiché ; l'état est rechargé ensuite ; l'erreur
+ * du serveur est levée.
+ */
+export async function ecrire<T = unknown>(route: string, corps: Record<string, unknown>, llm = false): Promise<T> {
   if (llm) {
     if (!atelier.occupe) atelier.depuis = Date.now();
     atelier.occupe++;
@@ -53,7 +73,7 @@ export async function ecrire<T = unknown>(route: string, corps: unknown, llm = f
     const r = await fetch(`/api/atelier/${route}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(corps),
+      body: JSON.stringify({ parcours: atelier.parcours, ...corps }),
     });
     const v = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(v.erreur ?? `${r.status}`);
@@ -65,6 +85,11 @@ export async function ecrire<T = unknown>(route: string, corps: unknown, llm = f
   } finally {
     if (llm) atelier.occupe--;
   }
+}
+
+/** Arrête les appels au LLM en cours (atelier ou réception, REC-030) ; ils échouent avec « annulé ». */
+export async function annulerLLM() {
+  await fetch("/api/llm/annuler", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
 }
 
 /** Lien vers une page de l'atelier ; null dans le site exporté (pas d'atelier). */
@@ -123,3 +148,41 @@ export const ETATS: Record<string, string> = {
   faite: "faite",
   sautee: "sautée",
 };
+
+/** Nom lisible d'un type d'artefact de l'atelier (SPEC-17), au singulier et au pluriel. */
+export const ARTEFACTS: Record<string, [string, string]> = {
+  pitch: ["pitch", "pitchs"],
+  axe: ["axe", "axes"],
+  ecrit: ["écrit libre", "écrits libres"],
+  unite: ["unité de sens", "unités de sens"],
+  carte: ["carte mentale", "cartes mentales"],
+  probleme: ["problème", "problèmes"],
+  analogie: ["analogie", "analogies"],
+  idee: ["idée", "idées"],
+  analyse: ["analyse", "analyses"],
+  scamper: ["piste SCAMPER", "pistes SCAMPER"],
+  storyboard: ["storyboard", "storyboards"],
+  besoin: ["besoin", "besoins"],
+  exigence: ["exigence", "exigences"],
+  roadmap: ["roadmap", "roadmaps"],
+  clarification: ["clarification", "clarifications"],
+};
+/** Nom lisible d'un type d'artefact (le type brut s'il est inconnu, vide sans type). */
+export const nomArtefact = (genre: string | null | undefined, pluriel = true) =>
+  genre ? (ARTEFACTS[genre]?.[pluriel ? 1 : 0] ?? genre) : "";
+
+/** Un sujet clarifié (besoin, exigence…) et ses clarifications ; `clarifie` quand toutes sont closes. */
+export type Sujet = { sujet: string; titre: string; clarifications: ArtefactResume[]; clarifie: boolean };
+
+/** Clarifications regroupées par sujet (REC-040.2), les sujets encore en cours d'abord. */
+export function sujets(titreDe: (id: string) => string = () => ""): Sujet[] {
+  const m = new Map<string, ArtefactResume[]>();
+  for (const c of atelier.etat?.clarifications ?? []) {
+    const s = champ(c, "sujet") || "?";
+    if (!m.has(s)) m.set(s, []);
+    m.get(s)!.push(c);
+  }
+  return [...m.entries()]
+    .map(([sujet, cs]) => ({ sujet, titre: titreDe(sujet), clarifications: cs, clarifie: cs.every((c) => champ(c, "etat") === "close") }))
+    .sort((a, b) => Number(a.clarifie) - Number(b.clarifie) || a.sujet.localeCompare(b.sujet, "fr", { numeric: true }));
+}

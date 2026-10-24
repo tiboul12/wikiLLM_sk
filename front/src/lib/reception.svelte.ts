@@ -4,6 +4,7 @@
 // @req EF-123, EF-124
 import type { EtatReception } from "../types/EtatReception";
 import type { Remarque } from "../types/Remarque";
+import type { Page } from "../types/Page";
 import { statique } from "./statique";
 import { adapterHote } from "./atelier.svelte";
 
@@ -94,3 +95,42 @@ export const SOURCES: Record<string, string> = {
   llm: "proposée par le LLM",
   manuel: "",
 };
+
+/** Nœud de l'arborescence des pages : une page et celles qu'elle mène. */
+export type Noeud = { page: Page; enfants: Noeud[] };
+
+/**
+ * Arborescence des pages de l'application (REC-026) : le parent d'une page à route est la page dont la
+ * route est son plus long préfixe (`/` en tête) ; une page sans route va sous la page de son dossier
+ * (`atelier` → `/atelier`), sinon sous l'accueil. « Général » reste en tête, hors arbre.
+ */
+export function arbrePages(pages: Page[]): Noeud[] {
+  const noeuds = new Map(pages.map((p) => [p.cle, { page: p, enfants: [] as Noeud[] }]));
+  const segments = (r: string) => r.split("/").filter(Boolean);
+  const avecRoute = pages.filter((p) => p.route);
+  const parentDe = (p: Page): Page | undefined => {
+    if (p.cle === "general") return undefined;
+    if (p.route) {
+      const s = segments(p.route);
+      return avecRoute
+        .filter((q) => q !== p && segments(q.route!).length < s.length && segments(q.route!).every((x, i) => x === s[i]))
+        .sort((a, b) => segments(b.route!).length - segments(a.route!).length)[0];
+    }
+    const dossier = p.groupe?.split("/").pop();
+    return avecRoute.find((q) => dossier && segments(q.route!).length === 1 && segments(q.route!)[0] === dossier) ?? avecRoute.find((q) => q.route === "/");
+  };
+  const racines: Noeud[] = [];
+  for (const p of pages) {
+    const parent = parentDe(p);
+    (parent ? noeuds.get(parent.cle)!.enfants : racines).push(noeuds.get(p.cle)!);
+  }
+  return racines;
+}
+
+/**
+ * Page montrée par défaut : ni masquée, ni disparue du code sans remarque ouverte (un écran renommé ne
+ * reste pas en double une fois ses remarques traitées ; elles restent lisibles dans le traitement).
+ */
+export function visible(p: Page): boolean {
+  return !p.masque && !(p.disparue && !remarquesDe(p.cle).some((r) => r.statut === "ouverte"));
+}
