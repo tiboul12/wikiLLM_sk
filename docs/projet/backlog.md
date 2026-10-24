@@ -56,8 +56,9 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 
 ## 🔁 v9 : retours de la réception du 24/10
 
-- [ ] Traiter les 38 remarques ouvertes : PLAN-v9 (branche `v9-retours`, partie de `v8-retours`), 9 phases.
-- [ ] **Recevoir la v9** (Tibo), puis fusionner `v7-retours`, `v8-retours`, `v9-retours` dans `master`.
+- [x] Traiter les 38 remarques ouvertes : PLAN-v9 (branche `v9-retours`, partie de `v8-retours`), 9 phases, toutes traitées le 24/10.
+- [ ] **Recevoir la v9** (Tibo) : `make install`, relancer `wikik`, valider les remarques (Traitement › À valider) et les tests TEST-021 à 036 restants (TEST-025 recherche par le sens : `ollama pull nomic-embed-text` sur la machine d'Ollama ; TEST-023 sur le téléphone).
+- [ ] **Fusionner** `v7-retours`, `v8-retours`, `v9-retours` dans `master` (skill `wikik-publication-git`, Git › Publication) ; poser les tags.
 - [ ] **Relire** BDR-v9-1/2, CDC-v9, EF-169 à 184.
 
 ## 🧩 Constats de la v1 à traiter
