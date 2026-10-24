@@ -1,9 +1,11 @@
 <script lang="ts">
   // Free writing : pour chaque axe, écrire sans s'arrêter pendant le temps imparti, puis récolter les
-  // unités de sens (verbatims extraits mot pour mot par le LLM).
+  // unités de sens (verbatims extraits mot pour mot par le LLM). La proposition de l'axe (ce que l'écriture
+  // doit explorer) reste affichée juste au-dessus de l'écriture (REC-096) ; un axe se met en pause et se
+  // reprend (REC-095, EF-179) : en pause, il n'est plus proposé à l'écriture.
   import type { Fiche } from "../../types/Fiche";
   import { api } from "../../lib/api";
-  import { deType, ecrire } from "../../lib/atelier.svelte";
+  import { atelier, deType, ecrire } from "../../lib/atelier.svelte";
   import { url } from "../../lib/routeur.svelte";
   import Propositions from "./Propositions.svelte";
 
@@ -31,6 +33,24 @@
   let erreur = $state("");
   /** Texte de chaque écrit enregistré, par identifiant, chargé une fois pour la récolte. */
   let textes = $state<Record<string, string>>({});
+  /** Proposition de chaque axe (le corps de son fichier, sans le titre), chargée une fois. */
+  let propositions = $state<Record<string, string>>({});
+  $effect(() => {
+    for (const a of axes)
+      if (!(a.id in propositions)) api.document(a.id).then((p) => (propositions[a.id] = p.corps.replace(/^#[^\n]*\n/, "").trim()));
+  });
+  /** Axes en pause dans cet atelier. */
+  const pauses = $derived(new Set(atelier.etat?.pauses ?? []));
+  /** Met l'axe en pause ou le reprend ; une écriture en cours sur lui est abandonnée. */
+  async function basculerPause(axe: string) {
+    erreur = "";
+    try {
+      if (axeOuvert === axe) axeOuvert = null;
+      await ecrire("pause", { axe, pause: !pauses.has(axe) });
+    } catch (e) {
+      erreur = String(e instanceof Error ? e.message : e);
+    }
+  }
 
   $effect(() => {
     if (!fin) return;
@@ -73,9 +93,17 @@
   <p class="discret">Garde d'abord un ou plusieurs axes (sous-étape précédente).</p>
 {/if}
 {#each axes as axe (axe.id)}
-  <section class="cible">
-    <h4><a class="id" href={url.document(axe.id)}>{axe.id}</a> {axe.titre}</h4>
-    {#if axeOuvert === axe.id}
+  {@const enPause = pauses.has(axe.id)}
+  <section class="cible" class:en-pause={enPause}>
+    <h4>
+      <a class="id" href={url.document(axe.id)}>{axe.id}</a> {axe.titre}
+      {#if enPause}<span class="pastille">en pause</span>{/if}
+      <button class="discret-bouton pause" onclick={() => basculerPause(axe.id)}>{enPause ? "▶ Reprendre" : "⏸ Mettre en pause"}</button>
+    </h4>
+    {#if propositions[axe.id]}<p class="proposition-axe">{propositions[axe.id]}</p>{/if}
+    {#if enPause}
+      <p class="discret">Axe en pause : il n'est pas proposé à l'écriture.</p>
+    {:else if axeOuvert === axe.id}
       <div class="ecriture">
         <div class="minuteur" class:fini={reste === 0}>{reste ? mmss(reste) : "Temps écoulé : termine ta phrase"}</div>
         <!-- svelte-ignore a11y_autofocus -->
@@ -99,3 +127,21 @@
   </section>
 {/each}
 {#if erreur}<p class="erreur">{erreur}</p>{/if}
+
+<style>
+  .proposition-axe {
+    margin: 2px 0 10px;
+    padding: 8px 12px;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-fond);
+    border-radius: 0 var(--rayon) var(--rayon) 0;
+    font-size: 14.5px;
+  }
+  .pause {
+    margin-left: 8px;
+    font-size: 12.5px;
+  }
+  .en-pause {
+    opacity: 0.65;
+  }
+</style>

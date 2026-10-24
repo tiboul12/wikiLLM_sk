@@ -523,6 +523,14 @@ kbd { padding: 1px 6px; border: 1px solid var(--bord-fort); border-bottom-width:
 .entete-panneau .replier:hover { background: var(--fond-3); color: var(--texte); }
 a.titre-panneau:hover { color: var(--accent); text-decoration: none; }
 .barre ul ul { margin-left: 10px; padding-left: 6px; border-left: 1px solid var(--bord); }
+/* Nœud repliable d'une arborescence du volet (REC-102) : le triangle replie, le lien ouvre la page. */
+details.noeud { margin: 0; }
+details.noeud > summary { display: flex; align-items: center; padding: 0; list-style: none; font-weight: inherit; font-size: inherit; letter-spacing: 0; }
+details.noeud > summary::-webkit-details-marker { display: none; }
+details.noeud > summary::before { content: "▸"; flex: none; display: inline-grid; place-items: center; width: 14px; height: 14px; line-height: 1; color: var(--texte-2); font-size: 11px; transition: transform 0.1s; }
+details.noeud[open] > summary::before { transform: rotate(90deg); }
+details.noeud > summary > a { flex: 1; min-width: 0; }
+.titre-transverse { margin: 10px 6px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--texte-2); }
 .titre-panneau { margin: 0 6px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texte-2); }
 .barre .puce { display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 50%; background: var(--fond-3); font-size: 10.5px; font-weight: 650; color: var(--texte-2); }
 .barre .puce.etat-faite { background: var(--vert-fond); color: var(--vert); }
@@ -546,16 +554,17 @@ a.titre-panneau:hover { color: var(--accent); text-decoration: none; }
 
 @media (max-width: 820px) {
   .barre-activite {
-    position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: 58px; z-index: 11;
+    position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: 52px; z-index: 11;
     flex-direction: row; padding: 0 4px; border-right: 0; border-top: 1px solid var(--bord);
   }
-  .barre-activite a { flex: 1; height: 58px; border-left: 0; border-top: 2px solid transparent; align-content: center; gap: 2px; }
+  .barre-activite a { flex: 1; height: 52px; border-left: 0; border-top: 2px solid transparent; align-content: center; gap: 2px; }
   .barre-activite a.actif { border-top-color: var(--accent); }
-  .barre-activite .libelle { display: block; font-size: 10.5px; }
+  /* Icônes seules sur téléphone (REC-100) : les noms des sections passaient sur deux lignes ; le nom reste en info-bulle et pour les lecteurs d'écran. */
+  .barre-activite .libelle { display: none; }
   .barre-activite .espace { display: none; }
   .barre-activite .badge { top: 4px; right: calc(50% - 22px); }
   .contenu { padding-bottom: 90px; }
-  .barre { bottom: 58px; height: auto; }
+  .barre { bottom: 52px; height: auto; }
 }
 .bascule { flex-wrap: wrap; }
 .meta-page { flex: 1 1 200px; }
@@ -612,7 +621,7 @@ a.reprendre { margin-left: auto; }
 .alerte-acces { padding: 8px 12px; border-left: 3px solid var(--orange); background: var(--orange-fond); border-radius: 0 6px 6px 0; font-size: 14px; }
 @media (max-width: 820px) {
   .cadre.avec-terminal { margin-right: 0; }
-  .panneau-terminal { left: 0; width: auto !important; bottom: 58px; }
+  .panneau-terminal { left: 0; width: auto !important; bottom: 52px; }
   .poignee-terminal { display: none; }
   .bouton-terminal span { display: none; }
 }
@@ -623,8 +632,7 @@ a.reprendre { margin-left: auto; }
 .barre-activite button.arret .libelle { display: none; }
 .serveur-arrete { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: color-mix(in srgb, var(--fond) 92%, transparent); text-align: center; padding: 16px; }
 @media (max-width: 820px) {
-  .barre-activite button.arret { flex: 1; height: 58px; border-left: 0; align-content: center; gap: 2px; }
-  .barre-activite button.arret .libelle { display: block; font-size: 10.5px; }
+  .barre-activite button.arret { flex: 1; height: 52px; border-left: 0; align-content: center; gap: 2px; }
 }
 
 /* Message bref après une écriture ou Ctrl+Z (EF-159). */

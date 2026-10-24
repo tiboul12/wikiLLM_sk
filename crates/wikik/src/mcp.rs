@@ -20,6 +20,7 @@ struct Outil {
 }
 
 /// Outils exposés par le serveur MCP : nom, description lue par l'agent pour choisir l'outil, paramètres.
+/// @relu 2026-10-24 09be8887
 const OUTILS: &[Outil] = &[
     Outil {
         nom: "carte",
@@ -72,6 +73,11 @@ const OUTILS: &[Outil] = &[
         nom: "cherche",
         description: "Recherche plein texte dans les blocs de doc et les documents du projet.",
         parametres: &[("texte", "Mots à chercher.", true)],
+    },
+    Outil {
+        nom: "cherche_sens",
+        description: "Recherche par le sens (embeddings d'Ollama, ADR-0020) : les symboles et documents qui répondent à une question en langage naturel, même sans les mots exacts. Plus lente la première fois (calcul des vecteurs).",
+        parametres: &[("question", "Question en langage naturel.", true)],
     },
     Outil {
         nom: "adr",
@@ -275,7 +281,7 @@ fn texte(args: &Value, cle: &str) -> Result<String> {
 }
 
 /// Exécute un outil sur l'index à jour et renvoie la sortie texte de la CLI.
-/// @relu 2026-10-22 d726a57f
+/// @relu 2026-10-24 e8361922
 fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
     index.mettre_a_jour()?;
     let i = &*index;
@@ -293,6 +299,27 @@ fn appeler(index: &mut Index, nom: &str, args: &Value) -> Result<String> {
         }
         "perimes" => query::perimes(i)?,
         "cherche" => query::cherche(i, &texte(args, "texte")?)?,
+        "cherche_sens" => {
+            use wikik_core::semantique;
+            let morceaux = semantique::morceaux(i)?;
+            let trouves = semantique::chercher(
+                &semantique::chemin(&i.racine),
+                &morceaux,
+                &semantique::Ollama::depuis(&i.config),
+                &texte(args, "question")?,
+                20,
+            )?;
+            let lignes = trouves
+                .iter()
+                .map(|t| format!("{:.2}  {}  {}  {}", t.score, t.cle, t.genre, t.titre))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Ok(if lignes.is_empty() {
+                "Aucun résultat.".into()
+            } else {
+                lignes
+            });
+        }
         "adr" => query::adr(i, &texte(args, "id")?)?,
         "exigence" => query::exigence(i, &texte(args, "id")?)?,
         "ref" => query::reference(i, &texte(args, "reference")?)?,

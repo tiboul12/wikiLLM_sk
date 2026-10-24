@@ -1,14 +1,17 @@
-// Onglets de pages, à la VS Code (EF-151, REC-069) : chaque page ouverte a son onglet au-dessus du contenu.
-// Une navigation simple remplace la page de l'onglet actif ; Ctrl+clic, clic du milieu ou « ouvrir dans
-// un onglet » (graphe) en ouvre un nouveau ; ↗ détache l'onglet dans une fenêtre du navigateur, sans barre
+// Onglets de pages, à la VS Code (EF-151, EF-169, REC-069) : chaque page ouverte a son onglet au-dessus du contenu.
+// Une navigation simple ouvre la page dans l'onglet d'aperçu (titre en italique), qui est remplacé à la
+// navigation suivante : on parcourt sans accumuler d'onglets, et les onglets fixés ne sont jamais écrasés.
+// L'aperçu se fixe par un double-clic sur l'onglet ou dès qu'on écrit dans la page ; Ctrl+clic, clic du
+// milieu ou « ouvrir dans un onglet » (graphe) ouvrent un onglet fixé. Une page déjà ouverte réactive son
+// onglet au lieu d'en ouvrir un second. ↗ détache l'onglet dans une fenêtre du navigateur, sans barre
 // d'onglets. Les onglets sont gardés par ce navigateur (rechargement compris).
 //
-// @req EF-151
+// @req EF-151, EF-169
 import { aller, adresseCourante, type Route } from "./routeur.svelte";
 import type { Projet } from "../types/Projet";
 
-/** Un onglet : l'adresse de sa page et le titre affiché. */
-export type Onglet = { url: string; titre: string };
+/** Un onglet : l'adresse de sa page, le titre affiché et, pour l'onglet d'aperçu (un seul au plus), `apercu`. */
+export type Onglet = { url: string; titre: string; apercu?: boolean };
 
 /** Clé de stockage des onglets dans ce navigateur. */
 const CLE = "wikik.onglets";
@@ -50,33 +53,63 @@ function garder() {
   }
 }
 
-/**
- * Arrivée dans l'application (rechargement, lien collé) : la page rejoint son onglet s'il existe, sinon elle en prend un
- * nouveau ; ensuite, chaque navigation remplace la page de l'onglet actif.
- */
-let arrivee = true;
+/** Adresse sans son ancre : une page et un symbole de cette page partagent l'onglet. */
+const sansAncre = (url: string) => url.split("#")[0];
 
-/** Suit la page affichée : l'onglet actif prend son adresse et son titre (à chaque changement de route). */
+/**
+ * Suit la page affichée (à chaque changement de route). Si l'onglet actif l'affiche déjà, il prend son adresse et
+ * son titre ; si un autre onglet l'affiche, il devient actif ; sinon la page va dans l'onglet d'aperçu, remplacé, ou
+ * créé juste après l'onglet actif. Aucune navigation n'écrase un onglet fixé (EF-169).
+ */
 export function suivre(titre: string) {
   if (detachee) return;
   const url = adresseCourante();
-  if (arrivee) {
-    arrivee = false;
-    const i = onglets.liste.findIndex((o) => o.url === url);
-    if (i >= 0) onglets.actif = i;
-    else {
-      onglets.liste.push({ url, titre });
-      onglets.actif = onglets.liste.length - 1;
+  const actif = onglets.liste[onglets.actif];
+  if (actif && sansAncre(actif.url) === sansAncre(url)) {
+    onglets.liste[onglets.actif] = { ...actif, url, titre };
+  } else {
+    const deja = onglets.liste.findIndex((o) => sansAncre(o.url) === sansAncre(url));
+    if (deja >= 0) {
+      onglets.actif = deja;
+      onglets.liste[deja] = { ...onglets.liste[deja], url, titre };
+    } else {
+      const ap = onglets.liste.findIndex((o) => o.apercu);
+      if (ap >= 0) {
+        onglets.liste[ap] = { url, titre, apercu: true };
+        onglets.actif = ap;
+      } else {
+        const rang = onglets.liste.length ? onglets.actif + 1 : 0;
+        onglets.liste.splice(rang, 0, { url, titre, apercu: true });
+        onglets.actif = rang;
+      }
     }
   }
-  onglets.liste[onglets.actif] = { url, titre };
   garder();
 }
 
-/** Ouvre `url` dans un nouvel onglet, juste après l'onglet actif, et l'affiche. */
+/** Fixe l'onglet `i` (double-clic) : la navigation suivante ne le remplacera plus. */
+export function fixer(i: number) {
+  const o = onglets.liste[i];
+  if (!o?.apercu) return;
+  onglets.liste[i] = { url: o.url, titre: o.titre };
+  garder();
+}
+
+/** Fixe l'onglet actif : appelé après chaque écriture dans la page (édition, validation). */
+export function fixerActif() {
+  fixer(onglets.actif);
+}
+
+/** Ouvre `url` dans un nouvel onglet fixé, juste après l'onglet actif, et l'affiche. */
 export function ouvrir(url: string) {
   if (detachee) {
     window.open(url, "_blank");
+    return;
+  }
+  const deja = onglets.liste.findIndex((o) => sansAncre(o.url) === sansAncre(url));
+  if (deja >= 0) {
+    fixer(deja);
+    activer(deja);
     return;
   }
   onglets.liste.splice(onglets.actif + 1, 0, { url, titre: "…" });
@@ -93,8 +126,12 @@ export function activer(i: number) {
   aller(onglets.liste[i].url);
 }
 
-/** Ferme l'onglet `i` ; fermer le dernier ramène à l'accueil. */
+/**
+ * Ferme l'onglet `i` ; fermer le dernier ramène à l'accueil. Fermer l'onglet actif affiche son voisin (celui de droite,
+ * ou de gauche s'il était le dernier) : sa page est rechargée, sinon le contenu de l'onglet fermé resterait affiché (REC-089).
+ */
 export function fermer(i: number) {
+  const etaitActif = i === onglets.actif;
   onglets.liste.splice(i, 1);
   if (!onglets.liste.length) {
     onglets.actif = 0;
@@ -102,11 +139,11 @@ export function fermer(i: number) {
     aller("/");
     return;
   }
-  if (i < onglets.actif || onglets.actif >= onglets.liste.length) onglets.actif = Math.max(0, onglets.actif - 1);
-  else if (i === onglets.actif) {
+  if (etaitActif) {
     activer(Math.min(i, onglets.liste.length - 1));
     return;
   }
+  if (i < onglets.actif) onglets.actif--;
   garder();
 }
 
@@ -156,18 +193,21 @@ export function titreDe(route: Route, projet: Projet | null): string {
   }
 }
 
-/** Titre d'onglet des pages sans titre propre, par genre de page. */
+/** Titre d'onglet des pages sans titre propre, par genre de page.
+ * @relu 2026-10-24 69724965
+ */
 const TITRES: Record<string, string> = {
   accueil: "Accueil",
   produit: "Code",
   projet: "Projet",
   relecture: "À relire",
-  cascade: "Cascade",
-  atelier: "Design thinking",
+  ateliers: "Design thinking",
+  atelier: "Atelier",
   clarifications: "Clarifications",
   reception: "Cahier de réception",
   traitement: "Traitement",
   parametres: "Paramètres",
   git: "Historique git",
+  publication: "Publication git",
 };
 

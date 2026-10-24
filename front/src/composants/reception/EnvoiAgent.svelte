@@ -1,7 +1,7 @@
 <script lang="ts">
-  // « Traiter avec l'agent » (REC-041, EF-148, EF-156) : envoie le skill de traitement (Paramètres,
-  // Prompts système) dans le terminal intégré ; collé dans l'agent s'il tourne, sinon l'agent est lancé
-  // avec lui.
+  // « Traiter avec l'agent » (REC-041, EF-148, EF-156) : envoie le skill de traitement dans le terminal
+  // intégré ; collé dans l'agent s'il tourne, sinon l'agent est lancé avec lui. Le skill se relit et se
+  // corrige dans l'encart « Prompt de l'agent » des pages qui ont ce bouton (EF-176).
   import { terminal, traiterAvecAgent } from "../../lib/terminal.svelte";
   import { url } from "../../lib/routeur.svelte";
 
@@ -22,7 +22,7 @@
 </script>
 
 {#if terminal.proprietaire && terminal.parametres}
-  <button class="principal" onclick={traiter} title="L'agent reçoit le skill wikik-traiter-reception (Paramètres, Prompts système) : il commence par un plan">Traiter avec l'agent ↗</button>
+  <button class="principal" onclick={traiter} title="L'agent reçoit le skill wikik-traiter-reception (encart « Prompt de l'agent ») : il commence par un plan">Traiter avec l'agent ↗</button>
   {#if message}<span class="succes">{message}</span>{/if}
   {#if erreur}<span class="erreur">{erreur}</span>{/if}
 {:else}

@@ -223,6 +223,15 @@ pub fn fiches() -> &'static [Fiche] {
     })
 }
 
+/// Texte d'origine (embarqué) de la fiche `id`, tel qu'on le corrige pour un atelier (ADR-0019).
+pub fn texte_origine(id: &str) -> Result<&'static str> {
+    SOURCES
+        .iter()
+        .map(|(_, t)| *t)
+        .find(|t| analyser(t).is_ok_and(|f| f.id == id))
+        .with_context(|| format!("technique inconnue : {id}"))
+}
+
 /// Fiche par identifiant.
 pub fn fiche(id: &str) -> Result<&'static Fiche> {
     fiches()

@@ -10,6 +10,7 @@ import type { ResumeParcours } from "./ResumeParcours";
  * État complet de l'atelier pour un parcours, servi à l'interface : étapes, artefacts, clarifications
  * (communes à tous les parcours) et leurs propositions, fournisseur, consommation de l'abonnement, liste
  * des parcours.
+ * @relu 2026-10-24 feada3a6
  */
 export type EtatAtelier = { 
 /**
@@ -31,4 +32,12 @@ lots_clarification: Array<Lot>, fournisseur: string, consommation: Consommation 
 /**
  * Parcours affiché, et tous les parcours du projet (EF-145).
  */
-parcours: string, tous_parcours: Array<ResumeParcours>, };
+parcours: string, tous_parcours: Array<ResumeParcours>, 
+/**
+ * Mode de tout l'atelier (`express` ou `complet`, REC-094).
+ */
+mode: string, 
+/**
+ * Axes du free writing mis en pause (REC-095).
+ */
+pauses: Array<string>, };

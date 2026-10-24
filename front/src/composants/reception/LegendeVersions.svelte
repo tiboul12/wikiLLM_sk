@@ -1,43 +1,48 @@
 <script lang="ts">
-  // Légende des couleurs de correction (REC-082) : une teinte par version publiée, puis « poussé, pas
-  // publié », « pas poussé », « introuvable ».
-  import { git, versionsCitees, couleurCommit } from "../../lib/reception.svelte";
+  // Légende des couleurs de correction (REC-082) : une teinte par version où la correction est faite (tag
+  // qui la publie, sinon branche `vN-…`), puis ce que dit la forme de la pastille : publiée, poussée,
+  // seulement commitée, introuvable.
+  import { git, versionsCitees, couleurVersion } from "../../lib/reception.svelte";
 
-  /** Versions publiées citées par les remarques, dans l'ordre de leurs teintes. */
+  /** Versions des corrections citées par les remarques, dans l'ordre. */
   const versions = $derived(versionsCitees());
-  /** Couleur d'une version, prise sur l'un de ses commits pour rester identique à celle des pastilles. */
-  const echantillon = (v: string) => {
-    const e = Object.values(git.commits).find((x) => x.version === v);
-    return e ? couleurCommit(e.commit)?.couleur : "var(--gris)";
-  };
 </script>
 
 {#if git.charge && Object.keys(git.commits).length}
   <p class="legende-versions">
     <span class="discret">Corrections :</span>
-    {#each versions as v (v)}<span class="cle" style="--teinte: {echantillon(v)}">publiées en {v}</span>{/each}
-    <span class="cle" style="--teinte: var(--accent)">poussées, pas encore publiées</span>
-    <span class="cle" style="--teinte: var(--orange)">commitées, pas poussées</span>
-    <span class="cle" style="--teinte: var(--rouge)">commit introuvable</span>
+    {#each versions as v (v)}<span class="pastille-legende publie" style="--teinte: {couleurVersion(v)}">{v}</span>{/each}
+    <span class="discret">·</span>
+    <span class="pastille-legende publie" style="--teinte: var(--texte-2)">plein</span> publiée (tag)
+    <span class="pastille-legende" style="--teinte: var(--texte-2)">contour</span> poussée, pas encore publiée
+    <span class="pastille-legende local" style="--teinte: var(--texte-2)">tirets</span> commitée, pas poussée
+    <span class="pastille-legende" style="--teinte: var(--rouge)">✗</span> commit introuvable
   </p>
 {/if}
 
 <style>
   .legende-versions {
     display: flex;
-    gap: 10px;
+    gap: 6px 8px;
     flex-wrap: wrap;
     align-items: center;
     font-size: 12.5px;
   }
-  .cle::before {
-    content: "";
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    margin-right: 5px;
-    border-radius: 3px;
+  .pastille-legende {
+    padding: 0 6px;
+    border: 1.5px solid var(--teinte);
+    border-radius: 999px;
+    color: var(--teinte);
+    font-size: 11px;
+    font-weight: 650;
+    line-height: 16px;
+    font-family: var(--mono);
+  }
+  .publie {
     background: var(--teinte);
-    vertical-align: -1px;
+    color: var(--fond);
+  }
+  .local {
+    border-style: dashed;
   }
 </style>

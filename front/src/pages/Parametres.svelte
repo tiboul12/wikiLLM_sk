@@ -1,21 +1,21 @@
 <script lang="ts">
-  // Section Paramètres (EF-147, EF-155, EF-156), en accordéons dans l'ordre où l'on règle : la connexion au
-  // LLM de wikik (connecteur, modèle, effort, test), l'agent de développement, les prompts système (des
-  // skills du projet, un par sous-accordéon, ADR-0017) et l'application reçue. Écrit dans wikik.toml et
-  // `.claude/skills/` ; réservé au propriétaire (ADR-0013). `#skill-<nom>` ouvre un skill.
+  // Section Paramètres (EF-147, EF-155, EF-156, EF-176), en deux blocs : 1. la connexion (LLM de wikik :
+  // connecteur, modèle, effort, test ; agent du terminal ; réglages avancés repliés), 2. les prompts système
+  // généraux (skills du projet, un par sous-accordéon, ADR-0017). Les prompts propres à une tâche sont sur la
+  // page de cette tâche (composant PromptSysteme) : ils sont seulement listés ici, avec leur lien. Écrit dans
+  // wikik.toml et `.claude/skills/` ; réservé au propriétaire (ADR-0013). `#skill-<nom>` ouvre un skill.
+  // @relu 2026-10-24 6808f34f
   import { tick } from "svelte";
   import type { Parametres } from "../types/Parametres";
   import type { Modele } from "../types/Modele";
   import type { Skill } from "../types/Skill";
   import { terminal, chargerParametres, enregistrerParametres, ecrireSkill, poster } from "../lib/terminal.svelte";
-  import { reception, ecrireReception } from "../lib/reception.svelte";
+  import { url } from "../lib/routeur.svelte";
 
   /** Copie modifiable des réglages : rien n'est écrit tant que le formulaire n'est pas enregistré. */
   let p = $state<Parametres | null>(null);
   /** Arguments du connecteur, un par ligne dans le champ ; découpés à l'envoi par `avecArguments`. */
   let arguments_ = $state("");
-  /** Adresse de l'application reçue (section Réception), enregistrée à part dans le cahier. */
-  let adresse = $state("");
   /** Confirmation d'enregistrement, effacée à chaque nouvel envoi. */
   let message = $state("");
   /** Erreur d'enregistrement renvoyée par le serveur. */
@@ -25,7 +25,6 @@
     if (!terminal.parametres) return;
     p = structuredClone($state.snapshot(terminal.parametres));
     arguments_ = p.arguments.join("\n");
-    adresse = reception.etat?.url_application ?? "";
     textes = Object.fromEntries(terminal.skills.map((s) => [s.nom, s.texte]));
     chargerModeles();
     await tick();
@@ -102,14 +101,13 @@
     }
   }
 
-  /** Enregistre les réglages dans wikik.toml, puis l'adresse de l'application si la réception est active et qu'elle a changé. */
+  /** Enregistre les réglages dans wikik.toml. */
   async function enregistrer(e: SubmitEvent) {
     e.preventDefault();
     if (!p) return;
     message = erreur = "";
     try {
       await enregistrerParametres({ ...p, arguments: avecArguments() });
-      if (reception.actif && adresse.trim() !== (reception.etat?.url_application ?? "")) await ecrireReception("application", { url: adresse.trim() });
       message = "Enregistré dans wikik.toml.";
     } catch (x) {
       erreur = String(x instanceof Error ? x.message : x);
@@ -121,14 +119,44 @@
   let textes = $state<Record<string, string>>({});
   /** Message par skill après enregistrement, rétablissement ou installation. */
   let etatSkill = $state<Record<string, string>>({});
-  /** Groupes de skills affichés : identifiant, titre, à qui ils s'adressent (ADR-0017). */
+  /** Groupes de skills généraux affichés ici : identifiant, titre, à qui ils s'adressent (ADR-0017). */
   const GROUPES: [string, string, string][] = [
-    ["agent", "Pour l'agent de développement", "Ce que l'agent qui code dans le projet (Claude Code, dans le terminal) reçoit ou trouve dans .claude/skills/."],
-    ["llm", "Pour le LLM de wikik", "Ce que wikik envoie à son LLM (Design thinking, réception, recherche) et à tout client de son serveur MCP."],
-    ["structure", "Structure des documents", "Comment sont rédigés les documents de chaque section du projet : donnés au LLM quand il en produit, et à l'agent."],
+    ["agent", "Pour l'agent de développement", "Ce que l'agent qui code dans le projet (Claude Code, dans le terminal) trouve dans .claude/skills/."],
+    ["llm", "Pour le LLM de wikik", "Le préambule de toutes les demandes de wikik à son LLM, et ce que lit tout client de son serveur MCP."],
   ];
-  /** Skills d'un groupe, dans l'ordre fourni par le serveur. */
-  const deGroupe = (g: string) => terminal.skills.filter((s) => s.groupe === g);
+  /**
+   * Skills propres à une page (EF-176, REC-104.3) : réglés sur la page qui s'en sert, pas ici. Pour chacun, l'endroit où
+   * il se trouve ; les skills de structure sont sur la page de chaque document du genre.
+   * @relu 2026-10-24 9c40b989
+   */
+  const SUR_PAGE: Record<string, [string, () => string]> = {
+    "wikik-traiter-reception": ["Réception › Traitement des remarques", url.traitement],
+    "wikik-clarification": ["Design thinking › chaque clarification", url.clarifications],
+    "wikik-publication-git": ["Git › Publication", url.publication],
+  };
+  /** Skill général, montré dans ce bloc ; les autres sont sur leur page. */
+  const estGeneral = (nom: string) => !SUR_PAGE[nom] && !nom.startsWith("wikik-structure-");
+  /** Skills généraux d'un groupe, dans l'ordre fourni par le serveur. */
+  const deGroupe = (g: string) => terminal.skills.filter((s) => s.groupe === g && estGeneral(s.nom));
+  /** Skills réglés sur leur page, pour la liste de renvois. */
+  const surPage = $derived(terminal.skills.filter((s) => !estGeneral(s.nom)));
+
+  // Modèle : une vraie liste quand le connecteur en propose (REC-105), avec « autre » pour un nom libre.
+  /** Saisie libre du modèle : aucun modèle proposé, ou un nom absent de la liste. */
+  let modeleLibre = $state(false);
+  $effect(() => {
+    if (p?.modele && modeles.length && !modeles.some((m) => m.id === p!.modele)) modeleLibre = true;
+  });
+  /** Choix dans la liste des modèles : « autre » passe en saisie libre. */
+  function choisirModele(v: string) {
+    if (!p) return;
+    if (v === "__autre") {
+      modeleLibre = true;
+      return;
+    }
+    modeleLibre = false;
+    p.modele = v;
+  }
   /** Écrit le skill dans son `SKILL.md` du projet. */
   async function enregistrerSkill(s: Skill) {
     etatSkill[s.nom] = "";
@@ -174,7 +202,8 @@
   <form class="formulaire parametres" onsubmit={enregistrer}>
     <fieldset disabled={!terminal.proprietaire}>
       <details class="bloc-parametres" open id="connexion">
-        <summary><span class="num">1</span> Connexion au LLM <small>{connecteur?.nom ?? p.connecteur}{p.modele ? ` · ${p.modele}` : ""}{p.effort ? ` · effort ${p.effort}` : ""}</small></summary>
+        <summary><span class="num">1</span> Connexion <small>{connecteur?.nom ?? p.connecteur}{p.modele ? ` · ${p.modele}` : ""}{p.effort ? ` · effort ${p.effort}` : ""} · agent {p.agent || "claude"}</small></summary>
+        <h3>LLM de wikik</h3>
         <p class="discret">Le LLM que wikik appelle pour le Design thinking, la réception (écrans manquants) et la recherche assistée. L'authentification reste celle du CLI ou du serveur local : wikik ne garde aucune clé.</p>
         {#if terminal.factice}<p class="discret">wikik tourne avec <code>--factice</code> : ces réglages serviront au prochain lancement sans.</p>{/if}
         <div class="connecteurs" role="radiogroup" aria-label="Fournisseur">
@@ -188,14 +217,17 @@
         </div>
 
         {#if connecteur && !["cli", "factice"].includes(p.connecteur)}
-          <div class="ligne-champs">
-            <label class="champ-large"><span>Modèle</span>
-              <input list="modeles-proposes" bind:value={p.modele} placeholder={modeles.length ? "par défaut du fournisseur" : "nom du modèle (vide : par défaut)"} />
-              <datalist id="modeles-proposes">{#each modeles as m (m.id)}<option value={m.id}>{m.libelle}</option>{/each}</datalist>
-              <small>
-                {#if chargeModeles}Liste des modèles…{:else if erreurModeles}Liste indisponible : {erreurModeles}{:else if modeles.length}{modeles.length} modèle(s) proposé(s) : {modeles.map((m) => m.id).join(", ")}{:else}Aucun modèle proposé : écris son nom.{/if}
-                <button type="button" class="discret-bouton" onclick={chargerModeles}>actualiser</button>
-              </small>
+          <div class="ligne-champs" class:sans-effort={!connecteur.efforts.length}>
+            <label><span>Modèle</span>
+              {#if modeles.length && !modeleLibre}
+                <select value={p.modele} onchange={(e) => choisirModele(e.currentTarget.value)}>
+                  <option value="">par défaut du fournisseur</option>
+                  {#each modeles as m (m.id)}<option value={m.id}>{m.libelle && m.libelle !== m.id ? `${m.id} · ${m.libelle}` : m.id}</option>{/each}
+                  <option value="__autre">autre (saisir un nom)…</option>
+                </select>
+              {:else}
+                <input bind:value={p.modele} placeholder="nom du modèle (vide : par défaut)" />
+              {/if}
             </label>
             {#if connecteur.efforts.length}
               <label><span>Effort</span>
@@ -206,18 +238,17 @@
               </label>
             {/if}
           </div>
+          <small class="aide-modeles">
+            {#if chargeModeles}Liste des modèles…{:else if erreurModeles}Liste indisponible : {erreurModeles}{:else if modeles.length}{modeles.length} modèle(s) dans la liste.{#if modeleLibre} <button type="button" class="discret-bouton" onclick={() => (modeleLibre = false)}>revenir à la liste</button>{/if}{:else}Aucun modèle proposé : écris son nom.{/if}
+            <button type="button" class="discret-bouton" onclick={chargerModeles}>actualiser</button>
+          </small>
           {#if connecteur.serveur}
             <label><span>Adresse du serveur</span><input bind:value={p.url} placeholder={connecteur.url_defaut} onchange={chargerModeles} /><small>Vide : {connecteur.url_defaut} (celle de Shelley Administration si elle est installée sur cette machine).</small></label>
-          {:else}
-            <label><span>Commande</span><input bind:value={p.commande} placeholder={connecteur.commande_defaut} /><small>Le binaire du CLI, s'il n'est pas dans le PATH sous ce nom.</small></label>
           {/if}
         {/if}
         {#if p.connecteur === "cli"}
           <label><span>Commande</span><input bind:value={p.commande} /></label>
           <label><span>Arguments (un par ligne)</span><textarea rows={8} class="mono" bind:value={arguments_}></textarea><small>Jetons remplacés à chaque appel : <code>{"{consigne}"}</code>, <code>{"{schema}"}</code>, <code>{"{mcp}"}</code>. La sortie doit être un flux <code>stream-json</code> de Claude Code.</small></label>
-        {/if}
-        {#if p.connecteur !== "factice"}
-          <label class="champ-court"><span>Délai maximum (s)</span><input type="number" min="10" bind:value={p.delai} /></label>
         {/if}
         <div class="actions">
           <button type="button" onclick={tester} disabled={enTest}>{enTest ? "Test en cours…" : "Tester la connexion"}</button>
@@ -226,16 +257,19 @@
             {:else}<span class="erreur">✗ {test.fournisseur} : {test.erreur}</span>{/if}
           {/if}
         </div>
-      </details>
 
-      <details class="bloc-parametres" id="agent">
-        <summary><span class="num">2</span> Agent de développement <small>{p.agent}</small></summary>
-        <label><span>Commande de l'agent</span><input bind:value={p.agent} placeholder="claude" /><small>Lancée dans le terminal intégré par « Lancer l'agent » et par « Traiter avec l'agent », qui lui envoie le skill <code>wikik-traiter-reception</code>.</small></label>
-      </details>
+        <h3>Agent du terminal</h3>
+        <label><span>Commande de l'agent</span><input bind:value={p.agent} placeholder="claude" /><small>L'agent qui code dans le projet : lancé dans le terminal intégré par « Lancer l'agent » et par « Traiter avec l'agent ». À changer seulement pour un autre agent (Antigravity, Mistral Vibe…).</small></label>
 
-      <details class="bloc-parametres" id="application">
-        <summary><span class="num">3</span> Application reçue <small>{adresse || "déduite"}</small></summary>
-        <label><span>Adresse de l'application</span><input bind:value={adresse} placeholder={reception.etat?.url_detectee === "/" ? "ce serveur (déduit)" : (reception.etat?.url_detectee ?? "http://10.0.0.21:4200")} /><small>Vide : déduite du projet ({reception.etat?.url_detectee === "/" ? "ce serveur" : (reception.etat?.url_detectee ?? "rien de trouvé")}). Sert aux liens « Ouvrir cette page » du cahier de réception.</small></label>
+        {#if p.connecteur !== "factice"}
+          <details class="avance">
+            <summary>Réglages avancés</summary>
+            {#if connecteur && !connecteur.serveur && p.connecteur !== "cli"}
+              <label><span>Programme du LLM</span><input bind:value={p.commande} placeholder={connecteur.commande_defaut} /><small>Le binaire que wikik appelle pour son LLM ({connecteur.commande_defaut}), seulement s'il n'est pas dans le PATH sous ce nom.</small></label>
+            {/if}
+            <label class="champ-court"><span>Délai maximum (s)</span><input type="number" min="10" bind:value={p.delai} /></label>
+          </details>
+        {/if}
       </details>
 
       <div class="actions">
@@ -247,8 +281,8 @@
   </form>
 
   <details class="bloc-parametres" id="prompts">
-    <summary><span class="num">4</span> Prompts système <small>{terminal.skills.length} skills · {terminal.skills.filter((s) => s.modifie).length} modifié(s)</small></summary>
-    <p class="discret">Chaque consigne donnée à un LLM est un skill au format Claude Code (<code>SKILL.md</code> : un frontmatter <code>name</code> et <code>description</code>, puis des sections). Ce sont les textes réellement envoyés. Tant qu'un skill n'est pas dans le projet, son texte d'origine sert ; l'enregistrer l'écrit dans <code>.claude/skills/</code>, où l'agent de développement le trouve aussi.</p>
+    <summary><span class="num">2</span> Prompts système <small>{terminal.skills.length} skills · {terminal.skills.filter((s) => s.modifie).length} modifié(s)</small></summary>
+    <p class="discret">Chaque consigne donnée à un LLM est un skill au format Claude Code (<code>SKILL.md</code> : un frontmatter <code>name</code> et <code>description</code>, puis des sections). Ce sont les textes réellement envoyés. Tant qu'un skill n'est pas dans le projet, son texte d'origine sert ; l'enregistrer l'écrit dans <code>.claude/skills/</code>, où l'agent de développement le trouve aussi. Ici, les prompts généraux ; ceux d'une tâche sont sur sa page.</p>
     {#each GROUPES as [g, titre, aide] (g)}
       <h3>{titre}</h3>
       <p class="discret">{aide}</p>
@@ -272,6 +306,17 @@
         </details>
       {/each}
     {/each}
+    <h3>Sur leur page</h3>
+    <p class="discret">Les prompts d'une tâche se règlent dans l'encart ⚙ de la page où l'agent intervient.</p>
+    <ul class="sur-page">
+      {#each surPage as s (s.nom)}
+        <li>
+          <strong>{s.titre}</strong>
+          {#if s.modifie}<span class="pastille statut-proposé">modifié</span>{/if}
+          · {#if SUR_PAGE[s.nom]}<a href={SUR_PAGE[s.nom][1]()}>{SUR_PAGE[s.nom][0]}</a>{:else}sur la page de chaque document du genre{/if}
+        </li>
+      {/each}
+    </ul>
   </details>
 {/if}
 
@@ -335,13 +380,46 @@
     box-shadow: 0 0 0 1px var(--accent);
     background: var(--accent-fond);
   }
+  /* Modèle et effort sur une ligne, à la même hauteur et dans une proportion lisible (REC-105). */
   .ligne-champs {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     gap: 12px;
-    flex-wrap: wrap;
+    align-items: end;
   }
-  .champ-large {
-    flex: 1 1 18rem;
+  .ligne-champs.sans-effort {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ligne-champs select,
+  .ligne-champs input {
+    width: 100%;
+    height: 38px;
+  }
+  .aide-modeles {
+    display: block;
+    margin: -4px 0 10px;
+    color: var(--texte-2);
+    font-size: 12.5px;
+  }
+  .avance {
+    margin-top: 14px;
+    border-top: 1px solid var(--bord);
+    padding-top: 6px;
+  }
+  .avance > summary {
+    cursor: pointer;
+    color: var(--texte-2);
+    padding: 6px 0;
+  }
+  .sur-page {
+    margin: 4px 0 8px;
+    padding-left: 18px;
+    font-size: 14px;
+  }
+  @media (max-width: 560px) {
+    .ligne-champs {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
   .champ-court input {
     max-width: 8rem;

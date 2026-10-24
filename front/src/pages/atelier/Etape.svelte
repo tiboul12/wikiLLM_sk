@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Écran d'une étape du parcours affiché : « en bref » (à quoi elle sert, ce qu'on fait, ce qu'elle produit), règles de la
-  // fiche, mode, puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon) ; la
+  // Écran d'une étape du parcours affiché : « en bref » (à quoi elle sert, ce qu'on fait, ce qu'elle produit), la fiche de
+  // la technique, corrigible pour cet atelier (EF-178), règles de la fiche, mode (celui de l'atelier), puis chaque sous-étape avec son écran (dédié pour le mode Express, générique sinon) ; la
   // carte mentale se modifie dans l'éditeur Mermaid (EF-167).
   // Une page de réception par étape (EF-164) :
   // @ecrans /atelier/pitch Pitch
@@ -27,6 +27,7 @@
   import { terminal } from "../../lib/terminal.svelte";
   import Planche from "../../composants/atelier/Planche.svelte";
   import EnBref from "../../composants/atelier/EnBref.svelte";
+  import FicheTechnique from "../../composants/atelier/FicheTechnique.svelte";
 
   let { etape }: { etape: string } = $props();
   /** Rang de l'étape dans le parcours affiché ; -1 si elle n'y est pas. */
@@ -72,18 +73,15 @@
 {#if !e}
   <p class="discret">{atelier.etat ? `Étape inconnue : ${etape}` : "Chargement…"}</p>
 {:else}
-  <p class="fil"><a href={url.atelier(atelier.parcours)}>Design thinking</a> · {atelier.etat?.tous_parcours.find((p) => p.id === atelier.parcours)?.titre ?? ""} · {PHASES[e.fiche.phase] ?? e.fiche.phase} · étape {index + 1} / {atelier.etat!.etapes.length}</p>
+  <p class="fil"><a href={url.ateliers()}>Design thinking</a> · <a href={url.atelier(atelier.parcours)}>{atelier.etat?.tous_parcours.find((p) => p.id === atelier.parcours)?.titre ?? ""}</a> · {PHASES[e.fiche.phase] ?? e.fiche.phase} · étape {index + 1} / {atelier.etat!.etapes.length}</p>
   <h1>{e.fiche.titre}</h1>
   <div class="meta">
     <span class="pastille etat-{e.etat}">{ETATS[e.etat] ?? e.etat}</span>
-    <span class="bascule" role="group" aria-label="Mode">
-      {#each ["express", "complet"] as m}
-        <button class:actif={e.mode === m} onclick={() => piloter("mode", m)}>{m === "express" ? "Express" : "Complet"}</button>
-      {/each}
-    </span>
+    <a class="pastille" href={url.atelier(atelier.parcours)} title="Le mode se choisit pour tout l'atelier">{e.mode === "complet" ? "Complet" : "Express"}</a>
     <span class="discret">origine : {e.fiche.origine.join(", ")}</span>
   </div>
   <EnBref fiche={e.fiche} mode={e.mode} />
+  <FicheTechnique {etape} propre={e.fiche_propre} />
   {#if e.fiche.regles.length}
     <details class="regles"><summary>Règles de la technique</summary><ul>{#each e.fiche.regles as r}<li>{r}</li>{/each}</ul></details>
   {/if}

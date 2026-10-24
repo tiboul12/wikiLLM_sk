@@ -5,6 +5,7 @@ import type { Lot } from "./Lot";
 
 /**
  * État d'une étape.
+ * @relu 2026-10-24 10be1d99
  */
 export type EtatEtape = { fiche: Fiche, 
 /**
@@ -14,4 +15,8 @@ etat: string, mode: string, artefacts: Array<ArtefactResume>,
 /**
  * Sélection par sous-étape.
  */
-selections: { [key in string]: Array<string> }, lots: Array<Lot>, };
+selections: { [key in string]: Array<string> }, lots: Array<Lot>, 
+/**
+ * Vrai si l'atelier utilise sa copie corrigée de la fiche (ADR-0019).
+ */
+fiche_propre: boolean, };

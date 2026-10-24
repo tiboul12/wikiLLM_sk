@@ -7,7 +7,7 @@
   // du contenu (EF-151), sauf dans une fenêtre détachée ; le graphe global se prépare en tâche de fond (EF-153) ;
   // Ctrl+Z / Ctrl+Y annulent ou rétablissent la dernière écriture, puis tout est relu (EF-159). Le serveur du projet sert les quatre sections
   // (ADR-0012) ; le site exporté n'a que l'accueil, Produit et Projet.
-  // @relu 2026-10-22 f3e2b7ca
+  // @relu 2026-10-24 76ac882f
   import { untrack } from "svelte";
   import { api } from "./lib/api";
   import { routeur, aller, url, parcoursDeUrl } from "./lib/routeur.svelte";
@@ -21,12 +21,12 @@
   import ProduitAccueil from "./pages/ProduitAccueil.svelte";
   import ProjetAccueil from "./pages/ProjetAccueil.svelte";
   import Relecture from "./pages/Relecture.svelte";
-  import Cascade from "./pages/Cascade.svelte";
   import PageFichier from "./pages/PageFichier.svelte";
   import PageDocument from "./pages/PageDocument.svelte";
   import Recherche from "./pages/Recherche.svelte";
   import PageGraphe from "./pages/PageGraphe.svelte";
   import DesignThinking from "./pages/atelier/DesignThinking.svelte";
+  import AccueilAtelier from "./pages/atelier/AccueilAtelier.svelte";
   import Etape from "./pages/atelier/Etape.svelte";
   import Clarification from "./pages/atelier/Clarification.svelte";
   import Clarifier from "./pages/atelier/Clarifier.svelte";
@@ -38,6 +38,7 @@
   import Traitement from "./pages/reception/Traitement.svelte";
   import Parametres from "./pages/Parametres.svelte";
   import Git from "./pages/Git.svelte";
+  import PublicationGit from "./pages/PublicationGit.svelte";
   import PanneauTerminal from "./composants/PanneauTerminal.svelte";
   import Icone from "./composants/Icone.svelte";
   import { terminal, chargerParametres } from "./lib/terminal.svelte";
@@ -213,7 +214,7 @@
     {:else if routeur.route.page === "document"}
       {#key routeur.route.id}<PageDocument id={routeur.route.id} ancre={routeur.route.ancre} />{/key}
     {:else if routeur.route.page === "recherche"}
-      {#key routeur.route.q}<Recherche q={routeur.route.q} />{/key}
+      {#key routeur.route.q}<Recherche q={routeur.route.q} {projet} />{/key}
     {:else if routeur.route.page === "graphe"}
       {#key routeur.route.centre}<PageGraphe centre={routeur.route.centre} />{/key}
     {:else if routeur.route.page === "produit"}
@@ -222,14 +223,14 @@
       <ProjetAccueil {projet} />
     {:else if routeur.route.page === "relecture"}
       <Relecture {projet} />
-    {:else if routeur.route.page === "cascade"}
-      <Cascade {projet} />
     {:else if routeur.route.page === "accueil"}
       <Accueil {projet} />
     {:else if routeur.route.page === "parametres"}
       <Parametres />
     {:else if routeur.route.page === "git"}
       <Git />
+    {:else if routeur.route.page === "publication"}
+      <PublicationGit />
     {:else if !atelier.actif && !reception.actif}
       <p class="discret">Cette page n'existe pas dans le site exporté : lance <code>wikik</code> dans le projet.</p>
     {:else if routeur.route.page === "etape"}
@@ -240,6 +241,8 @@
       {#if atelier.etat}<Clarifications {projet} />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "clarifier"}
       {#if atelier.etat}{#key routeur.route.sujet}<Clarifier sujet={routeur.route.sujet} />{/key}{:else}<p class="discret">Chargement…</p>{/if}
+    {:else if routeur.route.page === "ateliers"}
+      {#if atelier.etat}<AccueilAtelier />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "atelier"}
       {#if atelier.etat}<DesignThinking />{:else}<p class="discret">Chargement…</p>{/if}
     {:else if routeur.route.page === "reception-page"}

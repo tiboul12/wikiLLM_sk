@@ -23,8 +23,10 @@ use wikik_core::atelier::fournisseur::{Demande, Fournisseur};
 use wikik_core::atelier::parcours;
 
 /// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel, parcours,
-/// clarifications, modification d'un atelier : EF-161), la recherche assistée par IA (EF-152) et
-/// l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
+/// clarifications, modification d'un atelier : EF-161), la fiche de chaque technique pour un atelier, son mode et
+/// la pause d'un axe (EF-177 à EF-179, ADR-0019), la recherche assistée par IA (EF-152) et par le sens (EF-173,
+/// ADR-0020), et l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
+/// @relu 2026-10-24 3f10a1ba
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/atelier/etat", get(api_etat))
@@ -43,6 +45,82 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/atelier/synthetiser", post(api_synthetiser))
         .route("/api/atelier/rappel", post(api_rappel))
         .route("/api/recherche/ia", post(api_recherche_ia))
+        .route("/api/recherche/sens", post(api_recherche_sens))
+        .route(
+            "/api/atelier/fiche",
+            get(api_lire_fiche).post(api_ecrire_fiche),
+        )
+        .route("/api/atelier/parcours/mode", post(api_mode))
+        .route("/api/atelier/pause", post(api_pause))
+}
+
+/// Paramètres de lecture d'une fiche d'atelier.
+#[derive(Deserialize)]
+struct ParamFiche {
+    #[serde(default = "defaut")]
+    parcours: String,
+    etape: String,
+}
+
+/// Texte de la fiche d'une technique pour un atelier, et s'il s'agit de sa copie corrigée (ADR-0019).
+async fn api_lire_fiche(State(e): State<Partage>, Query(q): Query<ParamFiche>) -> Response {
+    repondre(e, move |i| {
+        let (texte, propre) = parcours::texte_fiche(i, &q.parcours, &q.etape)?;
+        Ok(serde_json::json!({ "texte": texte, "propre": propre }))
+    })
+    .await
+}
+
+/// Corps d'écriture d'une fiche : `texte` absent ou nul revient au texte d'origine.
+#[derive(Deserialize)]
+struct EcritureFiche {
+    #[serde(default = "defaut")]
+    parcours: String,
+    etape: String,
+    texte: Option<String>,
+}
+
+/// Corrige la fiche d'une technique pour un atelier, ou rétablit celle d'origine (EF-178).
+async fn api_ecrire_fiche(State(e): State<Partage>, Json(p): Json<EcritureFiche>) -> Response {
+    ecrire(e, move |i| {
+        parcours::ecrire_fiche(i, &p.parcours, &p.etape, p.texte.as_deref())
+    })
+    .await
+}
+
+/// Corps du choix de mode de l'atelier : en express, les techniques cochées.
+#[derive(Deserialize)]
+struct ModeAtelier {
+    #[serde(default = "defaut")]
+    parcours: String,
+    mode: String,
+    #[serde(default)]
+    techniques: Vec<String>,
+}
+
+/// Mode de tout l'atelier et techniques gardées en express (EF-177).
+async fn api_mode(State(e): State<Partage>, Json(p): Json<ModeAtelier>) -> Response {
+    ecrire(e, move |i| {
+        parcours::choisir_mode(i, &p.parcours, &p.mode, &p.techniques)
+    })
+    .await
+}
+
+/// Corps de la mise en pause d'un axe.
+#[derive(Deserialize)]
+struct PauseAxe {
+    #[serde(default = "defaut")]
+    parcours: String,
+    axe: String,
+    pause: bool,
+}
+
+/// Met un axe du free writing en pause ou le reprend (EF-179).
+async fn api_pause(State(e): State<Partage>, Json(p): Json<PauseAxe>) -> Response {
+    ecrire(e, move |i| {
+        parcours::pause_axe(i, &p.parcours, &p.axe, p.pause)
+    })
+    .await
 }
 
 /// Corps de `/api/recherche/ia` : la question posée en langage naturel.
@@ -69,6 +147,26 @@ async fn api_recherche_ia(State(e): State<Partage>, Json(c): Json<CorpsRecherche
             jeton: Some(jeton),
         })?;
         Ok(reponse.elements)
+    })
+    .await;
+    resultat(r)
+}
+
+/// Recherche par le sens (EF-173, ADR-0020) : les morceaux sont lus sous le verrou de l'index, les vecteurs calculés
+/// et comparés hors du verrou (le wiki reste lisible pendant le premier calcul).
+async fn api_recherche_sens(State(e): State<Partage>, Json(c): Json<CorpsRechercheIa>) -> Response {
+    let r = tokio::task::spawn_blocking(move || -> Result<Vec<wikik_core::semantique::Trouve>> {
+        use wikik_core::semantique;
+        let (morceaux, base, ollama) = {
+            let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+            i.mettre_a_jour()?;
+            (
+                semantique::morceaux(&i)?,
+                semantique::chemin(&i.racine),
+                semantique::Ollama::depuis(&i.config),
+            )
+        };
+        semantique::chercher(&base, &morceaux, &ollama, &c.question, 20)
     })
     .await;
     resultat(r)

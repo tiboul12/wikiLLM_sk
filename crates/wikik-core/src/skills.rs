@@ -25,6 +25,7 @@ pub struct Definition {
 }
 
 /// Skills livrés, dans l'ordre des Paramètres.
+/// @relu 2026-10-24 419d13f0
 pub const SKILLS: &[Definition] = &[
     Definition {
         nom: "wikik",
@@ -39,6 +40,13 @@ pub const SKILLS: &[Definition] = &[
         role: "Envoyé à l'agent par « Traiter avec l'agent » (cahier de réception) : plan par lots validé, puis correction, vérification, commit et enregistrement de chaque remarque.",
         groupe: "agent",
         origine: include_str!("../skills/wikik-traiter-reception.md"),
+    },
+    Definition {
+        nom: "wikik-publication-git",
+        titre: "Publier une version avec git",
+        role: "Procédure de publication de l'agent (section Git › Publication) : une branche par version, commits par lot vérifiés, réception, puis fusion, tag et poussée avec l'accord de l'utilisateur.",
+        groupe: "agent",
+        origine: include_str!("../skills/wikik-publication-git.md"),
     },
     Definition {
         nom: "wikik-lecture",

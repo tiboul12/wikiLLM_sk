@@ -1,13 +1,13 @@
 <script lang="ts">
   // Historique git (EF-166, REC-067), à la GitKraken : le graphe des branches (un couloir de couleur par
   // branche, fusions comprises), les branches et tags sur leurs commits, la situation de la branche
-  // (modifications non commitées, commits à pousser ou à récupérer) ; un commit ouvre son message, ses
+  // (modifications non commitées, dépliables en liste de liens par dossier : REC-108 ; commits à pousser ou à récupérer) ; un commit ouvre son message, ses
   // fichiers et le diff de chacun. `?commit=` ou `?ref=` sélectionne un commit.
   import { tick } from "svelte";
   import type { Historique } from "../types/Historique";
   import type { DetailCommit } from "../types/DetailCommit";
   import { couloirs, TEINTES } from "../lib/git";
-  import { routeur } from "../lib/routeur.svelte";
+  import { routeur, url } from "../lib/routeur.svelte";
   import { autoLien } from "../lib/connus.svelte";
 
   /** Commits, références et situation de la branche ; vide hors d'un dépôt git (l'erreur le dit). */
@@ -18,6 +18,19 @@
   let limite = $state(400);
   /** Filtre sur le sujet, le début du hash, l'auteur ou une référence. */
   let filtre = $state("");
+  /** Liste des fichiers non commités dépliée (REC-108). */
+  let voirModifies = $state(false);
+  /** Sens des lettres d'état de `git status`. */
+  const STATUTS_GIT: Record<string, string> = { M: "modifié", A: "ajouté", D: "supprimé", R: "renommé", "?": "nouveau, pas encore suivi" };
+  /** Fichiers non commités groupés par dossier, pour voir d'un coup d'œil de quoi il s'agit. */
+  const dossiersModifies = $derived.by(() => {
+    const m = new Map<string, { chemin: string; statut: string }[]>();
+    for (const f of historique?.fichiers_modifies ?? []) {
+      const d = f.chemin.includes("/") ? f.chemin.slice(0, f.chemin.lastIndexOf("/")) : ".";
+      (m.get(d) ?? m.set(d, []).get(d)!).push(f);
+    }
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length);
+  });
   /** Hash du commit sélectionné. */
   let choisi = $state<string | null>(null);
   /** Message et fichiers du commit sélectionné. */
@@ -123,13 +136,52 @@
 {:else}
   <div class="situation">
     <span class="pastille">branche <strong>{historique.branche || "HEAD détaché"}</strong></span>
-    {#if historique.modifies}<span class="pastille attente">{historique.modifies} fichier(s) modifié(s), non commité(s)</span>{/if}
+    {#if historique.modifies}<button class="pastille attente bouton-pastille" aria-expanded={voirModifies} onclick={() => (voirModifies = !voirModifies)}>{historique.modifies} fichier(s) modifié(s), non commité(s) {voirModifies ? "▴" : "▾"}</button>{/if}
+    {#if historique.branche && !historique.poussee}<span class="pastille attente" title="Aucune branche distante : git push -u origin {historique.branche}">jamais poussée</span>{/if}
     {#if historique.en_avance}<span class="pastille attente">{historique.en_avance} commit(s) à pousser</span>{/if}
     {#if historique.en_retard}<span class="pastille attente">{historique.en_retard} commit(s) à récupérer</span>{/if}
-    {#if !historique.modifies && !historique.en_avance && !historique.en_retard}<span class="pastille ok">à jour</span>{/if}
+    {#if !historique.modifies && !historique.en_avance && !historique.en_retard && (historique.poussee || !historique.branche)}<span class="pastille ok">à jour</span>{/if}
     <span class="discret">{historique.commits.length} commits · {historique.branches.length} branches · {historique.tags.length} tags</span>
     <input type="search" bind:value={filtre} placeholder="Filtrer : message, auteur, hash, branche…" aria-label="Filtrer l'historique" />
   </div>
+  {#if historique.etat_branches.length}
+    {@const enLigne = historique.etat_branches.every((b) => b.fusionnee || b.retard === 0)}
+    <details class="branches-etat" open>
+      <summary>Branches par rapport à <code>{historique.principale}</code></summary>
+      <div class="defile">
+        <table>
+          <thead><tr><th>Branche</th><th>Partie de</th><th>Avance</th><th>Retard</th><th>Fusionnée</th></tr></thead>
+          <tbody>
+            {#each historique.etat_branches as b (b.nom)}
+              <tr class:courante={b.nom === historique.branche}>
+                <td><a href={url.git({ ref: b.nom })}>{b.nom}</a></td>
+                <td>{b.partie_de ?? "—"}</td>
+                <td>{b.avance} commit(s)</td>
+                <td>{b.retard ? `${b.retard} commit(s)` : "—"}</td>
+                <td>{b.fusionnee ? "✓ oui" : "non"}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      {#if enLigne}<p class="discret">Aucune de ces branches n'a encore été fusionnée et <code>{historique.principale}</code> n'a pas avancé depuis qu'elles existent : chacune part de la précédente, elles se suivent donc sur une seule ligne. Le dessin se sépare dès qu'une branche est fusionnée ou que la principale avance.</p>{/if}
+    </details>
+  {/if}
+  {#if voirModifies && historique.fichiers_modifies.length}
+    <div class="modifies">
+      {#each dossiersModifies as [dossier, fs] (dossier)}
+        <details open={dossiersModifies.length <= 4}>
+          <summary><code>{dossier}/</code> <small>{fs.length}</small></summary>
+          <ul>
+            {#each fs as f (f.chemin)}
+              {@const lien = autoLien(f.chemin)}
+              <li><span class="statut-fichier s-{f.statut === '?' ? 'A' : f.statut}" title={STATUTS_GIT[f.statut] ?? f.statut}>{f.statut}</span>{#if lien}<a href={lien}>{f.chemin.slice(dossier.length + 1)}</a>{:else}<span>{f.chemin.slice(dossier.length + 1)}</span>{/if}</li>
+            {/each}
+          </ul>
+        </details>
+      {/each}
+    </div>
+  {/if}
 
   <div class="git" class:avec-detail={!!choisi}>
     <div class="journal" role="list">
@@ -193,6 +245,58 @@
 <style>
   :global(.contenu:has(.git)) {
     max-width: none;
+  }
+  .branches-etat {
+    margin: 4px 0 14px;
+    font-size: 13.5px;
+  }
+  .branches-etat summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 4px 0;
+  }
+  .branches-etat table {
+    border-collapse: collapse;
+  }
+  .branches-etat th,
+  .branches-etat td {
+    padding: 4px 12px 4px 0;
+    text-align: left;
+    border-bottom: 1px solid var(--bord);
+    white-space: nowrap;
+  }
+  .branches-etat tr.courante td {
+    font-weight: 600;
+  }
+  .defile {
+    overflow-x: auto;
+  }
+  .bouton-pastille {
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+  .modifies {
+    margin: 4px 0 14px;
+    padding: 6px 12px;
+    border: 1px solid var(--bord);
+    border-radius: var(--rayon);
+    background: var(--fond-2);
+    font-size: 13.5px;
+  }
+  .modifies summary {
+    cursor: pointer;
+    padding: 3px 0;
+  }
+  .modifies ul {
+    list-style: none;
+    margin: 0 0 4px;
+    padding-left: 14px;
+  }
+  .modifies li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
   }
   .situation {
     display: flex;

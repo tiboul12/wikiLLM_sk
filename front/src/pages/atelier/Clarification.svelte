@@ -2,11 +2,17 @@
   // Clarification d'un sujet (SPEC-21 R4, EF-144) : le sujet, la question, les pistes que le LLM propose en
   // lisant le projet par MCP (demandées d'office à l'ouverture) ; garder, corriger ou rejeter fait la
   // réponse ; « Clarifié » la clôt avec les pistes gardées. Se reprend, se rouvre, se supprime. Une question
-  // jugée hors sujet par le LLM est signalée en tête (EF-162).
+  // jugée hors sujet par le LLM est signalée en tête (EF-162). La fiche du sujet est réaffichée en tête, repliable,
+  // et le LLM en reçoit le texte complet (REC-115). Le skill de clarification se règle dans son encart
+  // (EF-176).
   // @ecrans /clarifications/:id Clarification d'un sujet
+  // @relu 2026-10-24 49765b7b
   import { atelier, artefact, champ, ecrire } from "../../lib/atelier.svelte";
   import { aller, url } from "../../lib/routeur.svelte";
   import Propositions from "../../composants/atelier/Propositions.svelte";
+  import PromptSysteme from "../../composants/PromptSysteme.svelte";
+  import { api } from "../../lib/api";
+  import { rendre } from "../../lib/markdown";
 
   let { id }: { id: string } = $props();
   /** Clarification affichée : l'artefact, ou à défaut l'entrée de la liste des clarifications. */
@@ -25,6 +31,13 @@
   const sujet = $derived(champ(c, "sujet"));
   /** Erreur de la dernière action. */
   let erreur = $state("");
+  /** Fiche du sujet, réaffichée en tête (REC-115) : son titre et son corps rendu. */
+  let fiche = $state<{ titre: string; html: string } | null>(null);
+  $effect(() => {
+    const s = sujet;
+    fiche = null;
+    if (s) api.document(s).then((d) => (fiche = { titre: d.titre, html: rendre(d.corps) })).catch(() => {});
+  });
 
   /** Pistes déjà demandées pour cette page : évite une seconde demande pendant que la première tourne (REC-024.2). */
   let demandee = false;
@@ -55,7 +68,14 @@
   <div class="meta">
     <span class="pastille" class:statut-retenu={close}>{close ? "clarifiée" : "en cours"}</span>
   </div>
+  {#if fiche}
+    <details class="fiche-sujet" open>
+      <summary>Le sujet : <a href={url.document(sujet)}>{sujet}</a> {fiche.titre}</summary>
+      <div class="corps-sujet contenu-doc">{@html fiche.html}</div>
+    </details>
+  {/if}
   <blockquote class="question">{champ(c, "question")}</blockquote>
+  <PromptSysteme nom="wikik-clarification" />
 
   <h2>Pistes</h2>
   <p class="discret">Le LLM lit le sujet, ses sources et le projet. Garde, corrige ou rejette : les pistes gardées font la réponse.</p>
@@ -82,6 +102,24 @@
 {/if}
 
 <style>
+  .fiche-sujet {
+    margin: 8px 0 12px;
+    padding: 4px 14px;
+    border: 1px solid var(--bord);
+    border-radius: var(--rayon);
+    background: var(--fond-2);
+  }
+  .fiche-sujet > summary {
+    cursor: pointer;
+    padding: 6px 0;
+    font-weight: 600;
+  }
+  .corps-sujet {
+    max-height: 260px;
+    overflow-y: auto;
+    font-size: 14px;
+  }
+
   .hors-sujet {
     padding: 10px 14px;
     margin: 8px 0 12px;

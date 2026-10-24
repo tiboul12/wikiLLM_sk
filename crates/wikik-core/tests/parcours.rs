@@ -422,3 +422,84 @@ fn clarification_sans_question() {
             .exists()
     );
 }
+
+/// Une fiche corrigée pour un atelier sert à cet atelier seulement, et ses consignes partent au LLM ; une fiche qui
+/// change d'identifiant est refusée ; revenir à l'origine supprime la copie (ADR-0019).
+///
+/// @req EF-178
+#[test]
+fn fiche_corrigee_par_atelier() {
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(d.path().join("docs/projet")).unwrap();
+    let i = Index::ouvrir(d.path()).unwrap();
+    let p2 = p::creer_parcours(&i, "Appli météo", "v2").unwrap();
+    let (origine, propre) = p::texte_fiche(&i, &p2, "pitch").unwrap();
+    assert!(!propre);
+    let corrige = origine.replacen("## Consignes", "## Consignes\n\nCONSIGNE-MAISON.\n", 1);
+    assert!(
+        p::ecrire_fiche(
+            &i,
+            &p2,
+            "pitch",
+            Some(&origine.replacen("id: \"pitch\"", "id: \"autre\"", 1))
+        )
+        .is_err(),
+        "l'identifiant ne change pas"
+    );
+    p::ecrire_fiche(&i, &p2, "pitch", Some(&corrige)).unwrap();
+    assert!(
+        d.path()
+            .join("docs/atelier/parcours-2/.techniques/pitch.md")
+            .exists()
+    );
+    assert!(p::texte_fiche(&i, &p2, "pitch").unwrap().1);
+    assert!(
+        !p::texte_fiche(&i, p::DEFAUT, "pitch").unwrap().1,
+        "l'autre atelier garde l'origine"
+    );
+    let etat = p::etat(&i, &p2, "factice").unwrap();
+    assert!(
+        etat.etapes
+            .iter()
+            .find(|e| e.fiche.id == "pitch")
+            .unwrap()
+            .fiche_propre
+    );
+    p::ecrire_fiche(&i, &p2, "pitch", None).unwrap();
+    assert!(!p::texte_fiche(&i, &p2, "pitch").unwrap().1);
+}
+
+/// En express, seules les techniques cochées restent à faire ; repasser en complet les reprend toutes (EF-177).
+#[test]
+fn mode_de_tout_l_atelier() {
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(d.path().join("docs/projet")).unwrap();
+    let i = Index::ouvrir(d.path()).unwrap();
+    p::choisir_mode(&i, p::DEFAUT, "express", &["pitch".into(), "bilan".into()]).unwrap();
+    let e = p::etat(&i, p::DEFAUT, "factice").unwrap();
+    let etat_de = |id: &str| {
+        e.etapes
+            .iter()
+            .find(|x| x.fiche.id == id)
+            .unwrap()
+            .etat
+            .clone()
+    };
+    assert_eq!(e.mode, "express");
+    assert_eq!(etat_de("pitch"), "a_faire");
+    assert_eq!(etat_de("free-writing"), "sautee");
+    p::choisir_mode(&i, p::DEFAUT, "complet", &[]).unwrap();
+    let e = p::etat(&i, p::DEFAUT, "factice").unwrap();
+    assert!(
+        e.etapes
+            .iter()
+            .all(|x| x.etat == "a_faire" && x.mode == "complet")
+    );
+    p::pause_axe(&i, p::DEFAUT, "AXE-001", true).unwrap();
+    assert_eq!(
+        p::etat(&i, p::DEFAUT, "factice").unwrap().pauses,
+        vec!["AXE-001".to_string()]
+    );
+    p::pause_axe(&i, p::DEFAUT, "AXE-001", false).unwrap();
+    assert!(p::etat(&i, p::DEFAUT, "factice").unwrap().pauses.is_empty());
+}

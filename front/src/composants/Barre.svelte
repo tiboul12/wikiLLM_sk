@@ -1,26 +1,30 @@
 <script lang="ts">
   // Panneau latéral de la section active (EF-131, EF-140). Code : l'arbre des fichiers et le graphe.
-  // Projet : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), les plans, puis un
-  // groupe par type avec ⚙ (skill de structure) et, en orange, ce qui attend une relecture, compté jusqu'à
-  // l'accordéon ; les besoins en cascade avec leurs exigences et leurs tests (EF-160). Design thinking :
+  // Projet : la gestion en tête (backlog, ce qui attend une décision, favoris : EF-157), puis l'arbre des
+  // versions (ArbreVersions, EF-174, ADR-0018 : de la demande d'évolution aux tests) et les documents
+  // transverses ; en orange, ce qui attend une relecture, compté jusqu'au nœud. Design thinking :
   // les ateliers (numéro, statut, étapes, « + ») puis, à part, les clarifications par sujet (EF-161) et
-  // les artefacts. Git : l'historique, les branches et les tags (EF-166). Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
+  // les artefacts. Git : l'historique, la publication (REC-111), les branches et les tags (EF-166). Réception : l'arborescence des pages et les remarques, chacune avec la couleur de la
   // version qui a publié sa correction (EF-165).
   // Le titre mène à l'accueil de la section ; un bouton replie tout puis, pressé à nouveau, déplie tout ;
   // hors du code, les accordéons sont fermés à l'arrivée (EF-150) et seul celui de l'élément ouvert se
-  // déplie, centré.
-  // @relu 2026-10-19 eb4d041f
+  // déplie, centré. Les arborescences (pages de réception, cascade besoin → exigences → tests) se replient
+  // nœud par nœud, fermées à l'arrivée (REC-102).
+  // @relu 2026-10-24 4f29a45d
   import type { Projet } from "../types/Projet";
   import type { DocumentResume } from "../types/DocumentResume";
   import { routeur, url, estCourant } from "../lib/routeur.svelte";
   import { NOMS, type Section } from "../lib/sections.svelte";
   import { atelier, ETATS, ecrire, sujets, STATUTS_ATELIER } from "../lib/atelier.svelte";
   import { aller } from "../lib/routeur.svelte";
-  import { reception, remarquesDe, arbrePages, visible, couleurCommit, type Noeud } from "../lib/reception.svelte";
+  import { reception, remarquesDe, arbrePages, visible, type Noeud } from "../lib/reception.svelte";
   import { statique } from "../lib/statique";
   import { tick } from "svelte";
   import { api } from "../lib/api";
   import { aRelire as aRelireDe, tachesBacklog, favoris, basculerFavori, edition } from "../lib/edition.svelte";
+  import { rangerParVersion } from "../lib/versions";
+  import ArbreVersions from "./ArbreVersions.svelte";
+  import PastilleVersion from "./reception/PastilleVersion.svelte";
 
   let { projet, section }: { projet: Projet; section: Section } = $props();
   /** Documents d'une zone pour les groupes du panneau ; parcours et clarifications ont leur propre arbre et n'y sont pas répétés. */
@@ -83,10 +87,17 @@
     }
     return [...m.entries()].sort((a, b) => a[1].rang - b[1].rang);
   };
-  /** Groupes de documents de la zone qui correspond à la section affichée. */
-  const groupes = $derived(grouper(docsDe(section === "atelier" ? "atelier" : section === "reception" ? "reception" : "projet")));
-  /** Accueil de chaque section, sur lequel mène le titre du panneau. */
-  const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: () => url.atelier(atelier.parcours), reception: url.reception, git: () => url.git() };
+  /** Zone Projet rangée par version (EF-174, ADR-0018) : les versions, et ce qui n'en a pas. */
+  const rangement = $derived(section === "projet" ? rangerParVersion(projet.documents) : null);
+  /**
+   * Groupes de documents de la zone qui correspond à la section affichée ; en Projet, seulement les documents
+   * transverses (sans version), le reste étant dans l'arbre des versions.
+   */
+  const groupes = $derived(grouper(rangement ? rangement.transverses : docsDe(section === "atelier" ? "atelier" : "reception")));
+  /** Accueil de chaque section, sur lequel mène le titre du panneau.
+   * @relu 2026-10-24 09b47684
+   */
+  const ACCUEILS: Partial<Record<Section, () => string>> = { produit: url.produit, projet: url.projet, atelier: url.ateliers, reception: url.reception, git: () => url.git() };
 
   // Section Git (EF-166) : branches, branches distantes et tags ; un clic montre leur commit.
   /** Références git listées dans la section Git (EF-166) : branche courante, branches locales et distantes, tags. */
@@ -127,17 +138,6 @@
   /** Total de ce qui attend l'utilisateur : tâches, relectures, clarifications, remarques ; affiché sur « À traiter ». */
   const enAttente = $derived(taches.length + aRelire.length + ouvertes + remarquesAValider);
 
-  /** ⚙ d'un groupe : le skill qui dit comment ses documents sont structurés (REC-054, ADR-0017). */
-  const SKILL_DE: Record<string, string> = {
-    BDR: "wikik-structure-bdr",
-    "Cahier des charges": "wikik-structure-cahier-des-charges",
-    Besoins: "wikik-structure-besoin",
-    Exigences: "wikik-structure-exigence",
-    "Exigences non fonctionnelles": "wikik-structure-exigence",
-    "Décisions (ADR)": "wikik-structure-adr",
-    Specs: "wikik-structure-spec",
-    Tests: "wikik-structure-test",
-  };
   /** Identifiants à relire, pour colorer chaque lien du panneau sans reparcourir la liste. */
   const aRelireIds = $derived(new Set(aRelire.map((d) => d.id)));
 
@@ -267,12 +267,18 @@
     {#each noeuds as { page: p, enfants } (p.cle)}
       {@const href = url.pageReception(p.cle)}
       {@const n = remarquesDe(p.cle).filter((r) => r.statut === "ouverte").length}
-      <li>
+      {#snippet lien()}
         <a {href} class:actif={cleCourante === p.cle} title={p.route ?? p.nom}>
           {p.nom}
           {#if n}<span class="compteur faible">{n}</span>{/if}
         </a>
-        {#if enfants.length}{@render branche(enfants)}{/if}
+      {/snippet}
+      <li>
+        {#if enfants.length}
+          <details class="noeud"><summary>{@render lien()}</summary>{@render branche(enfants)}</details>
+        {:else}
+          {@render lien()}
+        {/if}
       </li>
     {/each}
   </ul>
@@ -289,12 +295,12 @@
   </div>
 
   {#if section === "git"}
-    <ul class="liens-section"><li><a href={url.git()} class:actif={actif(url.git())}>Historique</a></li></ul>
+    <ul class="liens-section"><li><a href={url.git()} class:actif={actif(url.git())}>Historique</a></li><li><a href={url.publication()} class:actif={actif(url.publication())}>Publication (skill)</a></li></ul>
     {#if refs}
       {#each [["Branches", refs.branches], ["Branches distantes", refs.distantes], ["Tags", refs.tags]] as [titre, liste] (titre)}
-        <details open={titre === "Branches"}>
+        <details open={titre !== "Tags"}>
           <summary>{titre} <small>{(liste as string[]).length}</small></summary>
-          <ul>{#each liste as string[] as r (r)}<li><a href={url.git({ ref: r })} title={r}>{r === refs.branche ? "● " : ""}{r}</a></li>{/each}</ul>
+          <ul>{#each liste as string[] as r (r)}<li><a href={url.git({ ref: r })} title={r === refs.branche ? `${r} (branche courante)` : r}>{r}</a></li>{/each}</ul>
         </details>
       {/each}
     {/if}
@@ -369,48 +375,63 @@
         {@render branche(arbre)}
       </details>
     {/if}
-    {#if section === "projet" && !groupes.some(([nom]) => nom === "Gestion")}{@render gestion([])}{/if}
+    {#if rangement}
+      {@render gestion(groupes.find(([nom]) => nom === "Gestion")?.[1].docs ?? [])}
+      <details class="arbre" open>
+        <summary>Versions <small>{rangement.versions.length}</small></summary>
+        <ArbreVersions versions={rangement.versions} {aRelireIds} />
+      </details>
+      {#if groupes.some(([nom]) => nom !== "Gestion")}<p class="titre-transverse">Transverse</p>{/if}
+    {/if}
     {#each groupes as [nom, g]}
       {#if nom === "Gestion" && section === "projet"}
-        {@render gestion(g.docs)}
+        <!-- déjà rendue en tête, avant les versions -->
       {:else}
       {@const attente = g.docs.filter((d) => aRelireIds.has(d.id)).length}
       <details>
         <summary>
           {nom} <small>{g.docs.length}</small>
           {#if attente}<span class="compteur faible" title="{attente} à relire">{attente}</span>{/if}
-          {#if section === "projet" && SKILL_DE[nom] && !statique}<a class="reglage" href={url.parametres() + "#skill-" + SKILL_DE[nom]} title="Comment sont structurés ces documents (skill {SKILL_DE[nom]})" aria-label="Structure de la section">⚙</a>{/if}
         </summary>
         <ul>
-          {#if nom === "Besoins" && section === "projet"}<li><a href={url.cascade()} class:actif={actif(url.cascade())} class="lien-cascade">Cascade : besoins → exigences → tests</a></li>{/if}
           {#each g.docs as d}
             {@const href = url.document(d.id)}
-            <li>
+            {@const es = d.genre === "besoin" ? projet.documents.filter((e) => e.besoins.includes(d.id)) : []}
+            {#snippet lienDoc()}
               <a {href} class:actif={actif(href)} title={d.titre}>
                 <span class="id">{d.id}</span> {d.titre === d.id ? "" : d.titre}
                 {#if aRelireIds.has(d.id)}<span class="compteur faible" title="à relire">●</span>{/if}
                 {#if d.genre === "remarque"}
                   {@const rq = reception.etat?.remarques.find((x) => x.id === d.id)}
-                  {@const c = couleurCommit(rq?.commit)}
-                  {#if c}<span class="compteur" style="color: {c.couleur}" title={c.libelle}>●</span>{:else if rq?.statut === "ouverte"}<span class="compteur faible" title="ouverte">○</span>{/if}
+                  {#if rq?.commit}<PastilleVersion commit={rq.commit} />{:else if rq?.statut === "ouverte"}<span class="compteur faible" title="ouverte">○</span>{/if}
                 {/if}
               </a>
-              {#if d.genre === "besoin"}
-                {@const es = projet.documents.filter((e) => e.besoins.includes(d.id))}
-                {#if es.length}
+            {/snippet}
+            <li>
+              {#if es.length}
+                <!-- Cascade repliable (REC-102) : besoin → exigences → tests. -->
+                <details class="noeud">
+                  <summary>{@render lienDoc()}</summary>
                   <ul>
                     {#each es as e (e.id)}
                       {@const he = url.document(e.id)}
                       {@const ts = projet.documents.filter((t) => t.genre === "test" && t.exigences.includes(e.id))}
+                      {#snippet lienEx()}<a href={he} class:actif={actif(he)} title={e.titre}><span class="id">{e.id}</span> {e.titre}{#if !ts.length}<span class="compteur" title="sans test">○</span>{/if}</a>{/snippet}
                       <li>
-                        <a href={he} class:actif={actif(he)} title={e.titre}><span class="id">{e.id}</span> {e.titre}{#if !ts.length}<span class="compteur" title="sans test">○</span>{/if}</a>
                         {#if ts.length}
-                          <ul>{#each ts as t (t.id)}{@const ht = url.document(t.id)}<li><a href={ht} class:actif={actif(ht)} title={t.titre}><span class="id">{t.id}</span> {t.titre}<span class="compteur" class:faible={t.validation !== "utilisateur" && t.validation !== "modele"}>{t.validation === "utilisateur" || t.validation === "modele" ? "✓" : t.validation === "echec" ? "✗" : "…"}</span></a></li>{/each}</ul>
+                          <details class="noeud">
+                            <summary>{@render lienEx()}</summary>
+                            <ul>{#each ts as t (t.id)}{@const ht = url.document(t.id)}<li><a href={ht} class:actif={actif(ht)} title={t.titre}><span class="id">{t.id}</span> {t.titre}<span class="compteur" class:faible={t.validation !== "utilisateur" && t.validation !== "modele"}>{t.validation === "utilisateur" || t.validation === "modele" ? "✓" : t.validation === "echec" ? "✗" : "…"}</span></a></li>{/each}</ul>
+                          </details>
+                        {:else}
+                          {@render lienEx()}
                         {/if}
                       </li>
                     {/each}
                   </ul>
-                {/if}
+                </details>
+              {:else}
+                {@render lienDoc()}
               {/if}
             </li>
           {/each}
