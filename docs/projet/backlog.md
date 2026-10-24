@@ -51,14 +51,15 @@ Refonte de wikiK en outil **Rust** (un seul binaire) : extracteur tree-sitter, i
 
 - [x] Traiter les 41 remarques (REC-042 à REC-082) : PLAN-v8 (branche `v8-retours`, partie de `v7-retours`), 10 phases, toutes traitées le 22/10.
 - [ ] **Recevoir la v8** (Tibo) : `make install`, relancer `wikik` (⏻ puis `wikik`), valider les remarques traitées (Traitement › À valider) et les tests restants (Projet › Cascade : TEST-007 modèles locaux, TEST-014 hors-sujet avec un vrai LLM, TEST-020 terminal).
-- [ ] **Fusionner** `v7-retours` puis `v8-retours` dans `master` une fois la réception faite ; poser le tag `v8.0-rc1`.
+- [x] **Fusionner** `v7-retours` puis `v8-retours` dans `master` (24/10, avec la v9).
 - [ ] **Relire** BDR-v8-1/2, CDC-v8, EF-150 à 168, ADR-0015 à 0017, et les 11 skills livrés (Paramètres › Prompts système).
 
 ## 🔁 v9 : retours de la réception du 24/10
 
 - [x] Traiter les 38 remarques ouvertes : PLAN-v9 (branche `v9-retours`, partie de `v8-retours`), 9 phases, toutes traitées le 24/10.
 - [ ] **Recevoir la v9** (Tibo) : `make install`, relancer `wikik`, valider les remarques (Traitement › À valider) et les tests TEST-021 à 036 restants (TEST-025 recherche par le sens : `ollama pull nomic-embed-text` sur la machine d'Ollama ; TEST-023 sur le téléphone).
-- [ ] **Fusionner** `v7-retours`, `v8-retours`, `v9-retours` dans `master` (skill `wikik-publication-git`, Git › Publication) ; poser les tags.
+- [x] **Fusionner** `v7-retours`, `v8-retours`, `v9-retours` dans `master` (`--no-ff`, 24/10).
+- [ ] **Taguer et pousser** `master` (tags `v7.0-rc1`, `v8.0-rc1`, `v9.0-rc1` à décider avec Tibo).
 - [ ] **Relire** BDR-v9-1/2, CDC-v9, EF-169 à 184.
 
 ## 🧩 Constats de la v1 à traiter
