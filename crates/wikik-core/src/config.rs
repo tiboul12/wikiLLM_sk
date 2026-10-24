@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Configuration d'un projet.
-/// @relu 2026-10-19 ca0ea310
+/// @relu 2026-10-24 875fe1a8
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -20,6 +20,27 @@ pub struct Config {
     pub serveur: ConfigServeur,
     pub reception: ConfigReception,
     pub ia: ConfigIa,
+    pub semantique: ConfigSemantique,
+}
+
+/// Section `[semantique]` : recherche par le sens (EF-173, ADR-0020), par les embeddings d'Ollama.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigSemantique {
+    /// Modèle d'embeddings d'Ollama.
+    pub modele: String,
+    /// Adresse d'Ollama ; vide : celle du connecteur Ollama, sinon celle de Shelley ou `localhost:11434`.
+    pub url: String,
+}
+
+impl Default for ConfigSemantique {
+    /// `nomic-embed-text`, à l'adresse d'Ollama déduite.
+    fn default() -> Self {
+        Self {
+            modele: "nomic-embed-text".into(),
+            url: String::new(),
+        }
+    }
 }
 
 /// Section `[ia]` : agent de développement (EF-147). Les consignes d'avant la v8 y restent lisibles, mais

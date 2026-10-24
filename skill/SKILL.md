@@ -38,7 +38,7 @@ description: >-
 
 Identifiant de symbole : `chemin/fichier.rs::Type::methode` ; un nom partiel (`methode`, `Type::methode`) suffit s'il est unique. Chaque sortie commence par `# … · ~N tokens`.
 
-Si le serveur MCP wikik est configuré (`claude mcp add wikik -- wikik mcp`, lancé depuis la racine du projet), utiliser ses outils `carte`, `fichier`, `symbole`, `impact`, `cherche`, `adr`, `exigence`, `perimes`, `ref`, `check` plutôt que le shell : mêmes sorties. Outils de l'atelier : `atelier`, `document`, et `atelier_rappel` quand un point du besoin est flou (voir `procedures/atelier.md`). Outils de réception : `pages` (écrans de l'application et leur code), `reception` (remarques de l'utilisateur à traiter) et `reception_traiter` (voir `procedures/reception.md`).
+Si le serveur MCP wikik est configuré (`claude mcp add wikik -- wikik mcp`, lancé depuis la racine du projet), utiliser ses outils `carte`, `fichier`, `symbole`, `impact`, `cherche`, `cherche_sens` (par le sens, quand on ne connaît pas les mots : embeddings d'Ollama), `adr`, `exigence`, `perimes`, `ref`, `check` plutôt que le shell : mêmes sorties. Outils de l'atelier : `atelier`, `document`, et `atelier_rappel` quand un point du besoin est flou (voir `procedures/atelier.md`). Outils de réception : `pages` (écrans de l'application et leur code), `reception` (remarques de l'utilisateur à traiter) et `reception_traiter` (voir `procedures/reception.md`).
 
 Si `wikik` n'est pas dans le PATH : `make install` depuis le dépôt wikiK.
 

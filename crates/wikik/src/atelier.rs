@@ -24,8 +24,9 @@ use wikik_core::atelier::parcours;
 
 /// Routes de l'atelier (état, pilotage, propositions, décisions, saisies, synthèses, rappel, parcours,
 /// clarifications, modification d'un atelier : EF-161), la fiche de chaque technique pour un atelier, son mode et
-/// la pause d'un axe (EF-177 à EF-179, ADR-0019), la recherche assistée par IA (EF-152) et l'annulation des appels
-/// au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
+/// la pause d'un axe (EF-177 à EF-179, ADR-0019), la recherche assistée par IA (EF-152) et par le sens (EF-173,
+/// ADR-0020), et l'annulation des appels au LLM. Chaque écriture d'un parcours porte `parcours` (`PARCOURS` par défaut, EF-145).
+/// @relu 2026-10-24 3f10a1ba
 pub(crate) fn routes() -> Router<Partage> {
     Router::new()
         .route("/api/atelier/etat", get(api_etat))
@@ -44,6 +45,7 @@ pub(crate) fn routes() -> Router<Partage> {
         .route("/api/atelier/synthetiser", post(api_synthetiser))
         .route("/api/atelier/rappel", post(api_rappel))
         .route("/api/recherche/ia", post(api_recherche_ia))
+        .route("/api/recherche/sens", post(api_recherche_sens))
         .route(
             "/api/atelier/fiche",
             get(api_lire_fiche).post(api_ecrire_fiche),
@@ -145,6 +147,26 @@ async fn api_recherche_ia(State(e): State<Partage>, Json(c): Json<CorpsRecherche
             jeton: Some(jeton),
         })?;
         Ok(reponse.elements)
+    })
+    .await;
+    resultat(r)
+}
+
+/// Recherche par le sens (EF-173, ADR-0020) : les morceaux sont lus sous le verrou de l'index, les vecteurs calculés
+/// et comparés hors du verrou (le wiki reste lisible pendant le premier calcul).
+async fn api_recherche_sens(State(e): State<Partage>, Json(c): Json<CorpsRechercheIa>) -> Response {
+    let r = tokio::task::spawn_blocking(move || -> Result<Vec<wikik_core::semantique::Trouve>> {
+        use wikik_core::semantique;
+        let (morceaux, base, ollama) = {
+            let mut i = e.index.lock().unwrap_or_else(|x| x.into_inner());
+            i.mettre_a_jour()?;
+            (
+                semantique::morceaux(&i)?,
+                semantique::chemin(&i.racine),
+                semantique::Ollama::depuis(&i.config),
+            )
+        };
+        semantique::chercher(&base, &morceaux, &ollama, &c.question, 20)
     })
     .await;
     resultat(r)

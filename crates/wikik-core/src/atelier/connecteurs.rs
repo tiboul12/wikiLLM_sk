@@ -214,6 +214,16 @@ fn commande(config: &ConfigLlm, defaut: &str) -> String {
     }
 }
 
+/// Adresse d'Ollama pour les embeddings (ADR-0020) : celle du connecteur s'il est réglé sur Ollama, sinon celle de
+/// Shelley ou `localhost:11434`.
+pub fn adresse_ollama(config: &ConfigLlm) -> String {
+    if config.connecteur() == "ollama" {
+        url(config, "ollama")
+    } else {
+        adresses_shelley().0
+    }
+}
+
 /// Adresse de l'API : celle de la configuration sans `/` final, sinon celle par défaut du connecteur.
 fn url(config: &ConfigLlm, id: &str) -> String {
     let u = config.url.trim().trim_end_matches('/');

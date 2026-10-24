@@ -1,8 +1,9 @@
 <script lang="ts">
   // Champ à recherche dynamique (EF-172, REC-113) : les éléments qui correspondent s'affichent sous le champ au fil
   // de la frappe, triés par la recherche floue ; ↑ ↓ pour choisir, Entrée ou clic pour valider, Échap pour fermer.
-  // `choisir` reçoit l'élément retenu, ou le texte saisi tel quel quand rien n'est sélectionné.
-  import { chercher, type Cherchable } from "../lib/floue";
+  // `choisir` reçoit l'élément retenu, ou le texte saisi tel quel quand rien n'est sélectionné (Entrée sans avoir
+  // choisi au clavier) ; un texte égal à un identifiant, à la casse près, vaut cet élément.
+  import { chercher, normaliser, type Cherchable } from "../lib/floue";
 
   let {
     elements,
@@ -14,24 +15,27 @@
 
   /** Liste ouverte sous le champ. */
   let ouverte = $state(false);
-  /** Rang de l'élément surligné au clavier. */
-  let rang = $state(0);
+  /** Rang de l'élément surligné au clavier ; -1 : aucun, Entrée valide le texte saisi. */
+  let rang = $state(-1);
   /** Éléments qui correspondent au texte saisi. */
   const resultats = $derived(valeur.trim() ? chercher(valeur, elements) : []);
   $effect(() => {
     resultats;
-    rang = 0;
+    rang = -1;
   });
 
-  /** Valide l'élément `e`, ou le texte si aucun ne correspond. */
+  /** Valide l'élément `e`, celui surligné, celui dont l'identifiant est le texte saisi, ou à défaut le texte. */
   function valider(e?: Cherchable) {
     ouverte = false;
-    choisir(e ?? resultats[rang] ?? valeur.trim());
+    const exact = resultats.find((x) => normaliser(x.id) === normaliser(valeur));
+    choisir(e ?? resultats[rang] ?? exact ?? valeur.trim());
   }
-  /** Navigation au clavier dans la liste. */
+  /** Navigation au clavier dans la liste.
+   * @relu 2026-10-24 6f1cee04
+   */
   function clavier(ev: KeyboardEvent) {
     if (ev.key === "ArrowDown") rang = Math.min(rang + 1, resultats.length - 1);
-    else if (ev.key === "ArrowUp") rang = Math.max(rang - 1, 0);
+    else if (ev.key === "ArrowUp") rang = Math.max(rang - 1, -1);
     else if (ev.key === "Enter") valider();
     else if (ev.key === "Escape") ouverte = false;
     else return;
